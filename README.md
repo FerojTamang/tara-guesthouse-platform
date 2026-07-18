@@ -26,4 +26,4 @@ Modular MVC
 
 Author
 
-Your Company Name
+Tivrasoft IT Training Center
