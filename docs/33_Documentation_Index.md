@@ -3,272 +3,93 @@
 ## Project Information
 
 | Item | Details |
-|------|---------|
-| **Project** | Tara Guest House Management System |
-| **Document** | Documentation Index |
-| **Document No.** | 33 |
-| **Version** | 1.0 |
-| **Status** | Approved |
-| **Prepared By** | fero.dev |
-| **Project Owner** | Feroj |
-| **Date** | July 2026 |
-
----
+|---|---|
+| Project | Tara Guest House Management System |
+| Document number | 33 |
+| Version | 1.1 |
+| Status | Synchronized — Project Manager review required |
+| Authority | `00_V1_ARCHITECT_DECISIONS.md` |
+| Date | 20 July 2026 |
 
 # 1. Purpose
 
-This document serves as the official master index for all documentation associated with the Tara Guest House Management System.
+This is the master inventory and reading map for the preserved 38-document project suite. Filenames and titles below match the repository. “Synchronized” means aligned to the approved Version 1 architect decisions; it does not claim that application code exists or that implementation testing has passed.
 
-Its objectives are to:
+# 2. Authority and Scope
 
-- Maintain a complete document inventory.
-- Provide a centralized reference.
-- Simplify document navigation.
-- Support onboarding activities.
-- Assist audits and reviews.
-- Ensure documentation completeness.
+When documents conflict, follow the authority order in `00_V1_ARCHITECT_DECISIONS.md` DEC-031. Future-ready material remains useful only when clearly labeled **Future Enhancements**. Database migrations are the executable database source of truth; versioned `/api/v1/...` route contracts are authoritative for JSON endpoints.
 
----
+# 3. Master Document Register
 
-# 2. Introduction
+| No. | Filename | Document title | Synchronization status |
+|---:|---|---|---|
+| 01 | `01_Project_Overview.md` | Project Overview | Synchronized; review required |
+| 02 | `02_Client_Requirements.md` | Client Requirements Specification | Synchronized; review required |
+| 03 | `03_Team_Organization.md` | Team Organization & Responsibilities | Synchronized; review required |
+| 04 | `04_Project_Architecture.md` | Project Architecture | Synchronized; review required |
+| 05 | `05_Folder_Structure.md` | Folder Structure & Development Standards | Synchronized; review required |
+| 06 | `06_Coding_Standards.md` | Coding Standards & Best Practices | Synchronized; review required |
+| 07 | `07_Git_Workflow.md` | Git Workflow & Version Control | Synchronized; review required |
+| 08 | `08_Database_Design.md` | Database Design | Synchronized; review required |
+| 09 | `09_ER_Diagram.md` | Entity Relationship Diagram | Synchronized; review required |
+| 10 | `10_Database_Dictionary.md` | Database Dictionary | Synchronized; migration verification required |
+| 11 | `11_Booking_System_Specification.md` | Booking System Specification | Synchronized; review required |
+| 12 | `12_Room_Management_Specification.md` | Room Management Specification | Synchronized; review required |
+| 13 | `13_Activity_Management_Specification.md` | Activity Management Specification | Synchronized; review required |
+| 14 | `14_Gallery_Management_Specification.md` | Gallery Management Specification | Synchronized; review required |
+| 15 | `15_Content_Management_System.md` | Content Management System Specification | Synchronized; review required |
+| 16 | `16_Authentication_Authorization_System.md` | Authentication & Authorization System Specification | Synchronized; review required |
+| 17 | `17_Admin_Dashboard_Specification.md` | Admin Dashboard Specification | Synchronized; review required |
+| 18 | `18_Review_Rating_System.md` | Review & Rating System Specification | Synchronized; review required |
+| 19 | `19_Payment_Management_System.md` | Payment Management System Specification | Synchronized; review required |
+| 20 | `20_Notification_System.md` | Notification System Specification | Synchronized; review required |
+| 21 | `21_Business_Process_Flow.md` | Business Process Flow | Synchronized; review required |
+| 22 | `22_System_State_Machine.md` | System State Machine | Canonical V1 model; pre-decision proposals archived |
+| 23 | `23_REST_API_Specification.md` | REST API Specification | Synchronized; route-map verification required |
+| 24 | `24_Frontend_Architecture.md` | Frontend Architecture | Synchronized; review required |
+| 25 | `25_Backend_Architecture.md` | Backend Architecture | Synchronized; review required |
+| 26 | `26_Deployment_Guide.md` | Deployment Guide | Synchronized to cPanel; host verification required |
+| 27 | `27_Testing_Strategy.md` | Testing Strategy | Synchronized; test IDs pending implementation |
+| 28 | `28_User_Manual.md` | User Manual | Synchronized; implementation screenshots pending |
+| 29 | `29_Developer_Guide.md` | Developer Guide | Synchronized; review required |
+| 30 | `30_Maintenance_Manual.md` | Maintenance Manual | Synchronized; hosting verification required |
+| 31 | `31_Framework_Architecture.md` | Framework Architecture | Synchronized; review required |
+| 32 | `32_Project_Implementation_Plan.md` | Project Implementation Plan | Synchronized to approved phase order |
+| 33 | `33_Documentation_Index.md` | Documentation Index | Synchronized |
+| 34 | `34_UI_UX_Screen_Specification.md` | UI/UX Screen Specification | Synchronized; deferred portal retained as future |
+| 35 | `35_Requirements_Traceability_Matrix.md` | Requirements Traceability Matrix | Synchronized baseline; implementation/test IDs pending |
+| 36 | `36_Architecture_Review_Report.md` | Architecture Review Report | Superseded readiness claims corrected |
+| 37 | `37_Sprint_1_Readiness_Report.md` | Sprint 1 Readiness Report | Reassessment required after review |
+| 38 | `38_Development_Handbook.md` | Development Handbook | Renamed and synchronized; review required |
 
-The Tara Guest House Management System documentation suite has been developed to provide comprehensive coverage of all aspects of the project.
+# 4. Governance and Audit Documents
 
-The documentation includes:
+These files support, but do not alter, the preserved 38-document numbering:
 
-- Business Documentation
-- Requirements Documentation
-- Architecture Documentation
-- Database Documentation
-- Development Documentation
-- Testing Documentation
-- Deployment Documentation
-- Operations Documentation
+| Filename | Purpose | Status |
+|---|---|---|
+| `00_V1_ARCHITECT_DECISIONS.md` | Authoritative Version 1 decisions | Approved |
+| `DOCUMENTATION_CONSISTENCY_AUDIT.md` | Pre-synchronization findings | Historical baseline; superseded by final audit |
+| `DOCUMENTATION_SYNCHRONIZATION_REPORT.md` | Synchronization change record | Created after synchronization |
+| `FINAL_DOCUMENTATION_CONSISTENCY_AUDIT.md` | Post-synchronization verification | Created after synchronization |
+| `archive/22_PreDecision_State_Machine_Proposals.md` | Historical pre-decision state proposals | Archived; not an implementation source |
 
-This index serves as the authoritative source for locating and referencing project documentation.
+# 5. Recommended Reading Order
 
----
+1. `00_V1_ARCHITECT_DECISIONS.md`
+2. `01_Project_Overview.md` and `02_Client_Requirements.md`
+3. Relevant module specification from documents 11–20
+4. `08_Database_Design.md`, `09_ER_Diagram.md`, `10_Database_Dictionary.md`, and the relevant migrations
+5. `22_System_State_Machine.md` and `23_REST_API_Specification.md`
+6. `04_Project_Architecture.md`, `24_Frontend_Architecture.md`, `25_Backend_Architecture.md`, and `31_Framework_Architecture.md`
+7. `05_Folder_Structure.md`, `06_Coding_Standards.md`, `07_Git_Workflow.md`, and `38_Development_Handbook.md`
+8. `27_Testing_Strategy.md`, `35_Requirements_Traceability_Matrix.md`, and the applicable ticket/acceptance criteria
+9. `26_Deployment_Guide.md` and `30_Maintenance_Manual.md`
 
-# 3. Documentation Categories
+# 6. Documentation Status
 
-| Category | Description |
-|---------|-------------|
-| Business | Project and Requirements Documents |
-| Architecture | System Design Documents |
-| Database | ERD and Schema Documents |
-| Development | Coding and Development Standards |
-| Testing | Quality Assurance Documents |
-| Deployment | Deployment and Maintenance Documents |
-| Operations | User and Maintenance Guides |
+The suite has been synchronized to the approved Version 1 decisions. Project Manager and Technical Architect review is still required before marking every document Approved. Implementation, executable migrations, route registration, automated tests, UAT, and deployment verification remain future project work and must not be implied by documentation approval.
 
----
+# 7. Future Documentation
 
-# 4. Master Document Register
-
-| No. | Document Name | Status |
-|----|-----------------------------|--------|
-| 01 | Project Charter | Approved |
-| 02 | Vision & Scope Document | Approved |
-| 03 | Business Requirements Document | Approved |
-| 04 | Project Architecture | Approved |
-| 05 | Folder Structure & Development Standards | Approved |
-| 06 | Functional Requirements Specification | Approved |
-| 07 | Non-Functional Requirements Specification | Approved |
-| 08 | Database Design Document | Approved |
-| 09 | Entity Relationship Diagram (ERD) | Approved |
-| 10 | Use Case Specification | Approved |
-| 11 | User Stories Document | Approved |
-| 12 | Activity Diagram Document | Approved |
-| 13 | Sequence Diagram Document | Approved |
-| 14 | Class Diagram Document | Approved |
-| 15 | State Diagram Document | Approved |
-| 16 | Component Diagram Document | Approved |
-| 17 | Deployment Diagram Document | Approved |
-| 18 | Security Requirements Specification | Approved |
-| 19 | UI/UX Specification | Approved |
-| 20 | Coding Standards | Approved |
-| 21 | Database Migration Strategy | Approved |
-| 22 | API Design Guidelines | Approved |
-| 23 | REST API Specification | Approved |
-| 24 | Frontend Architecture | Approved |
-| 25 | Backend Architecture | Approved |
-| 26 | Deployment Guide | Approved |
-| 27 | Testing Strategy | Approved |
-| 28 | User Manual | Approved |
-| 29 | Developer Guide | Approved |
-| 30 | Maintenance Manual | Approved |
-| 31 | Framework Architecture | Approved |
-| 32 | Project Implementation Plan | Approved |
-| 33 | Documentation Index | Approved |
-
----
-
-# 5. Documentation Statistics
-
-## Summary
-
-| Metric | Value |
-|------|------|
-| Total Documents | 33 |
-| Approved Documents | 33 |
-| Pending Documents | 0 |
-| Draft Documents | 0 |
-| Completion Percentage | 100% |
-
----
-
-## Documentation Coverage
-
-```text
-Requirements         : Complete
-Architecture         : Complete
-Database             : Complete
-Development          : Complete
-Testing              : Complete
-Deployment           : Complete
-Operations           : Complete
-Maintenance          : Complete
-Implementation Plan  : Complete
-```
-
----
-
-# 6. Recommended Reading Order
-
-New team members should review documents in the following order:
-
-### Phase 1: Project Understanding
-
-```text
-01 Project Charter
-02 Vision & Scope
-03 Business Requirements
-06 Functional Requirements
-07 Non-Functional Requirements
-```
-
----
-
-### Phase 2: Architecture
-
-```text
-04 Project Architecture
-24 Frontend Architecture
-25 Backend Architecture
-31 Framework Architecture
-```
-
----
-
-### Phase 3: Database
-
-```text
-08 Database Design
-09 ER Diagram
-21 Database Migration Strategy
-```
-
----
-
-### Phase 4: Development
-
-```text
-05 Folder Structure
-20 Coding Standards
-22 API Design Guidelines
-23 REST API Specification
-29 Developer Guide
-```
-
----
-
-### Phase 5: Operations
-
-```text
-26 Deployment Guide
-27 Testing Strategy
-28 User Manual
-30 Maintenance Manual
-32 Project Implementation Plan
-```
-
----
-
-# 7. Document Ownership
-
-| Document Category | Owner |
-|------------------|------|
-| Business Documents | Feroj |
-| Architecture Documents | fero.dev |
-| Development Documents | Development Team |
-| Testing Documents | QA Team |
-| Operations Documents | Support Team |
-
----
-
-# 8. Document Control
-
-## Versioning Rules
-
-- Major changes increment the major version.
-- Minor updates increment the minor version.
-- All revisions must be documented.
-- Previous versions should be archived.
-
----
-
-## Review Frequency
-
-| Document Type | Frequency |
-|--------------|-----------|
-| Requirements | As Needed |
-| Architecture | Quarterly |
-| Security | Quarterly |
-| Deployment | Quarterly |
-| Maintenance | Quarterly |
-
----
-
-# 9. Future Documentation
-
-Future versions of the project may require additional documents.
-
-Examples include:
-
-```text
-- Mobile Application Architecture
-- SaaS Architecture
-- Cloud Infrastructure Guide
-- Multi-Hotel Design Specification
-- Payment Gateway Integration Guide
-- Kubernetes Deployment Guide
-```
-
----
-
-# 10. Conclusion
-
-The Documentation Index serves as the official master reference for all documentation related to the Tara Guest House Management System.
-
-This documentation suite provides:
-
-- Complete Project Coverage
-- Enterprise-Level Standards
-- Comprehensive Technical Guidance
-- Operational Procedures
-- Development Standards
-- Maintenance Processes
-
-The Tara Guest House Management System documentation is considered complete and ready for development, deployment, and future expansion.
-
----
-
-# Document Approval
-
-| Role | Name | Status |
-|------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
-| Development Team | Approved |
-| QA Team | Approved |
-| Stakeholders | Approved |
+Future versions may add dedicated guides for customer accounts/portal, multi-room bookings, gateway integrations, additional staff permission systems, mobile clients, SMS/WhatsApp/push, VPS/cloud/Docker infrastructure, and full CMS version history. Such documents must be approved before those capabilities enter implementation scope.

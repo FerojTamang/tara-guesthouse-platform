@@ -2,821 +2,167 @@
 
 # 22. System State Machine
 
----
+## Document Control
 
-# Document Control
-
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | System State Machine |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
-
----
-
-# Change Log
-
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Enterprise State Machine Specification |
-
----
-
-# Table of Contents
-
-1. Purpose
-2. State Machine Standards
-3. Booking State Machine
-4. Payment State Machine
-5. Room State Machine
-6. Review State Machine
-7. Contact Message State Machine
-8. Notification State Machine
-9. Gallery State Machine
-10. Activity State Machine
-11. User Account State Machine
-12. General Transition Rules
-13. Audit Requirements
-14. API Impact
-15. Database Impact
-16. Related Documents
-
----
+| Field | Value |
+|---|---|
+| Version | 1.2 |
+| Status | Synchronized — Review Required |
+| Authority | `00_V1_ARCHITECT_DECISIONS.md` |
+| Historical proposals | `archive/22_PreDecision_State_Machine_Proposals.md` |
 
 # 1. Purpose
 
-This document defines every valid state transition used throughout the Tara Guest House Management System.
+This document contains the only active Version 1 state models. Payment progress is not represented as booking states. Room availability and occupancy are calculated conditions, not room operational states.
 
-The objective is to ensure that every developer implements identical business logic while preventing invalid workflow transitions.
+# 2. Booking State Machine
 
-This document acts as the primary reference for:
+## 2.1 States
 
-- Backend Developers
-- Frontend Developers
-- QA Engineers
-- Project Managers
-- Future Developers
+| State | Meaning | Blocks overlapping dates |
+|---|---|---|
+| `pending` | Booking created and awaiting payment verification or Administrator decision | Yes, until `confirmation_deadline_at` expires |
+| `confirmed` | Required payment verified and reservation confirmed | Yes |
+| `checked_in` | Guest has arrived | Yes |
+| `checked_out` | Guest has departed successfully | No |
+| `cancelled` | Booking cancelled with timestamp and reason | No |
+| `rejected` | Booking rejected with timestamp and reason | No |
 
----
+`checked_out`, `cancelled`, and `rejected` are terminal. Version 1 does not use `completed` or workflow `archived` as booking states.
 
-# 2. State Machine Standards
+## 2.2 Allowed Transitions
 
-Every state transition shall follow these principles.
+| Current | Next | Authority | Required data/effect |
+|---|---|---|---|
+| new record | `pending` | Booking Service | One room, guest snapshot, policy acceptance, deadline, event history |
+| `pending` | `confirmed` | Booking Service after Payment Service reports a verified payment | `confirmed_at`; append booking event |
+| `pending` | `rejected` | Administrator through Booking Service | `rejected_at`, reason; append event |
+| `pending` | `cancelled` | Administrator or expiry rule through Booking Service | `cancelled_at`, reason; append event |
+| `confirmed` | `checked_in` | Administrator through Booking Service | `checked_in_at`; append event |
+| `confirmed` | `cancelled` | Administrator through Booking Service | `cancelled_at`, reason; append event |
+| `checked_in` | `checked_out` | Administrator through Booking Service | `checked_out_at`; append event; create review invitation event/process |
 
-- Every transition must be valid.
-- Every transition must be logged.
-- Invalid transitions shall be rejected.
-- State history shall never be deleted.
-- State changes shall record timestamp.
-- State changes shall record responsible user.
-- Automatic transitions shall record "System" as actor.
+All other booking transitions are forbidden. Only the Booking Service changes `booking_status`.
 
----
+## 2.3 Expired Pending Bookings
 
-# 3. Booking State Machine
+When `confirmation_deadline_at` passes, the pending booking no longer blocks availability. The approved expiry process may transition it to `cancelled` with a recorded expiry reason. The exact deadline and execution interval require an approved configuration/ticket.
 
-## Purpose
+# 3. Payment State Machine
 
-Defines the lifecycle of a hotel reservation from creation until archival.
+## 3.1 States
 
----
+| State | Meaning |
+|---|---|
+| `pending` | Canonical reserved value; no active V1 endpoint creates an incomplete attempt |
+| `submitted` | Guest supplied details/proof for Administrator review |
+| `verified` | Administrator accepted the attempt |
+| `rejected` | Administrator did not accept the submitted attempt |
+| `refunded` | Canonical reserved state; implementation is blocked until refund policy/data fields are approved |
 
-## Booking Lifecycle
+## 3.2 Allowed Transitions
 
-Draft
+| Current | Next | Authority | Required data/effect |
+|---|---|---|---|
+| new attempt | `submitted` | Payment Service after complete secure Guest submission | Booking/method/amount/reference/proof validation; `submitted_at` |
+| `submitted` | `verified` | Administrator through Payment Service | Verification actor/time/note; notify Booking Service |
+| `submitted` | `rejected` | Administrator through Payment Service | Rejection actor/time/note |
 
-↓
+A rejected payment record remains rejected. Resubmission creates a new attempt; it does not reset the rejected row. Rejecting an attempt does not reject the booking. Only the Payment Service changes `payment_status`.
 
-Pending Payment
+There is no active Version 1 transition into `refunded`. Full-versus-partial behavior, authority, accounting treatment and persistence fields are **Architect/Client Confirmation Required**; a later approved update must add the transition and exact data contract together.
 
-↓
+# 4. Room Operational State
 
-Payment Submitted
+## 4.1 Stored Values
 
-↓
+- `active`
+- `maintenance`
+- `inactive`
 
-Payment Verified
+| Transition | Authority | Effect |
+|---|---|---|
+| `active` → `maintenance` | Administrator through Room Service | Room unavailable for all requested dates |
+| `maintenance` → `active` | Administrator through Room Service | Room may be offered if published and no booking blocks dates |
+| `active` → `inactive` | Administrator through Room Service | Room disabled but retained for history |
+| `maintenance` → `inactive` | Administrator through Room Service | Room disabled but retained for history |
+| `inactive` → `active` | Administrator through Room Service | Room may be offered after publication and availability checks |
+| `inactive` → `maintenance` | Administrator through Room Service | Room remains unavailable |
 
-↓
+## 4.2 Calculated Conditions
 
-Confirmed
+- **Available for a date range:** active, published for public search, within capacity, and no unexpired blocking booking overlaps.
+- **Reserved for a date range:** a `pending` or `confirmed` booking blocks the range.
+- **Currently occupied:** a `checked_in` booking covers the current stay.
 
-↓
+These are query results and must not be written to `rooms.operational_status`. Check-in and checkout update the booking only.
 
-Checked In
+# 5. Room Publication
 
-↓
+Publication is a boolean independent of operational status:
 
-Checked Out
+| Current | Next | Authority |
+|---|---|---|
+| unpublished | published | Administrator through Room Service |
+| published | unpublished | Administrator through Room Service |
 
-↓
-
-Completed
-
-↓
-
-Archived
-
----
-
-## State Definitions
-
-| State | Description |
-|--------|-------------|
-| Draft | Reservation form started but not submitted |
-| Pending Payment | Reservation created and awaiting payment |
-| Payment Submitted | Guest uploaded payment proof |
-| Payment Verified | Administrator approved payment |
-| Confirmed | Reservation officially confirmed |
-| Checked In | Guest has checked into hotel |
-| Checked Out | Guest has checked out |
-| Completed | Reservation successfully completed |
-| Archived | Historical record retained |
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor | API | Database | Audit |
-|---------------|------------|------|-----|----------|-------|
-| Draft | Pending Payment | Guest | POST /bookings | bookings | Yes |
-| Pending Payment | Payment Submitted | Guest | POST /payments | payments | Yes |
-| Payment Submitted | Payment Verified | Admin | POST /payments/{id}/verify | payments | Yes |
-| Payment Verified | Confirmed | System | Internal | bookings | Yes |
-| Confirmed | Checked In | Admin | POST /checkin | bookings, rooms | Yes |
-| Checked In | Checked Out | Admin | POST /checkout | bookings, rooms | Yes |
-| Checked Out | Completed | System | Internal | bookings | Yes |
-| Completed | Archived | System | Scheduled Job | bookings | Yes |
-
----
-
-## Invalid State Transitions
-
-| Invalid Transition | Reason |
-|--------------------|--------|
-| Draft → Checked In | Reservation incomplete |
-| Draft → Completed | Booking not created |
-| Pending Payment → Checked Out | Payment missing |
-| Confirmed → Pending Payment | Invalid rollback |
-| Completed → Confirmed | Booking already closed |
-| Archived → Checked In | Archived records are read-only |
-
----
-
-## UI Behaviour
-
-| State | Guest Actions | Admin Actions |
-|--------|---------------|---------------|
-| Pending Payment | Upload Payment | Cancel Booking |
-| Payment Submitted | View Status | Verify / Reject |
-| Confirmed | View Booking | Check-In |
-| Checked In | View Booking | Check-Out |
-| Completed | Leave Review | View History |
-| Archived | View History | View History |
-
----
-
-## Notification Triggers
-
-| State Change | Notification |
-|--------------|-------------|
-| Pending Payment | Payment Instructions |
-| Payment Submitted | Notify Administrator |
-| Payment Verified | Payment Approved |
-| Confirmed | Booking Confirmation |
-| Checked In | Welcome Notification |
-| Completed | Review Invitation |
-
----
-
-## Business Rules
-
-- Reservation reference must be unique.
-- Booking cannot skip required states.
-- Booking status history shall be preserved permanently.
-- Every booking must reference an existing room.
-- Only administrators may perform Check-In and Check-Out.
-- Archived bookings are read-only.
-
----
-
-# 4. Payment State Machine
-
-## Purpose
-
-Defines every stage of payment verification.
-
----
-
-## Payment Lifecycle
-
-Awaiting Payment
-
-↓
-
-Payment Submitted
-
-↓
-
-Under Verification
-
-↓
-
-Verified
-
-↓
-
-Invoice Generated
-
-↓
-
-Completed
-
-OR
-
-Rejected
-
-OR
-
-Refunded
-
----
-
-## State Definitions
-
-| State | Description |
-|--------|-------------|
-| Awaiting Payment | Guest has not yet submitted payment |
-| Payment Submitted | Voucher uploaded |
-| Under Verification | Admin reviewing payment |
-| Verified | Payment approved |
-| Invoice Generated | Invoice created |
-| Completed | Payment finished |
-| Rejected | Payment rejected |
-| Refunded | Payment refunded |
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor | API | Database | Audit |
-|---------------|------------|------|-----|----------|-------|
-| Awaiting Payment | Payment Submitted | Guest | POST /payments | payments | Yes |
-| Payment Submitted | Under Verification | System | Internal | payments | Yes |
-| Under Verification | Verified | Admin | POST /payments/{id}/verify | payments | Yes |
-| Under Verification | Rejected | Admin | POST /payments/{id}/reject | payments | Yes |
-| Verified | Invoice Generated | System | Internal | invoices | Yes |
-| Invoice Generated | Completed | System | Internal | payments | Yes |
-| Completed | Refunded | Admin | POST /refund | refunds | Yes |
-
----
-
-## Invalid Transitions
-
-| Invalid Transition | Reason |
-|--------------------|--------|
-| Awaiting Payment → Verified | Verification skipped |
-| Rejected → Verified | Requires new payment |
-| Refunded → Verified | Closed transaction |
-| Completed → Awaiting Payment | Invalid rollback |
-
----
-
-## Business Rules
-
-- Every payment belongs to one booking.
-- Duplicate transaction IDs are prohibited.
-- Payment proof cannot be modified after verification.
-- All payment actions shall be audited.
-- Refunds require administrator approval.
-
----
-
-## Notification Triggers
-
-| Event | Recipient |
-|-------|-----------|
-| Payment Submitted | Administrator |
-| Payment Verified | Guest |
-| Payment Rejected | Guest |
-| Invoice Generated | Guest |
-| Refund Completed | Guest |
-
----
-
-# End of Part 1
-
-The following sections continue in Part 2:
-
-- Room State Machine
-- Review State Machine
-- Contact Message State Machine
-- Notification State Machine
-- Gallery State Machine
-- Activity State Machine
-- User Account State Machine
-- General Transition Rules
-- Audit Requirements
-- API Impact
-- Database Impact
-- Related Documents
-
----
-
-# 5. Room State Machine
-
-## Purpose
-
-Defines the lifecycle of a room from creation until retirement.
-
----
-
-## Room Lifecycle
-
-Draft
-
-↓
-
-Ready for Review
-
-↓
-
-Published
-
-↓
-
-Available
-
-↓
-
-Reserved
-
-↓
-
-Occupied
-
-↓
-
-Cleaning
-
-↓
-
-Maintenance (Optional)
-
-↓
-
-Available
-
-OR
-
-Retired
-
----
-
-## State Definitions
-
-| State | Description |
-|--------|-------------|
-| Draft | Room record created but incomplete |
-| Ready for Review | Room information completed and awaiting approval |
-| Published | Room is visible on the website |
-| Available | Room can be booked |
-| Reserved | Room is reserved by a guest |
-| Occupied | Guest has checked in |
-| Cleaning | Room is being prepared for the next guest |
-| Maintenance | Room temporarily unavailable due to maintenance |
-| Retired | Room permanently removed from service |
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor | API | Database | Audit |
-|---------------|------------|------|-----|----------|-------|
-| Draft | Ready for Review | Admin | PUT /rooms/{id} | rooms | Yes |
-| Ready for Review | Published | Admin | POST /rooms/{id}/publish | rooms | Yes |
-| Published | Available | System | Internal | rooms | Yes |
-| Available | Reserved | System | POST /bookings | rooms | Yes |
-| Reserved | Occupied | Admin | POST /checkin | rooms | Yes |
-| Occupied | Cleaning | Admin | POST /checkout | rooms | Yes |
-| Cleaning | Available | Housekeeping/Admin | POST /rooms/{id}/ready | rooms | Yes |
-| Available | Maintenance | Admin | POST /rooms/{id}/maintenance | rooms | Yes |
-| Maintenance | Available | Admin | POST /rooms/{id}/maintenance/complete | rooms | Yes |
-| Available | Retired | Admin | DELETE /rooms/{id} (Soft Delete) | rooms | Yes |
-
----
-
-## Invalid State Transitions
-
-| Invalid Transition | Reason |
-|--------------------|--------|
-| Available → Occupied | Must be reserved first |
-| Occupied → Available | Cleaning required |
-| Maintenance → Reserved | Room unavailable |
-| Retired → Available | Retired rooms are read-only |
-
----
-
-## Business Rules
-
-- Only available rooms may be booked.
-- A room under maintenance cannot receive reservations.
-- Cleaning is mandatory after check-out.
-- Retired rooms remain in history for reporting.
-
----
-
-## Notification Triggers
-
-| Event | Recipient |
-|-------|-----------|
-| Room enters Maintenance | Administrator |
-| Room ready after Cleaning | Administrator |
-
----
+An active but unpublished room is not shown publicly.
 
 # 6. Review State Machine
 
-## Purpose
+Eligibility requires `booking_status = checked_out` and a secure unused review invitation.
 
-Defines the lifecycle of guest reviews.
+| Current | Next | Authority |
+|---|---|---|
+| new review | `pending` | Review Service after token/booking validation |
+| `pending` | `approved` | Administrator through Review Service |
+| `pending` | `rejected` | Administrator through Review Service |
 
----
+Only approved reviews are public. One review is permitted per booking. Approved/rejected moderation is audited.
 
-## Review Lifecycle
+# 7. CMS Page State Machine
 
-Draft
+| Current | Next | Authority |
+|---|---|---|
+| new page | `draft` | CMS Service |
+| `draft` | `published` | Administrator through CMS Service |
+| `published` | `archived` | Administrator through CMS Service |
+| `archived` | `published` | Administrator through CMS Service |
 
-↓
+`archived` is a CMS page state only; it is not a booking state. Full page-version history and rollback are future enhancements.
 
-Submitted
+# 8. Activities and Gallery Visibility
 
-↓
+Activities and gallery items have two independent booleans:
 
-Pending Moderation
+- active/inactive business control;
+- published/unpublished public visibility.
 
-↓
+Only active and published records are returned publicly. These controls are not booking or room states.
 
-Approved
+# 9. Notification Read State
 
-↓
+In-app Administrator notifications may be unread or read using `read_at`. Delivery channels are not workflow statuses. SMTP failures are logged and do not roll back committed business transactions.
 
-Published
+# 10. State-Change Enforcement
 
-↓
+- Request classes validate shape and canonical values.
+- Services authorize and enforce transitions inside transactions.
+- Repositories persist approved changes; they do not decide transitions.
+- Booking changes append `booking_events`.
+- Important administrative changes append `audit_logs`.
+- Views and frontend JavaScript never set domain states directly.
+- API endpoints accept transition intent only where documented in `23_REST_API_Specification.md`.
 
-Archived
+# 11. Required Tests
 
-OR
-
-Rejected
-
----
-
-## State Definitions
-
-| State | Description |
-|--------|-------------|
-| Draft | Guest has started writing a review |
-| Submitted | Review submitted by guest |
-| Pending Moderation | Awaiting administrator review |
-| Approved | Review approved |
-| Published | Visible on website |
-| Rejected | Review declined |
-| Archived | Historical record |
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor | API | Database | Audit |
-|---------------|------------|------|-----|----------|-------|
-| Draft | Submitted | Guest | POST /reviews | reviews | Yes |
-| Submitted | Pending Moderation | System | Internal | reviews | Yes |
-| Pending Moderation | Approved | Admin | POST /reviews/{id}/approve | reviews | Yes |
-| Pending Moderation | Rejected | Admin | POST /reviews/{id}/reject | reviews | Yes |
-| Approved | Published | System | Internal | reviews | Yes |
-| Published | Archived | Admin | POST /reviews/{id}/archive | reviews | Yes |
-
----
-
-## Invalid State Transitions
-
-| Invalid Transition | Reason |
-|--------------------|--------|
-| Draft → Published | Moderation required |
-| Rejected → Published | Must be resubmitted |
-| Archived → Published | Archived reviews are read-only |
-
----
-
-## Business Rules
-
-- Reviews must belong to completed bookings.
-- Reviews cannot bypass moderation.
-- Every moderation decision shall be audited.
-
----
-
-## Notification Triggers
-
-| Event | Recipient |
-|-------|-----------|
-| Review Submitted | Administrator |
-| Review Approved | Guest |
-| Review Rejected | Guest |
-
----
-
-# 7. Contact Message State Machine
-
-## Contact Lifecycle
-
-New
-
-↓
-
-Assigned
-
-↓
-
-In Progress
-
-↓
-
-Resolved
-
-↓
-
-Closed
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor |
-|---------------|------------|------|
-| New | Assigned | Admin |
-| Assigned | In Progress | Admin |
-| In Progress | Resolved | Admin |
-| Resolved | Closed | Admin |
-
----
-
-## Business Rules
-
-- Every contact message must be assigned to a staff member.
-- Closed messages cannot be edited.
-- Contact history shall be retained.
-
----
-
-# 8. Notification State Machine
-
-## Notification Lifecycle
-
-Created
-
-↓
-
-Queued
-
-↓
-
-Sent
-
-↓
-
-Delivered
-
-↓
-
-Read
-
-↓
-
-Archived
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor |
-|---------------|------------|------|
-| Created | Queued | System |
-| Queued | Sent | System |
-| Sent | Delivered | System |
-| Delivered | Read | User |
-| Read | Archived | System |
-
----
-
-## Business Rules
-
-- Notifications cannot skip delivery stages.
-- Read timestamps shall be recorded.
-- Archived notifications remain searchable.
-
----
-
-# 9. Gallery State Machine
-
-## Gallery Lifecycle
-
-Draft
-
-↓
-
-Uploaded
-
-↓
-
-Optimized
-
-↓
-
-Published
-
-↓
-
-Archived
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor |
-|---------------|------------|------|
-| Draft | Uploaded | Admin |
-| Uploaded | Optimized | System |
-| Optimized | Published | Admin |
-| Published | Archived | Admin |
-
----
-
-## Business Rules
-
-- Only optimized images may be published.
-- Archived images remain available for reporting.
-
----
-
-# 10. Activity State Machine
-
-## Activity Lifecycle
-
-Draft
-
-↓
-
-Published
-
-↓
-
-Available
-
-↓
-
-Unavailable
-
-↓
-
-Archived
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor |
-|---------------|------------|------|
-| Draft | Published | Admin |
-| Published | Available | System |
-| Available | Unavailable | Admin |
-| Unavailable | Available | Admin |
-| Available | Archived | Admin |
-
----
-
-## Business Rules
-
-- Unavailable activities cannot be booked.
-- Archived activities remain in historical reports.
-
----
-
-# 11. User Account State Machine
-
-## User Lifecycle
-
-Invited
-
-↓
-
-Registered
-
-↓
-
-Active
-
-↓
-
-Locked
-
-↓
-
-Inactive
-
-↓
-
-Archived
-
----
-
-## Valid State Transitions
-
-| Current State | Next State | Actor |
-|---------------|------------|------|
-| Invited | Registered | User |
-| Registered | Active | Admin |
-| Active | Locked | Admin |
-| Locked | Active | Admin |
-| Active | Inactive | Admin |
-| Inactive | Archived | Admin |
-
----
-
-## Business Rules
-
-- Only active users may log in.
-- Locked users cannot authenticate.
-- Archived accounts cannot be reactivated.
-
----
-
-# 12. General Transition Rules
-
-- Every state transition shall be validated.
-- Invalid transitions shall return an error response.
-- Every transition shall generate an audit log.
-- Automatic transitions shall record the actor as **System**.
-- State history shall never be deleted.
-
----
-
-# 13. Audit Requirements
-
-Every state transition shall record:
-
-- Entity Name
-- Entity ID
-- Previous State
-- New State
-- Date & Time
-- Performed By
-- IP Address (where applicable)
-- Notes (Optional)
-
-Audit records are immutable and retained for compliance.
-
----
-
-# 14. API Impact
-
-All APIs that change an entity's status must validate the current state before allowing a transition.
-
-If an invalid transition is requested, the API shall return an appropriate error (for example, HTTP 409 Conflict).
-
----
-
-# 15. Database Impact
-
-State values shall be stored using controlled enumerations or reference tables to ensure consistency.
-
-Every status change shall update the audit log.
-
-Foreign key relationships shall remain valid throughout all transitions.
-
----
-
-# 16. Related Documents
-
-- 11_Booking_System.md
-- 12_Room_Management_System.md
-- 13_Activity_Management_System.md
-- 14_Gallery_Management_System.md
-- 15_Content_Management_System.md
-- 16_Authentication_Authorization.md
-- 17_Admin_Dashboard.md
-- 18_Review_Rating_System.md
-- 19_Payment_Management_System.md
-- 20_Notification_System.md
-- 21_Business_Process_Flow.md
-- 23_ER_Diagram.md
-
----
-
-# End of Document
+- every allowed and forbidden booking transition;
+- terminal booking-state immutability;
+- pending deadline and availability blocking;
+- payment attempt resubmission as a new row;
+- Administrator-only verification/rejection;
+- no room operational-status change during booking/check-in/checkout;
+- room operational/publication combinations;
+- checked-out review eligibility and one review per booking;
+- CMS page transitions;
+- permanent booking-event and audit history.

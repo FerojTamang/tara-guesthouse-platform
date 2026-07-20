@@ -1,5 +1,7 @@
 # Developer Guide
 
+> **Version 1 authority:** Before implementation, developers and AI tools must read `00_V1_ARCHITECT_DECISIONS.md`, the relevant module specification, migrations/dictionary, route/API contract, folder/coding standards, ticket, and acceptance criteria. Do not invent columns, statuses, routes, roles, frameworks, or future features; use PHP sessions and canonical `/api/v1/...` routes.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Developer Guide |
 | **Document No.** | 29 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -129,11 +131,9 @@ cp .env.example .env
 
 ---
 
-### Start Apache
+### Start the local environment
 
-```bash
-sudo systemctl start apache2
-```
+Start Apache and MariaDB through XAMPP or another approved local PHP environment. Production service control is performed by the cPanel/shared-hosting provider; Version 1 development instructions do not require root service commands.
 
 ---
 
@@ -188,7 +188,7 @@ MariaDB
 
 - Controllers remain lightweight.
 - Services contain business logic.
-- Models communicate with the database.
+- Repositories communicate with the database through PDO; Models/entities represent domain data only.
 - Views handle presentation only.
 
 ---
@@ -213,7 +213,7 @@ app/
 | Folder | Responsibility |
 |------|----------------|
 | Controllers | Request Handling |
-| Models | Database Access |
+| Models/entities | Domain data representation; no SQL/PDO |
 | Services | Business Logic |
 | Middleware | Authorization |
 | Core | Framework Components |
@@ -365,10 +365,10 @@ All APIs must follow REST principles.
 ## Example
 
 ```http
-GET    /api/rooms
-POST   /api/bookings
-PUT    /api/bookings/{id}
-DELETE /api/bookings/{id}
+GET    /api/v1/rooms
+POST   /api/v1/bookings
+GET    /api/v1/admin/bookings/{id}
+PATCH  /api/v1/admin/bookings/{id}/status
 ```
 
 ---
@@ -469,7 +469,7 @@ The backend is developed using PHP 8.3 and MariaDB.
 
 - Controllers must remain lightweight.
 - Services contain business logic.
-- Models interact with the database.
+- Repositories contain PDO/SQL persistence logic; Models/entities contain no database access.
 - Use Prepared Statements exclusively.
 - Validate all user input.
 
@@ -752,8 +752,8 @@ This document serves as the official handbook for all current and future develop
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

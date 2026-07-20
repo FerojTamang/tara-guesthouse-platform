@@ -1,5 +1,7 @@
 # Git Workflow & Version Control
 
+> **Documentation gate:** A feature is not ready to merge until it matches `00_V1_ARCHITECT_DECISIONS.md`, uses the approved status/route/role vocabulary, includes critical automated tests, and updates affected documentation. AI-assisted changes remain subject to the same review, security, scope, and unrelated-change restrictions.
+
 ## Project Information
 
 | Item | Details |
@@ -7,7 +9,7 @@
 | **Project** | Tara Guest House Management System |
 | **Document** | Git Workflow & Version Control |
 | **Version** | 1.0 |
-| **Status** | Draft |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -535,7 +537,7 @@ Following this Git workflow ensures a structured and reliable development proces
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
+| Project Manager | Feroj | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

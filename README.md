@@ -1,295 +1,139 @@
-# 🏨 Tara Guest House Management System
+# Tara Guest House Management System
 
-> A modern hotel website and administration platform developed for **Tara Guest House, Sauraha, Chitwan, Nepal**.
+A responsive public website and administration system for Tara Guest House, Sauraha, Chitwan, Nepal, developed by the project team as a commercial hospitality application.
 
-![Status](https://img.shields.io/badge/Status-In%20Development-orange)
-![Version](https://img.shields.io/badge/Version-1.0-blue)
-![License](https://img.shields.io/badge/License-Private-red)
+## Documentation Authority
 
----
+Before implementation, read [Version 1 Architect Decisions](docs/00_V1_ARCHITECT_DECISIONS.md). It overrides conflicting Version 1 statements in other documents. The preserved 38-document suite is indexed in [Documentation Index](docs/33_Documentation_Index.md).
 
-# 📖 About The Project
+## Version 1 Objectives
 
-The **Tara Guest House Management System** is a commercial web application designed to modernize the online presence and daily operations of Tara Guest House.
+- Modernize the guest house's online presence.
+- Increase direct booking enquiries and reservations.
+- Provide clear room, activity, gallery, review, policy, and contact content.
+- Reduce manual administrative work.
+- Provide secure room, booking, payment, invoice, review, CMS, notification, and audit workflows.
+- Deliver a responsive, maintainable application compatible with cPanel/shared hosting.
 
-The project replaces the client's existing website with a secure, responsive, and maintainable platform that combines a professional public-facing hotel website with a comprehensive administration system.
+## Version 1 Scope
 
-The application enables customers to browse rooms, activities, galleries, and hotel information while providing administrators with complete control over bookings, content, payments, customer reviews, and hotel operations.
+### Public website
 
-This project is developed by **fero.dev** as its first commercial software project.
+- Home and About
+- Rooms, room details, and date-range availability
+- Activities and Gallery
+- Verified-stay reviews
+- Contact and CMS-managed policies/pages
+- Guest booking without an account, one room per booking
+- Manual payment-detail/proof submission
 
----
+### Administration
 
-# 🎯 Project Objectives
-
-- Modernize the hotel's online presence
-- Increase online reservations
-- Improve customer experience
-- Reduce manual administrative work
-- Provide an easy-to-use Content Management System (CMS)
-- Improve search engine visibility (SEO)
-- Ensure responsive design across all devices
-- Build a secure and scalable platform for future growth
-
----
-
-# ✨ Core Features
-
-## Public Website
-
-- Homepage
-- About Us
-- Rooms
-- Activities
-- Gallery
-- Contact Page
-- Customer Reviews
-- Online Reservation Request
-
-## Administration Panel
-
-- Secure Authentication
+- Administrator session login/logout
 - Dashboard
-- Booking Management
-- Room Management
-- Activity Management
-- Gallery Management
-- Review Management
-- Payment Verification
-- Invoice Generation
-- Content Management System (CMS)
-- Notification Management
+- Rooms and publication
+- Availability and bookings
+- Manual payment verification and invoices
+- Activities, gallery, reviews, contact messages, CMS/settings
+- In-app notifications, transactional SMTP email, and audit logging
 
----
+Customer accounts/portal, JWT, specialized staff roles, multi-room booking, payment gateways, SMS/WhatsApp/push, mobile applications, multiple hotels, Redis, WebSockets, Docker/Kubernetes, and VPS/cloud production infrastructure are Future Enhancements.
 
-# 🏗 System Architecture
-
-The project follows a custom **MVC-inspired architecture** designed to separate presentation, business logic, and data access.
-
-```text
-Client Browser
-        │
-        ▼
- Apache Web Server
-        │
-        ▼
- PHP Application
-        │
- ┌──────┼──────┐
- │      │      │
- ▼      ▼      ▼
-Models Controllers Views
-        │
-        ▼
- Business Logic
-        │
-        ▼
- MariaDB Database
-```
-
-The architecture emphasizes:
-
-- Separation of Concerns
-- Maintainability
-- Scalability
-- Secure Database Access
-- Reusable Components
-
----
-
-# 💻 Technology Stack
+## Approved Technology Stack
 
 | Layer | Technology |
-|--------|------------|
-| Frontend | HTML5, Bootstrap 5, JavaScript |
-| Backend | PHP 8.x |
-| Database | MariaDB / MySQL |
-| Web Server | Apache |
-| Development Environment | XAMPP |
-| Production Environment | cPanel Shared Hosting |
-| Version Control | Git & GitHub |
-| Architecture | Custom MVC-inspired PHP Architecture |
+|---|---|
+| Frontend | HTML5, CSS3, Bootstrap 5, vanilla JavaScript ES6+ |
+| Rendering | PHP-rendered views with selective Fetch/AJAX |
+| Backend | PHP 8.x, Composer PSR-4, custom layered MVC-inspired architecture |
+| Data access | Repositories using PDO prepared statements |
+| Database | MariaDB/MySQL; migrations are executable source of truth |
+| Authentication | Hardened server-side PHP sessions and CSRF protection |
+| Routes | Normal page routes plus `/api/v1/...` same-origin JSON endpoints |
+| Web server | Apache |
+| Production | HTTPS on cPanel/shared hosting |
+| Development | XAMPP or another compatible PHP/Apache/MySQL environment |
 
----
+The required backend flow is:
 
-# 🔒 Security
+```text
+Route -> Middleware -> Controller -> Request Validation
+      -> Service -> Repository -> Database
+```
 
-Security is integrated throughout the application.
-
-Implemented security measures include:
-
-- Password Hashing
-- Prepared Statements (PDO)
-- Session Security
-- CSRF Protection
-- Input Validation
-- Output Escaping
-- Authentication & Authorization
-- Role-Based Access Control (RBAC)
-
----
-
-# 📂 Repository Structure
+## Repository Structure
 
 ```text
 tara-guest-house/
-
-├── app/
-│   ├── Controllers/
-│   ├── Models/
-│   ├── Views/
-│   ├── Core/
-│   ├── Helpers/
-│   ├── Middleware/
-│   └── Services/
-│
-├── public/
-│
-├── database/
-│
-├── docs/
-│
-├── uploads/
-│
-├── tests/
-│
-├── vendor/
-│
-├── .env.example
-├── .gitignore
-├── README.md
-└── LICENSE
+|-- app/
+|   |-- Controllers/
+|   |-- Requests/
+|   |-- Services/
+|   |-- Repositories/
+|   |-- Models/
+|   |-- Middleware/
+|   |-- Core/
+|   |-- Helpers/
+|   `-- Exceptions/
+|-- config/
+|-- database/
+|   |-- migrations/
+|   |-- seeders/
+|   |-- backups/
+|   `-- schema.sql
+|-- public/
+|   |-- assets/
+|   `-- uploads/
+|-- resources/
+|   `-- views/
+|-- routes/
+|-- storage/
+|-- tests/
+|-- client-assets/
+|-- design/
+|-- meetings/
+|-- vendor/
+|-- docs/
+|-- .env.example
+|-- .gitignore
+|-- composer.json
+|-- composer.lock
+`-- README.md
 ```
 
-> The exact project structure follows the official project documentation.
+## Security Baseline
 
----
+- Password hashing and verification
+- Secure PHP sessions and cookies
+- CSRF protection
+- Authorization middleware
+- Server-side validation and context-aware output escaping
+- PDO prepared statements
+- Login rate limiting
+- Secure upload validation and non-executable uploads
+- Environment secrets excluded from Git
+- HTTPS, private error logs, and audit logging
 
-# 📚 Documentation
+AI-generated code is subject to the same controls and may not invent routes, roles, statuses, columns, frameworks, or future features.
 
-Complete project documentation is available in the **docs/** directory.
+## Testing
 
-The documentation includes:
+The required baseline includes unit, integration, feature, security, responsive/browser, and UAT coverage. Critical automated tests cover authentication/authorization, CSRF, rooms/publication, availability overlap and concurrency, booking transitions, payment attempts/verification, invoices, check-in/check-out, verified-stay reviews, uploads, and API response contracts.
 
-- Project Overview
-- Client Requirements
-- Project Objectives
-- Team Organization
-- Folder Structure
-- Coding Standards
-- Git Workflow
-- Database Design
-- Entity Relationship Diagram (ERD)
-- Database Dictionary
-- Authentication Specification
-- Module Specifications
-- REST/API Documentation (where applicable)
-- Frontend Architecture
-- Backend Architecture
-- Testing Strategy
-- UI/UX Specifications
-- Requirements Traceability Matrix
-- Development Handbook
+## Approved Implementation Order
 
-**Project documentation is the single source of truth throughout development.**
+1. Documentation synchronization
+2. Foundation
+3. Administrator authentication and rooms
+4. Availability and booking
+5. Payments and invoices
+6. Operations and content
+7. Dashboard, hardening, and cPanel deployment
 
----
+## Current Status
 
-# 🚀 Development Workflow
+Documentation has been synchronized to the approved Version 1 decisions and awaits Project Manager/Technical Architect review. This status does not claim that application implementation, automated tests, UAT, or deployment are complete.
 
-The project follows an Agile, sprint-based workflow.
+## Ownership
 
-```text
-Planning
-    │
-    ▼
-Documentation
-    │
-    ▼
-Development
-    │
-    ▼
-Code Review
-    │
-    ▼
-Testing
-    │
-    ▼
-Deployment
-```
-
-Every feature is developed according to the documented requirements before implementation.
-
----
-
-# 👥 Development Team
-
-| Team Member | Role | Responsibility |
-|-------------|------|----------------|
-| **Feroj Tamang** | Project Manager / Technical Architect | Project Planning, System Architecture, Documentation, Code Review |
-| **Rijan Mahato** | Backend Developer | Backend Development, Database Design & API Development |
-| **Saroj Tamang** | Frontend Developer | User Interface Development & Frontend Integration |
-| **Pallawi Tamang Dong** | QA Engineer / Content Manager | Testing, Quality Assurance & Content Management |
-
----
-
-# 📈 Current Status
-
-| Component | Status |
-|-----------|--------|
-| Project Planning | ✅ Completed |
-| Documentation | ✅ Completed |
-| System Design | ✅ Completed |
-| Database Design | ✅ Completed |
-| Development | 🚧 In Progress |
-| Testing | ⏳ Pending |
-| Deployment | ⏳ Pending |
-
----
-
-# 📋 Development Standards
-
-The project follows documented engineering standards covering:
-
-- Coding Standards
-- Git Workflow
-- Project Architecture
-- Secure Development Practices
-- Documentation Standards
-- Code Review Process
-- Testing Strategy
-
-All contributors are expected to follow the project documentation throughout the development lifecycle.
-
----
-
-# 🧪 Testing
-
-Testing includes:
-
-- Functional Testing
-- Integration Testing
-- User Acceptance Testing (UAT)
-- Security Testing
-- Regression Testing
-
----
-
-# 📌 Version
-
-**Current Version:** 1.0
-
----
-
-# 📄 License
-
-This repository is maintained as a **private commercial project**.
-
-Copyright © fero.dev. All rights reserved.
-
-Unauthorized copying, modification, distribution, or commercial use of this software is prohibited without written permission.
-
----
-
-
-Developed by **InternTeam** **FESARIPA** **Tivrasoft**
+The repository is a private commercial project. Team responsibilities and review rules are defined in `docs/03_Team_Organization.md` and `docs/07_Git_Workflow.md`.

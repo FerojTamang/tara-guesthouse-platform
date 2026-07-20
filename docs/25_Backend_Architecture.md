@@ -1,3 +1,5 @@
+> **Approved Version 1 backend:** PHP 8.x with Composer PSR-4 autoloading and the flow `Route → Middleware → Controller → Request Validation → Service → Repository → Database`. Administrator authentication uses hardened PHP sessions, not JWT. Migrations are executable database truth. The runtime target is Apache/MariaDB on cPanel/shared hosting; Redis, WebSockets, Docker, and cloud infrastructure are future enhancements.
+
 Architecture Name:
 Enterprise Layered MVC Architecture
 
@@ -19,7 +21,7 @@ Technology Stack:
 | **Document** | Backend Architecture |
 | **Document No.** | 25 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -119,7 +121,7 @@ Service Layer
 Repository Layer
       │
       ▼
-Model Layer
+PDO Persistence Layer
       │
       ▼
 PDO
@@ -145,7 +147,7 @@ Response
 | Request | Validation & Sanitization |
 | Service | Business Logic |
 | Repository | Data Access |
-| Model | CRUD Operations |
+| Model/entity | Domain data representation; no SQL/PDO |
 | PDO | Database Communication |
 | MariaDB | Data Storage |
 
@@ -256,10 +258,11 @@ api.php
 ## Example
 
 ```php
-GET    /rooms
-POST   /booking
-PUT    /booking/{id}
-DELETE /booking/{id}
+GET    /rooms                     (server-rendered page)
+GET    /booking                              (server-rendered page)
+POST   /api/v1/bookings                     (Guest JSON creation)
+GET    /api/v1/admin/bookings/{id}          (protected JSON detail)
+PATCH  /api/v1/admin/bookings/{id}/status   (protected transition)
 ```
 
 ---
@@ -500,10 +503,10 @@ ReviewRepository.php
 Service
    │
    ▼
-Repository
+Repository (PDO/SQL)
    │
-   ▼
-Model
+   ├── MariaDB persistence
+   └── maps rows to Models/entities
 ```
 
 Repositories ensure Services remain independent of database implementation details.
@@ -512,7 +515,7 @@ Repositories ensure Services remain independent of database implementation detai
 
 # 14. Model Architecture
 
-Models are responsible for interacting with the database.
+Models/entities represent domain data. They never interact with the database directly.
 
 ## Directory
 
@@ -534,10 +537,10 @@ Notification.php
 
 ## Responsibilities
 
-- CRUD Operations
-- Execute Prepared Statements
-- Return Application Data
-- Maintain Data Integrity
+- Represent domain fields and values
+- Return domain-safe data to Services/views
+- Contain persistence-independent behavior only
+- Accept mapping/hydration from Repositories
 
 ## Models Must NOT
 
@@ -545,6 +548,7 @@ Notification.php
 - Handle Sessions
 - Perform Business Logic
 - Redirect Users
+- Execute SQL, prepared statements or PDO calls
 
 ---
 
@@ -700,9 +704,10 @@ Authorization determines access rights within the application.
 
 ```text
 Administrator
-Manager
-Receptionist
-Customer
+Guest (unauthenticated public actor)
+Manager (Future)
+Receptionist (Future)
+Customer (Future)
 ```
 
 ---
@@ -729,9 +734,9 @@ Access Granted
 | Role | Access |
 |------|------|
 | Administrator | Full Access |
-| Manager | Limited Administration |
-| Receptionist | Booking Management |
-| Customer | Personal Dashboard |
+| Manager (Future) | Limited Administration |
+| Receptionist (Future) | Booking Management |
+| Customer (Future) | Personal Dashboard |
 
 ---
 
@@ -921,8 +926,8 @@ The Enterprise Layered MVC Architecture provides a robust foundation capable of 
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

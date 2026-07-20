@@ -1,475 +1,87 @@
-# Tara Guest House Management System
+# Tara Guest House Gallery Management Specification
 
-# Gallery Management Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 gallery categories, images and publication
 
-# Document Control
+## 1. Purpose and Actors
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Gallery Management Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+Guests browse active, published gallery items. Administrators manage categories and images through protected PHP-rendered pages and `/api/v1/admin/gallery...` endpoints.
 
----
+## 2. Version 1 Data Contract
 
-# Change Log
+### 2.1 Gallery categories
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Gallery Management Specification created |
+`gallery_categories` contains `id`, unique `name`, unique `slug`, `is_active`, `created_at` and `updated_at`.
 
----
+### 2.2 Gallery items
 
-# Table of Contents
+| Field | Rule |
+|---|---|
+| `id` | Primary key |
+| `gallery_category_id` | Optional category relationship |
+| `title` | Required display title |
+| `caption` | Optional text |
+| `file_path` | Required safe relative image path |
+| `alt_text` | Accessible description |
+| `sort_order` | Display order |
+| `is_active` | Business/removal control |
+| `is_published` | Separate public-visibility control |
+| `created_at`, `updated_at` | Timestamps |
 
-1. Purpose
-2. Scope
-3. Actors
-4. Business Objectives
-5. Gallery Categories
-6. Image Information
-7. Customer Journey
-8. Gallery Display
-9. Administrator Management
-10. Image Processing
-11. Business Rules
-12. Validation Rules
-13. Security Requirements
-14. SEO Requirements
-15. Future Enhancements
+There is no `media_files` table in Version 1. Featured, uploaded-by, soft-delete timestamp and generated-image database fields are not approved. Removal is represented by deactivation/unpublication; audit records preserve the Administrator action.
 
----
+Generated thumbnails/resized variants may be filesystem/cache artifacts created according to hosting capability. They are not authoritative database records and must be reproducible from the stored source file where the selected workflow permits.
 
-# 1. Purpose
+## 3. Exact Endpoints
 
-The Gallery Management Module allows Tara Guest House to professionally showcase the property, rooms, activities, surrounding nature, and guest experiences.
+Public:
 
-The gallery should inspire visitors to make a reservation by presenting high-quality visual content.
+* `GET /api/v1/gallery`
 
-The administrator must be able to manage the gallery entirely through the CMS without requiring developer assistance.
+Administrator:
 
----
+* `GET /api/v1/admin/gallery-categories`
+* `POST /api/v1/admin/gallery-categories`
+* `PUT /api/v1/admin/gallery-categories/{id}`
+* `GET /api/v1/admin/gallery`
+* `POST /api/v1/admin/gallery`
+* `PUT /api/v1/admin/gallery/{id}`
+* `PATCH /api/v1/admin/gallery/{id}/active`
+* `PATCH /api/v1/admin/gallery/{id}/publication`
+* `PATCH /api/v1/admin/gallery/reorder`
+* `DELETE /api/v1/admin/gallery/{id}` — implemented as deactivation/unpublication, not hard deletion
 
-# 2. Scope
+## 4. Shared-Hosting Image Workflow
 
-Included
+1. Administrator uploads one supported image through the protected form/endpoint.
+2. Server validates configured size, extension, MIME and decodability.
+3. Server generates a random filename and stores the file in a non-executable upload location supported by cPanel hosting.
+4. Optional resized variants are created only when the host's PHP image extension/resources support them.
+5. Repository records the safe relative `file_path` and metadata in `gallery`.
+6. On failure, partial files are cleaned up and the error is logged without exposing server paths.
 
-- Homepage Gallery
-- Full Gallery Page
-- Category Filtering
-- Lightbox Viewer
-- Image Upload
-- Image Editing
-- Image Reordering
-- Featured Images
+No numeric maximum is hardcoded. The approved upload configuration and host limits control the maximum.
 
-Excluded
+## 5. Display Rules
 
-- Video Management (Future)
-- 360° Virtual Tours (Future)
+Public gallery results require both `is_active = true` and `is_published = true`, an active category where a category is assigned, and accessible alt text. Ordering uses `sort_order`. Public UI may provide responsive grid/lightbox behavior using approved project dependencies only.
 
----
+## 6. Security and Persistence
 
-# 3. Actors
+Only authenticated Administrators mutate gallery data. Gallery Service coordinates filesystem/database operations and transactions/compensation. Gallery Repository contains PDO/SQL; Model/entity contains data only. Executable content, unsafe paths and client filenames are rejected. Mutations are audited.
 
-## Guest
+## 7. Acceptance Tests
 
-Can
+* No `media_files` dependency exists.
+* Public results include only active/published items.
+* Active and publication controls remain independent.
+* Upload validation reads approved configuration.
+* Database failure does not leave an authoritative orphan record/file.
+* DELETE route deactivates/unpublishes rather than destroying history.
+* No featured/uploaded-by/deleted-at/generated-image field is required.
 
-- Browse gallery
-- Filter images
-- View full-size images
-- Navigate image slider
-- Share image link
+## 8. Future Enhancements
 
-Cannot
-
-- Upload images
-- Edit images
-- Delete images
-
----
-
-## Administrator
-
-Can
-
-- Upload images
-- Edit captions
-- Replace images
-- Delete images (Soft Delete)
-- Assign categories
-- Mark featured images
-- Change display order
-- Publish/Unpublish images
-
----
-
-# 4. Business Objectives
-
-The gallery should
-
-- Increase customer trust
-- Showcase hotel quality
-- Promote rooms and facilities
-- Highlight local attractions
-- Improve booking conversion
-- Support SEO
-- Be mobile friendly
-
----
-
-# 5. Gallery Categories
-
-The gallery should support categories managed through the CMS.
-
-Examples
-
-- Rooms
-- Deluxe Rooms
-- Standard Rooms
-- Family Rooms
-- Restaurant
-- Reception
-- Garden
-- Activities
-- Jungle Safari
-- Jeep Safari
-- Canoeing
-- Wildlife
-- Cultural Events
-- Hotel Exterior
-- Hotel Interior
-- Food & Drinks
-- Guest Experiences
-
-Categories should be editable by administrators.
-
----
-
-# 6. Image Information
-
-Every gallery image should contain
-
-| Field | Required |
-|---------|----------|
-| Image Title | Yes |
-| Image File | Yes |
-| Category | Yes |
-| Caption | Optional |
-| Alt Text | Yes |
-| Display Order | Yes |
-| Featured | Yes |
-| Status | Yes |
-| Uploaded By | Auto |
-| Upload Date | Auto |
-
----
-
-# 7. Customer Journey
-
-Customer
-
-↓
-
-Homepage
-
-↓
-
-Gallery Preview
-
-↓
-
-View All Gallery
-
-↓
-
-Filter Category
-
-↓
-
-Open Image
-
-↓
-
-Navigate Gallery
-
-↓
-
-Return to Booking
-
----
-
-# 8. Gallery Display
-
-Homepage
-
-Display
-
-- Featured Images
-- Automatic Slider
-- Responsive Layout
-
-Gallery Page
-
-Display
-
-- Masonry Layout
-- Grid View
-- Category Filter
-- Search
-- Pagination
-- Lazy Loading
-
-Image Viewer
-
-Features
-
-- Full Screen
-- Previous / Next
-- Keyboard Navigation
-- Mobile Swipe
-- Zoom
-- Download Disabled
-
----
-
-# 9. Administrator Management
-
-Administrator should be able to
-
-Upload Images
-
-Bulk Upload Images
-
-Edit Image Information
-
-Replace Images
-
-Delete Images
-
-Restore Deleted Images
-
-Change Display Order
-
-Mark Featured Images
-
-Publish/Unpublish Images
-
-Search Images
-
-Filter by Category
-
-View Upload History
-
----
-
-# 10. Image Processing
-
-Images should automatically
-
-Generate Thumbnail
-
-Generate Medium Version
-
-Generate Large Version
-
-Convert to WebP
-
-Compress Images
-
-Preserve Original Copy
-
-Store Image Metadata
-
----
-
-Recommended Sizes
-
-Thumbnail
-
-400 × 300
-
-Medium
-
-800 × 600
-
-Large
-
-1600 × 1200
-
-Hero Banner
-
-1920 × 1080
-
----
-
-# 11. Business Rules
-
-Every image must belong to one category.
-
-Featured images appear on homepage.
-
-Deleted images use Soft Delete.
-
-Original images must be preserved.
-
-Maximum upload size is configurable.
-
-Gallery order must be customizable.
-
-Inactive images are hidden from visitors.
-
----
-
-# 12. Validation Rules
-
-Supported Formats
-
-- JPG
-- JPEG
-- PNG
-- WEBP
-
-Maximum File Size
-
-10 MB
-
-Minimum Resolution
-
-800 × 600
-
-Maximum Caption
-
-300 Characters
-
-Maximum Alt Text
-
-150 Characters
-
-Duplicate filenames should be automatically renamed.
-
----
-
-# 13. Security Requirements
-
-Only administrators may upload images.
-
-Image MIME type must be verified.
-
-Executable files must be rejected.
-
-Random filenames should be generated.
-
-Images should never execute as scripts.
-
-Image uploads should be virus scanned (Future).
-
-Soft Delete should be used.
-
-All actions must be recorded in the Audit Log.
-
----
-
-# 14. SEO Requirements
-
-Every image should contain
-
-- Alt Text
-- Title
-- Caption
-- Descriptive Filename
-
-Example
-
-Bad
-
-IMG001.jpg
-
-Good
-
-tara-guest-house-deluxe-room-sauraha.jpg
-
-Images should improve search engine visibility.
-
----
-
-# 15. Future Enhancements
-
-Future versions may include
-
-- Video Gallery
-- 360° Room Tours
-- Drone Photography
-- AI Image Tagging
-- AI Image Enhancement
-- Automatic Watermarking
-- EXIF Metadata Viewer
-- Instagram Feed Integration
-- Customer Photo Upload
-- Photographer Credits
-- Before/After Image Comparison
-- Multi-language Captions
-- Cloud Storage Integration
-- CDN Image Delivery
-
----
-
-# Related Modules
-
-- Room Management
-- Activity Management
-- CMS
-- Homepage
-- Reviews
-
----
-
-# Related Database Tables
-
-- gallery
-- gallery_categories
-- media_files
-- users
-- audit_logs
-
----
-
-# Related API Endpoints
-
-GET /gallery
-
-GET /gallery/{id}
-
-POST /admin/gallery
-
-PUT /admin/gallery/{id}
-
-DELETE /admin/gallery/{id}
-
-POST /admin/gallery/upload
-
-POST /admin/gallery/reorder
-
----
-
-# Success Criteria
-
-The Gallery Management Module is considered complete when:
-
-- Administrators can manage all images without developer assistance.
-- Visitors can browse images on all devices.
-- Images load quickly.
-- SEO metadata is properly managed.
-- Image uploads are secure.
-- Gallery integrates seamlessly with the homepage, rooms, and activities.
-
----
-
-# End of Document
+Featured gallery ranking, uploader ownership, recoverable soft-delete fields, dedicated media library, generated-variant records, bulk upload, video/360 media, cloud storage/CDN, AI processing and customer uploads require later approved contracts.

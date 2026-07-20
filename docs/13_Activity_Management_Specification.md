@@ -1,279 +1,55 @@
-# Tara Guest House Management System
+# Tara Guest House Activity Management Specification
 
-# Activity Management Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 activity content and publication
 
-# Document Control
+## 1. Purpose and Actors
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Activity Management Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+Guests may browse active, published activities. Administrators manage the content through PHP-rendered `/admin/activities...` pages and `/api/v1/admin/activities...` JSON endpoints.
 
----
+## 2. Version 1 Data Contract
 
-# Change Log
+The `activities` table contains:
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Activity Management Specification created |
+| Field | Rule |
+|---|---|
+| `id` | Primary key |
+| `title` | Required display name |
+| `slug` | Required and unique |
+| `description` | Required activity content |
+| `price` | Fixed-precision NPR value where applicable |
+| `is_active` | Operational/business control |
+| `is_published` | Separate publication control |
+| `sort_order` | Public ordering |
+| `created_at`, `updated_at` | Timestamps |
 
----
+No activity category, featured-image, gallery-image, featured flag, duration, meeting-point or maximum-participants field/table is approved in Version 1. These fields must not appear in current forms, payloads or persistence instructions.
 
-# Table of Contents
+## 3. Public and Administrator Workflows
 
-1. Purpose
-2. Scope
-3. Actors
-4. Business Objectives
-5. Activity Information
-6. Activity Categories
-7. Customer Journey
-8. Admin Management
-9. Business Rules
-10. Validation Rules
-11. Security Requirements
-12. Future Enhancements
+Public `GET /api/v1/activities` returns only active and published records in approved order. Administrator endpoints list all records, create/update content, and change active/publication controls separately. Removal deactivates/unpublishes the record; no hard delete is required by the current dictionary.
 
----
+## 4. Validation and Security
 
-# 1. Purpose
+* Title, unique slug and description are validated server-side.
+* Price uses fixed-precision NPR and cannot be negative.
+* `is_active` and `is_published` are separate booleans.
+* Sort order is an allowed integer.
+* Only an authenticated Administrator may mutate activity data.
+* Activity Service owns rules/transactions; Repository owns PDO/SQL; Model/entity contains data only.
+* Mutations are audited.
 
-The Activity Management Module allows Tara Guest House to showcase tourism activities available in and around Sauraha.
+Version 1 has no activity image upload, so it defines no activity upload limit.
 
-The administrator can create, update, publish, or remove activities without developer assistance.
+## 5. Acceptance Tests
 
----
+* Public responses contain only active and published activities.
+* Deactivating does not silently overwrite publication, and vice versa.
+* Administrator mutations use `/api/v1/admin/activities...`.
+* No unapproved category/image/featured/duration/location/participant fields are required.
 
-# 2. Scope
+## 6. Future Enhancements
 
-This module includes
-
-- Activity listing
-- Activity details
-- Images
-- Pricing
-- Duration
-- Category
-- Featured activities
-- Publish/Unpublish
-
-Excluded
-
-- Online activity booking
-- Payment processing
-
----
-
-# 3. Actors
-
-## Guest
-
-Can
-
-- Browse activities
-- View activity details
-- View pricing
-- View gallery
-- Contact hotel for booking
-
-Cannot
-
-- Modify activities
-
----
-
-## Administrator
-
-Can
-
-- Add activities
-- Edit activities
-- Upload images
-- Change pricing
-- Feature activities
-- Delete (Soft Delete)
-- Publish/Unpublish
-
----
-
-# 4. Business Objectives
-
-The system should
-
-- Promote local tourism
-- Increase guest engagement
-- Increase hotel revenue
-- Encourage package bookings
-- Allow easy content updates
-
----
-
-# 5. Activity Information
-
-Each activity shall contain
-
-| Field | Required |
-|---------|----------|
-| Activity Name | Yes |
-| Category | Yes |
-| Short Description | Yes |
-| Full Description | Yes |
-| Price | Yes |
-| Duration | Yes |
-| Meeting Point | Optional |
-| Maximum Participants | Optional |
-| Featured Image | Yes |
-| Gallery Images | Optional |
-| Status | Yes |
-| Featured | Yes |
-
----
-
-# 6. Activity Categories
-
-Examples
-
-- Jungle Safari
-- Jeep Safari
-- Canoeing
-- Bird Watching
-- Cultural Program
-- Village Tour
-- Nature Walk
-- Museum Visit
-
-Categories should be manageable through the CMS.
-
----
-
-# 7. Customer Journey
-
-Customer
-
-↓
-
-Open Activities Page
-
-↓
-
-Browse Activities
-
-↓
-
-Filter by Category
-
-↓
-
-View Details
-
-↓
-
-View Gallery
-
-↓
-
-See Price
-
-↓
-
-Contact Hotel
-
----
-
-# 8. Administrator Management
-
-Administrator should be able to
-
-- Create activity
-- Edit activity
-- Upload images
-- Delete images
-- Set featured activity
-- Publish/Unpublish
-- Update pricing
-- Change display order
-- Search activities
-- Filter activities
-
----
-
-# 9. Business Rules
-
-Every activity must have
-
-- Name
-- Description
-- Price
-- Featured image
-
-Inactive activities should not appear publicly.
-
-Deleted activities use soft delete.
-
-Featured activities appear on the homepage.
-
----
-
-# 10. Validation Rules
-
-Activity Name
-
-3–100 characters
-
-Price
-
-Greater than or equal to zero
-
-Description
-
-Maximum 5000 characters
-
-Images
-
-JPG
-
-PNG
-
-WEBP
-
-Maximum 5 MB
-
----
-
-# 11. Security Requirements
-
-Only administrators may modify activities.
-
-Image uploads must be validated.
-
-All updates must be recorded in the audit log.
-
-Executable files must never be accepted.
-
----
-
-# 12. Future Enhancements
-
-Future releases may include
-
-- Online activity booking
-- Activity packages
-- Group discounts
-- Seasonal pricing
-- Google Maps integration
-- Video gallery
-- Customer reviews
-- Live availability
-- AI recommendations
-- Activity calendar
-
----
-
-# End of Document
+Activity categories, featured images, galleries, featured ranking, duration, meeting point, maximum participants, online activity booking, packages, maps, calendars and reviews require a later decision and synchronized database/API/UI changes.

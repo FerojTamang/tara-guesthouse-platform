@@ -1,662 +1,160 @@
-Operating System : Ubuntu Server 24.04 LTS
-Web Server       : Apache 2.4
-PHP              : PHP 8.3
-Database         : MariaDB 11
-Dependency Mgmt  : Composer
-Version Control  : Git
-SSL              : Let's Encrypt
-Architecture     : PHP MVC
-
-# Deployment Guide
-
-## Project Information
-
-| Item | Details |
-|------|---------|
-| **Project** | Tara Guest House Management System |
-| **Document** | Deployment Guide |
-| **Document No.** | 26 |
-| **Version** | 1.0 |
-| **Status** | Approved |
-| **Prepared By** | fero.dev |
-| **Project Owner** | Feroj |
-| **Date** | July 2026 |
-
----
-
-# 1. Purpose
-
-This document defines the deployment procedures, server requirements, environment configurations, and operational standards for the Tara Guest House Management System.
-
-It establishes standards for:
-
-- Development Environment
-- Staging Environment
-- Production Environment
-- Server Configuration
-- Apache Configuration
-- Database Configuration
-- SSL Configuration
-- Backup Procedures
-- Deployment Workflow
-- Rollback Procedures
-- Security Checklist
-
-All deployments must follow the standards defined in this document.
-
----
-
-# 2. Deployment Overview
-
-The application follows a three-environment deployment model.
-
-```text
-Development
-      │
-      ▼
-Staging
-      │
-      ▼
-Production
-```
-
----
+# Tara Guest House Version 1 Deployment Guide
 
-## Environment Responsibilities
+## Document Information
 
-| Environment | Purpose |
-|------------|---------|
-| Development | Feature Development |
-| Staging | Pre-Production Testing |
-| Production | Live Application |
+* Status: Synchronized — Host verification required
+* Target: cPanel/shared hosting with Apache, PHP 8.x and MariaDB/MySQL
+* Scope: Documentation procedure only; exact host capabilities must be confirmed before deployment
 
----
+## 1. Preconditions
 
-# 3. Deployment Architecture
+Confirm the selected cPanel plan supports:
 
-```text
-Developer
-    │
-    ▼
-Git Repository
-    │
-    ▼
-Staging Server
-    │
-    ▼
-Quality Assurance
-    │
-    ▼
-Production Server
-    │
-    ▼
-Customers
-```
+* the project-approved PHP 8.x version and required extensions;
+* MariaDB/MySQL databases and users;
+* HTTPS certificates;
+* a supported document-root/subdomain arrangement that can point to `public/` or an approved safe equivalent;
+* Composer through cPanel Terminal/SSH, or deployment of locally built `vendor/` files;
+* writable non-executable storage/upload directories;
+* cron jobs where retry/scheduled booking processes require them;
+* backup/export and restore mechanisms;
+* SMTP connectivity and application logs.
 
----
+Record confirmed capabilities in the deployment ticket. Do not assume root access or the ability to restart system services.
 
-# 4. Server Requirements
+## 2. Prepare the Release
 
-## Minimum Requirements
+1. Use an approved tagged/committed release after documentation, tests and acceptance gates pass.
+2. Install production Composer dependencies with development packages excluded, either locally in a compatible environment or using the supported cPanel terminal.
+3. Verify no `.env`, secrets, development dumps, test artifacts or local logs are included.
+4. Verify `public/` contains only web-accessible entry/assets and uploads cannot execute PHP.
+5. Produce checksums/release notes and a rollback reference.
 
-| Component | Specification |
-|----------|---------------|
-| CPU | 2 Cores |
-| RAM | 4 GB |
-| Storage | 50 GB SSD |
-| Network | 100 Mbps |
-| OS | Ubuntu 24.04 LTS |
+## 3. Upload or Deploy Through cPanel
 
----
+Choose one host-supported method:
 
-## Recommended Requirements
+### cPanel File Manager
 
-| Component | Specification |
-|----------|---------------|
-| CPU | 4 Cores |
-| RAM | 8 GB |
-| Storage | 100 GB SSD |
-| Network | 1 Gbps |
-| Backup Storage | 100 GB |
+Upload the release archive outside the live document root when possible, extract it, verify ownership/content, and switch/copy the approved release using the host's safe workflow. Never expose `.env`, `vendor` metadata, database backups or application source through the public path.
 
----
+### Supported Git Deployment
 
-# 5. Software Requirements
+Use cPanel Git Version Control only when the host supports private-repository credentials and deploy hooks safely. Deploy the approved commit/tag; do not run development branches in production.
 
-| Software | Version |
-|---------|--------|
-| Apache | 2.4+ |
-| PHP | 8.3+ |
-| MariaDB | 11+ |
-| Composer | Latest |
-| Git | Latest |
-| OpenSSL | Latest |
+## 4. Configure the Document Root
 
----
+Preferred: configure the primary domain/subdomain document root to the release's `public/` directory using cPanel Domains/Subdomains tools.
 
-# 6. Project Setup
+If the host cannot point directly to `public/`, the technical architect must approve a host-compatible arrangement that keeps `app/`, `config/`, `database/`, `resources/`, `routes/`, `storage/`, `.env` and Composer files inaccessible from the web. Do not simply copy the entire repository into a public directory.
 
-## Clone Repository
+Confirm Apache rewrite behavior through the host-supported `.htaccess` configuration. Version 1 instructions do not require manual server-module changes, virtual-host file editing or Apache restart access.
 
-```bash
-git clone <repository-url>
-```
+## 5. Select PHP and Extensions
 
----
+Use cPanel MultiPHP Manager/Select PHP Version (as provided) to select the approved PHP version. Enable/confirm required extensions, including those used by PDO MySQL, multibyte strings, JSON, sessions, file information, OpenSSL and the approved image workflow. Exact extension names depend on the host and release dependency check.
 
-## Navigate to Project
+Apply supported PHP settings through cPanel or approved local configuration. Upload/session values must match approved security/configuration decisions and hosting limits; this guide does not hardcode them.
 
-```bash
-cd tara-guesthouse-platform
-```
+## 6. Create MariaDB Database and User
 
----
+Use cPanel MySQL/MariaDB Databases or Database Wizard:
 
-## Install Dependencies
+1. Create a production database with the host account prefix.
+2. Create a dedicated application database user with a strong generated password.
+3. Grant only the privileges needed by migrations/runtime, according to host capabilities.
+4. Record the host-provided database hostname, port, database and username in the secret manager/approved credential record.
+5. Never use the hosting root database account for the application.
 
-```bash
-composer install
-```
+## 7. Environment Configuration
 
----
+Create the production `.env` or host-supported environment configuration outside public access. Set environment, base URL, timezone (`Asia/Kathmandu`), database credentials, session/cookie settings, SMTP settings, log paths and approved upload/deadline values.
 
-## Environment Setup
+Production requirements include HTTPS-aware secure cookies, generic user-facing errors, debug disabled, private logs and secrets excluded from Git/backups distributed to unauthorized users.
 
-```bash
-cp .env.example .env
-```
+## 8. Composer Dependencies
 
----
+Preferred supported options:
 
-# 7. Environment Configuration
+* run the approved production Composer command in cPanel Terminal from the application root; or
+* run Composer locally/CI using a compatible PHP/platform configuration and deploy the generated `vendor/` directory.
 
-## Example
+Verify `composer.lock`, autoload generation and platform requirements. Do not run Composer from a public URL or leave Composer credentials in the release.
 
-```env
-APP_NAME=Tara Guest House
-APP_ENV=production
-APP_DEBUG=false
+## 9. Run Database Migrations
 
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=tara_guesthouse
-DB_USER=root
-DB_PASSWORD=secure_password
+Migrations are the executable schema source of truth.
 
-APP_URL=https://www.taraguesthouse.com
-```
+1. Back up the current production database using the supported mechanism.
+2. Put the site into the approved maintenance mode if required.
+3. Run the application migration command through cPanel Terminal/approved deployment hook, or use an architect-approved one-time deployment mechanism with authentication and immediate removal.
+4. Verify each migration and migration-history record.
+5. Run only approved production seeders (Administrator/configuration data); never seed Guest/future roles or sample data.
+6. On failure, stop and follow the migration-specific rollback/recovery plan.
 
----
+Directly importing an informal `schema.sql` over production migrations is not the standard deployment procedure.
 
-## Environment Rules
+## 10. Permissions and Writable Paths
 
-- Never commit `.env`.
-- Disable debug mode in production.
-- Use strong passwords.
-- Rotate credentials periodically.
+Set the least permissions supported by the host. Application code/configuration should not be writable by the web process. Only approved storage, cache, log, session and upload paths are writable. Never use broad world-writable permissions.
 
----
+Confirm uploaded files cannot execute, directory listing is disabled where supported, and private proof/log/backup files are outside public access or protected by host controls.
 
-# 8. Apache Configuration
+## 11. HTTPS and Domain Verification
 
-## Virtual Host Example
+Enable/verify the cPanel-provided certificate (for example AutoSSL where available). Redirect HTTP to HTTPS using the host-supported configuration. Verify certificate chain/renewal, secure cookies, base URL, canonical redirects and mixed-content absence.
 
-```apache
-<VirtualHost *:80>
-    ServerName taraguesthouse.com
-    DocumentRoot /var/www/tara/public
+## 12. Cron Jobs
 
-    <Directory /var/www/tara/public>
-        AllowOverride All
-        Require all granted
-    </Directory>
-</VirtualHost>
-```
+Where supported, use cPanel Cron Jobs for approved scheduled tasks such as pending-booking deadline processing, retryable email and backup housekeeping. Use absolute host paths supplied by cPanel, minimal frequency, locking/idempotency and private log output. Exact schedules require approved configuration.
 
----
+## 13. Backups and Restore Readiness
 
-## Apache Modules
+Use supported cPanel account/database backup tools and/or approved application backups. Define frequency, retention, encryption/access, off-host copy and restoration ownership before go-live. Test restoration in a safe environment. Never expose backup archives beneath the public document root.
 
-Enable the following modules:
+## 14. Deployment Verification
 
-```bash
-a2enmod rewrite
-a2enmod ssl
-a2enmod headers
-```
+Verify:
 
----
+* public pages, assets and PHP page routes;
+* Administrator login/session/logout and CSRF;
+* public `/api/v1/...` and protected `/api/v1/admin/...` behavior;
+* database migration version;
+* one-room booking, availability overlap and zero-payment booking creation;
+* manual payment submission/verification and booking confirmation;
+* check-in/check-out and verified-stay review;
+* uploads, SMTP delivery/failure logging, cron and audit logs;
+* HTTPS, error privacy, file permissions and inaccessible private paths;
+* backup creation and documented restore readiness.
 
-# 9. MariaDB Configuration
+Record evidence and rollback decision. Documentation synchronization alone does not prove deployment readiness.
 
-## Database Creation
+## 15. Rollback
 
-```sql
-CREATE DATABASE tara_guesthouse;
-```
+Rollback uses the recorded prior release plus the migration-specific data recovery plan. Do not overwrite a migrated database blindly with old code. If a restore is required, follow the approved backup/restore procedure and preserve incident/audit evidence.
 
----
+## 16. Future VPS Appendix — Not Version 1 Procedure
 
-## Database User
+The following apply only after a future VPS/cloud decision and are not instructions for the Version 1 shared-hosting deployment:
 
-```sql
-CREATE USER 'tara_user'@'localhost'
-IDENTIFIED BY 'secure_password';
+* `/var/www/...` layout and manual Apache virtual hosts;
+* `a2enmod` and manual module configuration;
+* Apache/PHP-FPM/database service restart commands;
+* root MySQL shell commands/imports;
+* firewall rules;
+* SSH daemon hardening and key policy;
+* root-login controls, operating-system patches and full-server monitoring;
+* Docker/Kubernetes, reverse proxies and cloud load balancing.
 
-GRANT ALL PRIVILEGES
-ON tara_guesthouse.*
-TO 'tara_user'@'localhost';
-```
+Such a deployment requires a separately approved infrastructure architecture, security runbook and responsible operator.
 
----
+## 17. Decisions/Configuration Still Required
 
-## Database Rules
-
-- Use dedicated database users.
-- Enable foreign keys.
-- Enable backups.
-- Restrict remote access.
-
----
-
-# 10. File Permissions
-
-Recommended permissions:
-
-```bash
-storage/    -> 775
-public/     -> 755
-uploads/    -> 775
-```
-
----
-
-## Security Rules
-
-- Never use 777.
-- Restrict write access.
-- Protect configuration files.
-
----
-
-# 11. Storage Configuration
-
-Storage directories:
-
-```text
-storage/
-    logs/
-    cache/
-    temp/
-
-public/uploads/
-    rooms/
-    gallery/
-    profiles/
-    payments/
-```
-
----
-
-## Storage Responsibilities
-
-- Store logs.
-- Store uploads.
-- Store temporary files.
-- Store cached data.
-
----
-
-# 12. SSL Configuration
-
-Production deployments must use SSL.
-
-## SSL Provider
-
-```text
-Let's Encrypt
-```
-
----
-
-## SSL Responsibilities
-
-- Encrypt traffic.
-- Improve security.
-- Improve SEO.
-- Protect customer data.
-
----
-
-## SSL Flow
-
-```text
-Browser
-   │
-HTTPS
-   │
-Apache
-   │
-PHP
-```
-
----
-
-## End of Part 1
-
-Part 2 includes:
-
-- Backup Strategy
-- Restore Procedure
-- Deployment Workflow
-- Deployment Checklist
-- Rollback Procedure
-- Monitoring
-- Security Checklist
-- Future Improvements
-- Related Documents
-- Conclusion
-- Approval
-
----
-
-# 13. Backup Strategy
-
-Regular backups are mandatory for all environments, especially Production.
-
-## Backup Schedule
-
-| Type | Frequency |
-|------|-----------|
-| Database Backup | Daily |
-| Application Backup | Weekly |
-| Full Server Backup | Monthly |
-| Offsite Backup | Monthly |
-
----
-
-## Backup Components
-
-- MariaDB Database
-- Uploaded Files
-- Environment Configuration
-- Application Source Code
-- Logs
-- SSL Certificates
-
----
-
-## Backup Workflow
-
-```text
-Production Server
-       │
-       ▼
-Generate Backup
-       │
-       ▼
-Compress Files
-       │
-       ▼
-Store Locally
-       │
-       ▼
-Store Offsite
-```
-
----
-
-# 14. Restore Procedure
-
-Restoration procedures must be documented and tested periodically.
-
-## Database Restore
-
-```bash
-mysql -u root -p tara_guesthouse < backup.sql
-```
-
----
-
-## Application Restore
-
-```bash
-1. Restore Source Code
-2. Restore Uploads
-3. Restore .env
-4. Restore Database
-5. Restart Apache
-```
-
----
-
-## Restore Verification
-
-- Verify website accessibility.
-- Verify database connectivity.
-- Verify user authentication.
-- Verify file uploads.
-- Verify booking functionality.
-
----
-
-# 15. Deployment Workflow
-
-The official deployment workflow is:
-
-```text
-Developer
-     │
-     ▼
-Local Testing
-     │
-     ▼
-Git Commit
-     │
-     ▼
-Push to Repository
-     │
-     ▼
-Deploy to Staging
-     │
-     ▼
-QA Testing
-     │
-     ▼
-Production Deployment
-```
-
----
-
-## Deployment Rules
-
-- Never deploy untested code.
-- Always deploy through staging.
-- Perform backups before deployment.
-- Verify deployment immediately.
-
----
-
-# 16. Deployment Checklist
-
-## Pre-Deployment
-
-- Source code reviewed.
-- Unit tests passed.
-- Feature tests passed.
-- Database migrations verified.
-- Backup completed.
-
----
-
-## Production Deployment
-
-- Application deployed.
-- Database updated.
-- Apache restarted.
-- SSL verified.
-- File permissions verified.
-
----
-
-## Post-Deployment
-
-- Homepage tested.
-- Login tested.
-- Booking tested.
-- Payment tested.
-- Notifications tested.
-- Logs reviewed.
-
----
-
-# 17. Rollback Procedure
-
-In case of deployment failure:
-
-```text
-Deployment Failure
-       │
-       ▼
-Stop Deployment
-       │
-       ▼
-Restore Previous Release
-       │
-       ▼
-Restore Database Backup
-       │
-       ▼
-Restart Services
-       │
-       ▼
-Verify Application
-```
-
----
-
-## Rollback Rules
-
-- Maintain previous release copies.
-- Maintain recent database backups.
-- Document rollback activities.
-- Notify stakeholders.
-
----
-
-# 18. Monitoring
-
-The application should be monitored continuously.
-
-## Monitoring Areas
-
-- Server Health
-- CPU Usage
-- Memory Usage
-- Disk Usage
-- Database Performance
-- Application Logs
-- SSL Expiration
-- Failed Logins
-
----
-
-## Monitoring Tools (Future)
-
-- Grafana
-- Prometheus
-- Uptime Kuma
-- Netdata
-
----
-
-# 19. Security Checklist
-
-All deployments must pass the following security checks.
-
-## Server Security
-
-- Firewall Enabled
-- SSH Hardened
-- Root Login Disabled
-- Strong Passwords
-
----
-
-## Application Security
-
-- APP_DEBUG=false
-- SSL Enabled
-- CSRF Enabled
-- XSS Protection Enabled
-- Secure Sessions Enabled
-
----
-
-## Database Security
-
-- Dedicated User Accounts
-- Strong Passwords
-- Restricted Remote Access
-- Regular Backups
-
----
-
-# 20. Future Improvements
-
-The deployment architecture supports future enhancements.
-
-## Planned Features
-
-- Docker Containers
-- CI/CD Pipelines
-- GitHub Actions
-- Cloud Hosting
-- Load Balancing
-- Kubernetes
-- Multi-Server Deployment
-- Auto Scaling
-
----
-
-# 21. Related Documents
-
-This document should be used together with:
-
-- 04_Project_Architecture.md
-- 05_Folder_Structure.md
-- 08_Database_Design.md
-- 09_ER_Diagram.md
-- 23_REST_API_Specification.md
-- 24_Frontend_Architecture.md
-- 25_Backend_Architecture.md
-
----
-
-# 22. Conclusion
-
-The Deployment Guide establishes the standards and procedures required to deploy, maintain, and operate the Tara Guest House Management System across all environments.
-
-By following this guide, the development and operations teams can ensure:
-
-- Reliable Deployments
-- Secure Configurations
-- Consistent Environments
-- Effective Backup Strategies
-- Rapid Recovery
-- Improved System Availability
-
-The deployment architecture has been designed to support both current business requirements and future infrastructure growth.
-
----
-
-# Document Approval
-
-| Role | Name | Status |
-|------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
-| DevOps Engineer | Pending | Pending |
-| Backend Developer | Rijan | Pending |
-| QA Engineer | Pallawi | Pending |
-
+* Exact hosting provider/plan and capability evidence;
+* session inactivity/absolute-lifetime values;
+* upload MIME/extension/size values and image extension capability;
+* cron schedules and locking mechanism;
+* SMTP sender/provider/retry values;
+* backup frequency/retention/off-host requirements;
+* production log/retention policy;
+* rollback and emergency contact ownership.

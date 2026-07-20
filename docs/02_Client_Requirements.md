@@ -1,5 +1,7 @@
 # Client Requirements Specification (CRS)
 
+> **Version 1 synchronization:** The Version 1 actors are **Guest** (unauthenticated public visitor) and **Administrator** (authenticated staff user). Guests may book one room without registering. Registered-customer accounts, login, portal, saved booking history, and specialized staff roles are deferred to **Future Enhancements**. Transactional SMTP email and in-app administrator notifications remain in Version 1. See `00_V1_ARCHITECT_DECISIONS.md`, DEC-004 through DEC-006 and DEC-023.
+
 ## Project Information
 
 | Item | Details |
@@ -64,9 +66,9 @@ Develop a modern hotel website and management system for **Tara Guest House** th
 
 ---
 
-## Registered Customer
+## Registered Customer (Future Enhancement)
 
-### Permissions
+### Future Permissions
 
 - Login
 - View bookings
@@ -89,7 +91,7 @@ Develop a modern hotel website and management system for **Tara Guest House** th
 - Manage activities
 - Manage pricing
 - Generate invoices
-- Approve reservations
+- Manage booking transitions; booking confirmation occurs only after verified payment through Booking Service.
 - Upload and manage images
 
 ---
@@ -102,7 +104,7 @@ The homepage shall include:
 
 - Hero Section
 - Room Search
-- Featured Rooms
+- Room Preview
 - Activities
 - Customer Reviews
 - Gallery
@@ -170,10 +172,10 @@ The administrator shall be able to manage tourism activities including:
 
 Each activity shall contain:
 
-- Images
 - Price
 - Description
-- Duration
+
+Activity images, categories, duration, meeting point, participant limits and featured flags are Future Enhancements unless a later approved decision updates the database, API and UI together.
 
 ---
 
@@ -184,23 +186,21 @@ Administrator capabilities:
 - Upload images
 - Edit captions
 - Delete images
-- Feature images
+- Manage display order and separate active/publication controls
 
 ---
 
 ## 5.7 Review Module
 
-### Customer
+### Guest
 
 - Give rating
 - Write review
-- Upload optional image
+- Use a secure single-use invitation linked to a checked-out booking
 
 ### Administrator
 
-- Reply to reviews
-- Hide inappropriate reviews
-- Delete spam reviews
+- Approve or reject pending reviews
 
 ---
 
@@ -213,8 +213,7 @@ Administrator capabilities:
 ### Administrator
 
 - Read inquiries
-- Reply to inquiries
-- Archive messages
+- Manage inquiries using the approved contact workflow after its status policy is confirmed
 
 ---
 
@@ -270,10 +269,14 @@ The application shall function correctly on:
 The website shall include:
 
 - SEO-friendly URLs
-- Meta Tags
-- Open Graph Metadata
-- Schema Markup
-- XML Sitemap
+- Page meta title and meta description
+- Canonical URL derived from the current public route
+- Open Graph title and description derived from page metadata
+- Global/default Open Graph image stored in settings
+- XML sitemap generated from public routes and published records
+- Schema markup where appropriate
+
+Meta keywords are not required in Version 1.
 
 ---
 
@@ -282,7 +285,7 @@ The website shall include:
 The following features are planned for future releases and are **not included in Version 1**:
 
 - Online Payment Gateway
-- Email Notifications
+- Marketing email campaigns (transactional SMTP email remains in Version 1)
 - SMS Notifications
 - Loyalty Program
 - Coupons & Promotions

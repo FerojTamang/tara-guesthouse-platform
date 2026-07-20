@@ -1,511 +1,85 @@
-# Tara Guest House Management System
+# Tara Guest House Authentication and Authorization Specification
 
-# Authentication & Authorization System Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 Administrator authentication and authorization
 
-# Document Control
+## 1. Actors and Roles
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Authentication & Authorization System Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+Administrator is the only stored/authenticated Version 1 role. Guest is an unauthenticated actor and is not stored in `roles`. Customer accounts and Receptionist, Manager, Accountant and Content Manager roles/permissions are Future Enhancements.
 
----
+## 2. Authentication Mechanism
 
-# Change Log
+Version 1 uses a server-side PHP session. It does not issue or accept JWT access/refresh tokens.
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Authentication & Authorization Specification |
+Exact JSON endpoints:
 
----
+* `POST /api/v1/admin/auth/login`
+* `POST /api/v1/admin/auth/logout`
+* `GET /api/v1/admin/auth/profile`
+* `PUT /api/v1/admin/auth/password`
+* `POST /api/v1/admin/auth/forgot-password`
+* `POST /api/v1/admin/auth/reset-password`
 
-# Table of Contents
+Normal page routes include `/admin/login` and protected `/admin/...` pages.
 
-1. Purpose
-2. Scope
-3. Actors
-4. User Stories
-5. Business Objectives
-6. Functional Requirements
-7. Non-Functional Requirements
-8. Authentication Flow
-9. Authorization Model
-10. User Roles
-11. Permission Matrix
-12. Session Management
-13. Password Policy
-14. Security Controls
-15. Validation Rules
-16. Error Handling
-17. Audit Logging
-18. Performance Requirements
-19. Accessibility Requirements
-20. Acceptance Criteria
-21. Future Enhancements
-22. Related Modules
+## 3. Login Flow
 
----
+1. Administrator submits normalized email/username, password and CSRF/public-login controls.
+2. Controller validates syntax and rate limits.
+3. Authentication Service loads the Administrator through User Repository.
+4. The service verifies active/lock state and `password_hash` using PHP password APIs.
+5. On success, PHP regenerates the session ID and stores the minimum Administrator identity/role data.
+6. The action is audited without logging credentials/session identifiers.
+7. The PHP-rendered flow redirects to `/admin/dashboard`; JSON returns session/authenticated profile data only.
 
-# 1. Purpose
+Failure messages do not reveal whether an account exists.
 
-This document defines how users authenticate to the Tara Guest House Management System and how authorization controls access to protected resources.
+## 4. Session Lifetime
 
-The objective is to ensure that only authorized users can access administrative features while protecting customer and business data.
+Session controls use configuration placeholders:
 
----
+* `SESSION_INACTIVITY_TIMEOUT` — Architect/Security Configuration Required;
+* `SESSION_ABSOLUTE_LIFETIME` — Architect/Security Configuration Required.
 
-# 2. Scope
+Each protected request checks creation time and last activity. A session exceeding either configured limit is destroyed and rejected. Logout destroys server-side state and expires the cookie. No hardcoded 30-minute value is approved.
 
-Included
+Production cookies are Secure, HttpOnly and use an appropriate SameSite setting. Session IDs regenerate after login and any authorization-sensitive identity change.
 
-- Login
-- Logout
-- Session Management
-- Password Management
-- Authorization
-- User Roles
-- Permissions
-- Account Status
-- Login History
-- Audit Logging
+## 5. Authorization
 
-Excluded
+Every protected Administrator page/API requires a valid session and Administrator role. Unauthorized JSON returns `401`; authenticated but disallowed actions return `403`. State-changing session requests require CSRF validation.
 
-- Customer Portal Authentication (Future)
-- Google Login
-- Two-Factor Authentication
+Version 1 does not expose role creation, permission assignment or specialized staff matrices. The `roles` table is future-ready, but only Administrator is seeded/used.
 
----
+## 6. Password and Reset Rules
 
-# 3. Actors
+Passwords use PHP `password_hash()`/`password_verify()` with an approved current algorithm. Minimum/complexity/breach-check rules require security configuration and must be consistently validated. Password reset tokens are random, stored only as hashes, single-use and expiring. Reset lifetime is an approved security configuration value rather than a hardcoded document value.
 
-## Administrator
+## 7. Responsibilities and Persistence
 
-Can
+* Controllers validate requests and format responses.
+* Authentication Service applies login/session/password/reset rules and transactions.
+* User Repository contains PDO/SQL.
+* User/Role entities represent data and execute no SQL.
+* Views render escaped fields and execute no SQL.
 
-- Login
-- Logout
-- Change Password
-- Manage website
+## 8. Security and Audit
 
----
+Use TLS, prepared statements, generic errors, rate limiting/lock controls, CSRF, session fixation protection, safe logging and output escaping. Audit successful/failed login, logout, password/reset events, lock/state changes and Administrator-account mutations without secrets.
 
-## Future Manager
+## 9. Acceptance Tests
 
-Can
+* Only active Administrator accounts authenticate.
+* Login regenerates the session and returns no bearer tokens.
+* Missing/expired sessions cannot access `/api/v1/admin/...`.
+* Both configured session lifetime limits are enforced.
+* Logout invalidates the session.
+* CSRF protects state changes.
+* Guest/specialized roles cannot authenticate in Version 1.
+* Password/reset secrets are hashed and never logged.
 
-- Login
-- Manage bookings
-- Manage rooms
+## 10. Future Enhancements
 
-Limited permissions.
-
----
-
-## Future Receptionist
-
-Can
-
-- Check guests in
-- Check guests out
-- Manage reservations
-
-Cannot change CMS settings.
-
----
-
-# 4. User Stories
-
-### As an Administrator
-
-I want to securely log in
-
-So that I can manage the hotel.
-
----
-
-### As an Administrator
-
-I want my password encrypted
-
-So that it cannot be stolen from the database.
-
----
-
-### As an Administrator
-
-I want inactive accounts blocked
-
-So unauthorized users cannot access the system.
-
----
-
-# 5. Business Objectives
-
-The authentication system shall
-
-- Protect hotel information
-- Prevent unauthorized access
-- Record login history
-- Support future expansion
-- Follow OWASP security recommendations
-
----
-
-# 6. Functional Requirements
-
-The system shall provide
-
-- Login
-- Logout
-- Password Change
-- Session Timeout
-- Password Hashing
-- Account Lock
-- Account Activation
-- Role Checking
-- Permission Checking
-- Login Logging
-
----
-
-# 7. Non-Functional Requirements
-
-The authentication system shall be
-
-- Secure
-- Reliable
-- Fast
-- Maintainable
-- Scalable
-
-Average login response time
-
-< 2 seconds
-
----
-
-# 8. Authentication Flow
-
-Administrator
-
-↓
-
-Open Login Page
-
-↓
-
-Enter Username or Email
-
-↓
-
-Enter Password
-
-↓
-
-Server Validation
-
-↓
-
-Password Verification
-
-↓
-
-Account Status Check
-
-↓
-
-Create Secure Session
-
-↓
-
-Redirect Dashboard
-
-If login fails
-
-↓
-
-Display Generic Error
-
-↓
-
-Log Attempt
-
----
-
-# 9. Authorization Model
-
-Role-Based Access Control (RBAC)
-
-Users
-
-↓
-
-Role
-
-↓
-
-Permissions
-
-↓
-
-Resources
-
----
-
-# 10. User Roles
-
-Current Version
-
-| Role | Description |
-|------|-------------|
-| Administrator | Full system access |
-
-Future
-
-| Role | Description |
-|------|-------------|
-| Manager | Operational management |
-| Receptionist | Booking management |
-| Accountant | Financial reports |
-
----
-
-# 11. Permission Matrix
-
-| Module | Admin | Manager | Receptionist |
-|---------|-------|----------|--------------|
-| Dashboard | ✅ | ✅ | ✅ |
-| Rooms | ✅ | ✅ | ❌ |
-| Gallery | ✅ | ❌ | ❌ |
-| Activities | ✅ | ✅ | ❌ |
-| CMS | ✅ | ❌ | ❌ |
-| Bookings | ✅ | ✅ | ✅ |
-| Reviews | ✅ | ✅ | ❌ |
-| Payments | ✅ | ✅ | ❌ |
-| Settings | ✅ | ❌ | ❌ |
-| Users | ✅ | ❌ | ❌ |
-
----
-
-# 12. Session Management
-
-Sessions shall
-
-- Regenerate Session ID after login
-- Expire after inactivity
-- Be destroyed on logout
-- Use Secure Cookies
-- Use HttpOnly cookies
-- Use SameSite protection
-
-Default timeout
-
-30 minutes
-
----
-
-# 13. Password Policy
-
-Minimum Length
-
-12 characters
-
-Must contain
-
-- Uppercase letter
-- Lowercase letter
-- Number
-- Special character
-
-Passwords shall be hashed using
-
-PHP
-
-password_hash()
-
-Algorithm
-
-PASSWORD_DEFAULT
-
-Passwords shall never be stored in plain text.
-
----
-
-# 14. Security Controls
-
-The authentication system shall implement
-
-- CSRF Protection
-- SQL Injection Prevention
-- XSS Prevention
-- Password Hashing
-- Session Regeneration
-- Secure Cookies
-- HttpOnly Cookies
-- SameSite Cookies
-- Brute Force Protection
-- Login Rate Limiting
-- Server-side Validation
-- Output Escaping
-
----
-
-# 15. Validation Rules
-
-Username
-
-3–50 characters
-
-Email
-
-Valid email format
-
-Password
-
-12–128 characters
-
-Only active users may log in.
-
----
-
-# 16. Error Handling
-
-Never reveal whether
-
-- Username exists
-- Email exists
-- Password is incorrect
-
-Display
-
-Invalid username/email or password.
-
-Do not expose system information.
-
----
-
-# 17. Audit Logging
-
-Record
-
-- Successful Login
-- Failed Login
-- Logout
-- Password Change
-- Account Lock
-- Account Unlock
-- Role Changes
-- Permission Changes
-
-Audit Log Fields
-
-- User
-- IP Address
-- Browser
-- Date
-- Time
-- Action
-
----
-
-# 18. Performance Requirements
-
-Login response
-
-Less than 2 seconds
-
-Support
-
-100 concurrent sessions
-
-Session lookup
-
-Less than 100 milliseconds
-
----
-
-# 19. Accessibility Requirements
-
-Authentication pages shall
-
-- Support keyboard navigation
-- Meet WCAG 2.1 AA
-- Display clear error messages
-- Provide visible focus indicators
-- Support screen readers
-
----
-
-# 20. Acceptance Criteria
-
-The module is complete when
-
-- Users can log in securely.
-- Passwords are hashed.
-- Sessions are protected.
-- Unauthorized users are denied access.
-- Audit logs are recorded.
-- Permissions work correctly.
-
----
-
-# 21. Future Enhancements
-
-- Two-Factor Authentication (2FA)
-- OTP Login
-- Google Login
-- Microsoft Login
-- Passwordless Login
-- Passkeys
-- Face ID
-- Fingerprint Login
-- Security Dashboard
-- Device Management
-
----
-
-# 22. Related Database Tables
-
-- users
-- roles
-- user_permissions (Future)
-- audit_logs
-- login_history (Future)
-
----
-
-# 23. Related API Endpoints
-
-POST /login
-
-POST /logout
-
-POST /change-password
-
-GET /profile
-
-PUT /profile
-
----
-
-# 24. Related Modules
-
-- Admin Dashboard
-- CMS
-- Booking Management
-- Room Management
-- Gallery Management
-- Payment System
-- Notification System
-
----
-
-# End of Document
+Customer authentication/portal, specialized staff RBAC, two-factor authentication, social login, passkeys, device management and bearer-token APIs require later approval.

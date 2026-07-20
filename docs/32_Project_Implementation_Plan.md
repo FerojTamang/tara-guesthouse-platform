@@ -1,543 +1,209 @@
-# Project Implementation Plan
+# Tara Guest House Project Implementation Plan
 
-## Project Information
+## Document Information
 
-| Item | Details |
-|------|---------|
-| **Project** | Tara Guest House Management System |
-| **Document** | Project Implementation Plan |
-| **Document No.** | 32 |
-| **Version** | 1.0 |
-| **Status** | Approved |
-| **Prepared By** | fero.dev |
-| **Project Owner** | Feroj |
-| **Date** | July 2026 |
+* Document number: 32
+* Status: Synchronized — Review Required
+* Scope: Approved Version 1 Phase 0–6 implementation order
 
----
+## 1. Purpose
 
-# 1. Purpose
+This plan defines the approved delivery order, vertical-slice method, responsibilities, gates and deliverables for a secure, maintainable, production-ready Tara Guest House application.
 
-This document defines the implementation strategy, phases, milestones, timelines, and deliverables for the Tara Guest House Management System.
+## 2. Version 1 Scope
 
-The objectives of this document are to:
+Core Version 1 modules include:
 
-- Establish a clear implementation roadmap.
-- Define project phases and responsibilities.
-- Identify milestones and deliverables.
-- Improve project visibility.
-- Reduce implementation risks.
-- Ensure successful project completion.
+* Administrator authentication and accounts;
+* room types, rooms, amenities, publication and calculated availability;
+* Guest one-room bookings and booking transitions;
+* Payment Verification and Booking Confirmation through Booking Service;
+* invoices;
+* activities, gallery, settings and structured CMS pages;
+* verified-stay reviews, contacts and notifications;
+* dashboard projections, audit, backups, testing and cPanel deployment.
 
----
+Customer accounts/portal, specialized staff roles, multi-room booking, payment gateways, additional notification channels, advanced infrastructure and other documented Future Enhancements are excluded.
 
-# 2. Introduction
+## 3. Vertical-Slice Delivery Method
 
-The Tara Guest House Management System is an enterprise-grade hospitality management application designed to streamline room reservations, payments, content management, and administrative operations.
+Each feature is implemented end to end as a vertical slice. A slice includes all applicable:
 
-This implementation plan provides a structured approach for delivering the project from requirements gathering through production deployment and ongoing maintenance.
+1. database migration and approved seed/update;
+2. backend request/controller/service/repository/entity behavior;
+3. PHP-rendered frontend and selective Fetch/AJAX behavior;
+4. server/client validation;
+5. authorization, CSRF, escaping, prepared statements, upload/session and other security controls;
+6. automated unit, integration, feature and negative tests;
+7. documentation and traceability update.
 
----
+A slice is not complete when only its backend or frontend exists. Testing/security/documentation are performed within each slice, with regression and acceptance gates across phases.
 
-# 3. Project Objectives
+Services own business rules/transactions. Repositories own PDO/SQL. Models/entities contain domain data and execute no SQL.
 
-The primary objectives of the project are:
+## 4. Approved Phase Order
 
-- Deliver a secure web application.
-- Implement all approved requirements.
-- Maintain high code quality.
-- Ensure scalability and maintainability.
-- Complete development within the planned schedule.
-- Deliver complete documentation.
+Only the following Phase 0–6 order is active.
 
----
+### Phase 0 — Documentation Synchronization
 
-# 4. Project Scope
+Deliverables:
 
-The project includes the following modules:
+* approved architect decisions;
+* synchronized detailed requirements, schema, states, API, UI and deployment contracts;
+* documented unresolved decisions;
+* traceability baseline and reviewed Git diff.
 
-### Core Modules
+Exit gate: Project Manager and Technical Architect approve the implementation baseline or record remaining blocked areas.
 
-- Authentication
-- Room Management
-- Booking Management
-- Payment Management
-- Invoice Management
-- Review Management
-- Gallery Management
-- CMS Management
-- Notification Management
-- Audit Logging
+### Phase 1 — Foundation
 
----
+Vertical slices:
 
-### Administrative Modules
+* repository/folder bootstrap and environment configuration;
+* Composer autoloading and shared framework/core flow;
+* migration runner, database connection and domain constants;
+* error handling/logging, response/view helpers and security foundations;
+* baseline automated test harness and CI/local commands.
 
-- Dashboard
-- User Management
-- Booking Approval
-- Payment Verification
-- Website Settings
-- Reporting
+Exit gate: foundation runs in the approved local environment; migrations/test harness and security defaults pass review.
 
----
+### Phase 2 — Administrator Authentication and Rooms
 
-### Future Scope
+Vertical slices:
 
-- Online Payment Gateway
-- SMS Notifications
-- Mobile Application
-- Multi-Hotel Support
-- REST API Expansion
+* Administrator role/user/password reset and PHP-session authentication;
+* protected page/API middleware and CSRF;
+* room types, rooms, amenities and room images;
+* separate operational/publication controls;
+* calculated room eligibility foundations.
 
----
+Exit gate: only Administrator authenticates; room CRUD/publication/image/security tests pass; no stored Available/Reserved/Occupied status exists.
 
-# 5. Implementation Strategy
+### Phase 3 — Availability and Booking
 
-The project follows an iterative implementation strategy.
+Vertical slices:
 
-```text
-Requirements
-      │
-      ▼
-Architecture
-      │
-      ▼
-Database Design
-      │
-      ▼
-Backend Development
-      │
-      ▼
-Frontend Development
-      │
-      ▼
-Testing
-      │
-      ▼
-Deployment
-      │
-      ▼
-Maintenance
-```
-
----
-
-## Strategy Objectives
-
-- Deliver incremental progress.
-- Reduce implementation risks.
-- Improve quality assurance.
-- Enable easier tracking.
-- Support continuous improvements.
-
----
-
-# 6. Project Phases
-
-The implementation is divided into eight phases.
-
-| Phase | Description |
-|------|-------------|
-| Phase 1 | Requirements Gathering |
-| Phase 2 | Architecture & Design |
-| Phase 3 | Database Design |
-| Phase 4 | Backend Development |
-| Phase 5 | Frontend Development |
-| Phase 6 | Testing |
-| Phase 7 | Deployment |
-| Phase 8 | Maintenance |
-
----
-
-## Phase Details
-
-### Phase 1
-
-```text
-Requirements Gathering
-- Functional Requirements
-- Non-Functional Requirements
-- Stakeholder Approval
-```
-
----
-
-### Phase 2
-
-```text
-Architecture & Design
-- ER Diagram
-- System Architecture
-- Folder Structure
-- API Design
-```
-
----
-
-### Phase 3
-
-```text
-Database Design
-- Schema Creation
-- Relationships
-- Constraints
-- Seed Data
-```
-
----
-
-### Phase 4
-
-```text
-Backend Development
-- Controllers
-- Services
-- Repositories
-- Models
-- APIs
-```
-
----
-
-### Phase 5
-
-```text
-Frontend Development
-- HTML
-- Bootstrap
-- JavaScript
-- Responsive Design
-```
-
----
-
-### Phase 6
-
-```text
-Testing
-- Unit Testing
-- Integration Testing
-- Feature Testing
-- User Acceptance Testing
-```
-
----
-
-### Phase 7
-
-```text
-Deployment
-- Server Setup
-- Application Deployment
-- Configuration
-- Verification
-```
-
----
-
-### Phase 8
-
-```text
-Maintenance
-- Monitoring
-- Updates
-- Backups
-- Incident Management
-```
-
----
-
-# 7. Milestones
-
-| Milestone | Status |
-|----------|--------|
-| Requirements Complete | Completed |
-| Architecture Complete | Completed |
-| Database Design Complete | Completed |
-| Documentation Complete | In Progress |
-| Backend Development Complete | Pending |
-| Frontend Development Complete | Pending |
-| Testing Complete | Pending |
-| Production Deployment | Pending |
-
----
-
-# 8. Timeline
-
-## Estimated Timeline
-
-```text
-Month 1
---------
-Requirements
-Architecture
-Documentation
-
-Month 2
---------
-Database
-Backend Development
-
-Month 3
---------
-Frontend Development
-
-Month 4
---------
-Testing
-
-Month 5
---------
-Deployment
-
-Month 6+
---------
-Maintenance
-```
-
----
-
-## Timeline Objectives
-
-- Maintain project visibility.
-- Reduce delays.
-- Improve planning.
-- Support resource allocation.
-
----
-
-## End of Part 1
-
-Part 2 includes:
-
-- Resource Allocation
-- Risk Management
-- Communication Plan
-- Success Criteria
-- Deliverables
-- Future Roadmap
-- Conclusion
-- Approval
-
----
-
-# 9. Resource Allocation
-
-The following personnel are assigned to the project.
-
-| Role | Name | Responsibility |
-|------|------|----------------|
-| Project Manager | Feroj | Project Planning & Delivery |
-| Technical Architect | fero.dev | Architecture & Standards |
-| Backend Developer | Rijan | PHP & MariaDB Development |
-| Frontend Developer | Saroj | HTML, Bootstrap, JavaScript |
-| QA Engineer | Pallawi | Testing & Quality Assurance |
-
----
-
-## Resource Objectives
-
-- Clearly define responsibilities.
-- Improve accountability.
-- Facilitate collaboration.
-- Support project tracking.
-
----
-
-# 10. Risk Management
-
-Project risks shall be identified, assessed, and mitigated throughout the implementation lifecycle.
-
----
-
-## Risk Register
+* date-range availability and concurrency protection;
+* Guest and Administrator one-room booking creation;
+* Guest contact/policy/financial snapshots and non-sequential references;
+* booking deadlines and append-only events;
+* reject/cancel/check-in/check-out transitions.
+
+Exit gate: booking starts `pending`, creates zero payment attempts, prevents overlaps, allows adjacent checkout/check-in dates and retains history.
+
+### Phase 4 — Payments and Invoices
+
+Vertical slices:
+
+* configured manual payment methods;
+* secure Guest payment submission and multiple attempts;
+* Administrator verification/rejection;
+* Payment Verification and Booking Confirmation through Booking Service;
+* invoice issue/print from fixed-precision snapshots.
+
+Refund implementation remains excluded until its policy/data/API/UI decision. Tax/service-charge/rounding-dependent invoice behavior remains gated where unresolved.
+
+Exit gate: payment verification cannot be bypassed to confirm a booking; duplicate verification is blocked; invoice snapshot tests pass for approved policy.
+
+### Phase 5 — Operations and Content
+
+Vertical slices:
+
+* activities and gallery with separate active/publication controls;
+* settings and structured CMS pages;
+* contacts;
+* checked-out review invitations, submission and moderation;
+* Administrator in-app notifications and Guest transactional SMTP email;
+* associated uploads/audit behavior.
+
+Exit gate: public content uses only published eligible records; reviews require single-use checked-out invitations; Guests have no in-app notification centre.
+
+### Phase 6 — Dashboard, Hardening and Deployment
+
+Vertical slices/gates:
+
+* read-only Administrator dashboard projections;
+* cross-module regression, security, performance, accessibility/browser and UAT testing;
+* audit/log/backup/restore operational verification;
+* cPanel/shared-hosting release, migrations, HTTPS, permissions, SMTP and cron checks;
+* final documentation/traceability/release notes and acceptance evidence.
+
+Exit gate: approved acceptance tests pass, unresolved blocked functions remain absent, rollback/backup evidence exists, and stakeholders approve release.
+
+## 5. Milestones
+
+| Milestone | Completion evidence |
+|---|---|
+| Documentation baseline approved | Reviewed Phase 0 documents/decisions |
+| Foundation accepted | Running migrations, test harness and architecture review |
+| Authentication/rooms accepted | Phase 2 slice tests and demo |
+| Booking accepted | Phase 3 availability/concurrency/state evidence |
+| Payments/invoices accepted | Phase 4 verification/confirmation/invoice evidence |
+| Operations/content accepted | Phase 5 publication/review/notification evidence |
+| Production release accepted | Phase 6 UAT/security/deployment/rollback evidence |
+
+Milestones are not marked complete merely because documentation exists. Status must reference implementation and passing test evidence.
+
+## 6. Team Responsibilities
+
+| Project responsibility | Owner duties |
+|---|---|
+| Project Manager | Scope, priorities, client decisions, phase gates and acceptance |
+| Technical Architect | Architecture/data/API/security/deployment decisions and reviews |
+| Backend development | Migrations, Services, Repositories, endpoints and integration tests within each slice |
+| Frontend development | PHP views, Bootstrap/Vanilla interactions, accessibility and UI tests within each slice |
+| Quality assurance | Acceptance criteria, automated/manual/regression/security evidence within each slice |
+
+Team job titles do not create application roles.
+
+## 7. Slice Definition of Done
+
+A feature slice is complete only when:
+
+* its approved migration/schema change is reviewed and reversible/recoverable;
+* backend and frontend behavior agree with the API/UI contract;
+* validation/security/authorization/transaction rules are implemented;
+* automated positive and negative tests pass;
+* accessibility/error/empty/loading behavior is verified where applicable;
+* documentation and traceability identify the implementation and tests;
+* no future feature or unresolved policy was guessed;
+* responsible reviewers approve the slice.
+
+## 8. Risk Management
 
 | Risk | Impact | Mitigation |
-|------|--------|------------|
-| Schedule Delays | High | Regular Reviews |
-| Requirement Changes | Medium | Change Management Process |
-| Resource Constraints | Medium | Resource Planning |
-| Technical Issues | High | Early Testing |
-| Security Vulnerabilities | High | Security Reviews |
+|---|---|---|
+| Unresolved client policy | Incorrect implementation | Gate affected slice; obtain recorded decision |
+| Contract drift | Rework/defects | Update database/API/UI/tests/docs together in the slice |
+| Double booking | High | Transactional overlap checks and concurrency tests |
+| Security vulnerability | High | Threat-aware review and negative tests per slice |
+| Shared-host limitation | Deployment failure | Confirm cPanel capabilities before dependent work |
+| Schedule/resource pressure | Quality loss | Slice prioritization; do not defer tests/security/documentation |
+| AI-generated scope drift | Unsupported architecture | Enforce DEC-032 human review and exact contracts |
 
----
+## 9. Communication and Change Control
 
-## Risk Management Workflow
+Weekly team/project updates report slice status, tests, decisions and risks. Client/architect decisions that change scope/data/API/UI require controlled documentation updates before implementation. Phase-gate evidence is reviewed with the Project Manager and Technical Architect.
 
-```text
-Identify Risk
-      │
-      ▼
-Assess Impact
-      │
-      ▼
-Develop Mitigation Plan
-      │
-      ▼
-Monitor Risk
-      │
-      ▼
-Close Risk
-```
+## 10. Deliverables
 
----
+Technical deliverables include reviewed source, migrations, configuration templates, automated tests and cPanel release artifacts. Documentation deliverables include requirements, architecture, dictionary/ERD, state/API/UI specifications, test/deployment/user/developer/maintenance guidance, traceability and acceptance/release reports.
 
-# 11. Communication Plan
+## 11. Success Criteria
 
-Effective communication is essential for project success.
+The project is successful when approved Version 1 requirements are implemented as tested vertical slices; critical security/functional defects are resolved; UAT is approved; backup/rollback and cPanel deployment are verified; and final documentation accurately matches the release.
 
----
+Targets such as availability, response time or load time must be measured in an approved environment and cannot be marked achieved from documentation alone.
 
-## Communication Matrix
+## 12. Future Roadmap
 
-| Audience | Frequency | Method |
-|---------|-----------|--------|
-| Development Team | Weekly | Meetings |
-| Project Manager | Weekly | Status Reports |
-| Stakeholders | Monthly | Progress Reports |
-| QA Team | As Needed | Coordination Meetings |
+Later approved versions may add customer accounts/portal, specialized staff roles, multi-room bookings, gateways/refunds, additional channels, multi-language/mobile/multi-hotel features and VPS/cloud infrastructure. They are not inserted into Phase 0–6 Version 1 slices without a new decision.
 
----
+## 13. Approval
 
-## Communication Objectives
-
-- Maintain transparency.
-- Improve collaboration.
-- Reduce misunderstandings.
-- Ensure timely updates.
-
----
-
-# 12. Success Criteria
-
-The project shall be considered successful if the following criteria are met.
-
----
-
-## Success Metrics
-
-```text
-□ All Requirements Implemented
-□ Documentation Completed
-□ No Critical Defects
-□ Security Standards Met
-□ Performance Targets Achieved
-□ User Acceptance Approved
-□ Successful Deployment Completed
-```
-
----
-
-## Key Performance Indicators
-
-| KPI | Target |
-|----|--------|
-| System Availability | 99%+ |
-| Homepage Load Time | < 2 Seconds |
-| API Response Time | < 500 ms |
-| Critical Bugs | 0 |
-| Documentation Completion | 100% |
-
----
-
-# 13. Deliverables
-
-The following deliverables are included within the project scope.
-
----
-
-## Technical Deliverables
-
-- Source Code
-- Database Schema
-- Configuration Files
-- Test Cases
-- Deployment Scripts
-
----
-
-## Documentation Deliverables
-
-- Requirements Specification
-- ER Diagram
-- Project Architecture
-- API Specification
-- Testing Strategy
-- Deployment Guide
-- User Manual
-- Developer Guide
-- Maintenance Manual
-- Framework Architecture
-
----
-
-## Final Deliverables
-
-```text
-1. Complete Source Code
-2. Database Design
-3. Full Documentation Suite
-4. Deployment Package
-5. Test Reports
-6. User Acceptance Sign-Off
-```
-
----
-
-# 14. Future Roadmap
-
-The system has been designed to support future enhancements.
-
----
-
-## Version 2.0 Features
-
-```text
-- Online Payment Integration
-- SMS Notifications
-- Mobile Application
-- Multi-Hotel Support
-- Advanced Reporting
-- Multi-Language Support
-- REST API Expansion
-```
-
----
-
-## Long-Term Goals
-
-- Commercial Productization
-- Cloud Deployment
-- SaaS Offering
-- Third-Party Integrations
-- Internationalization
-
----
-
-# 15. Conclusion
-
-The Project Implementation Plan provides a structured roadmap for successfully delivering the Tara Guest House Management System.
-
-This plan establishes:
-
-- Project Phases
-- Timelines
-- Milestones
-- Responsibilities
-- Risks
-- Success Criteria
-- Deliverables
-
-By following this implementation plan, the project team can ensure a predictable, organized, and successful delivery while maintaining quality, security, and maintainability.
-
----
-
-# Document Approval
-
-| Role | Name | Status |
-|------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
-| Backend Developer | Rijan | Pending |
-| Frontend Developer | Saroj | Pending |
-| QA Engineer | Pallawi | Pending |
+| Role | Status |
+|---|---|
+| Project Manager | Review Required |
+| Technical Architect | Review Required |
+| Development/QA team | Pending approved phase/slice assignment |

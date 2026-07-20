@@ -1,662 +1,204 @@
 # Tara Guest House Management System
 
-# Business Process Flow
+# 21. Business Process Flow
 
----
+## Document Control
 
-# Document Control
+| Field | Value |
+|---|---|
+| Version | 1.2 |
+| Status | Synchronized — Review Required |
+| Authority | `00_V1_ARCHITECT_DECISIONS.md` |
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Business Process Flow |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+# 1. Actors
 
----
+- **Guest:** unauthenticated public visitor; may browse, check availability, create one-room bookings, submit payment attempts securely, and submit a token-authorized review after checkout.
+- **Administrator:** authenticated staff user using a hardened PHP session; manages Version 1 administration.
 
-# Change Log
+Customer accounts/portal and specialized staff permission systems are future enhancements.
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Business Process Flow created |
+# 2. Route Categories
 
----
+- Server-rendered pages use normal routes such as `/rooms`, `/booking`, and `/admin/bookings`.
+- Public/Guest JSON actions use `/api/v1/...`.
+- Protected Administrator JSON actions use `/api/v1/admin/...` with PHP-session authentication, authorization, and CSRF protection.
 
-# Table of Contents
+# 3. Public Content Flow
 
-1. Purpose
-2. Business Objectives
-3. Booking Process
-4. Payment Process
-5. Check-in Process
-6. Check-out Process
-7. Room Management Process
-8. Activity Management Process
-9. Gallery Management Process
-10. Content Management Process
-11. Review Process
-12. Contact Process
-13. Authentication Process
-14. Notification Process
-15. Related Modules
+1. Guest requests a PHP-rendered page.
+2. Controller requests published data through the appropriate Service/Repository.
+3. Public rooms require `operational_status = active` and publication enabled.
+4. Public activities/gallery require active and published controls.
+5. Public CMS pages require `status = published`.
+6. The server renders the Bootstrap view.
+7. Selective Fetch requests use versioned public JSON endpoints.
 
----
+# 4. Availability Flow
 
-# 1. Purpose
+Endpoint: `GET /api/v1/availability`
 
-This document defines every major business process within the Tara Guest House Management System.
+1. Guest supplies check-in, check-out, and occupancy.
+2. Request validation requires valid dates and `check_out > check_in`.
+3. Availability Service excludes maintenance/inactive rooms and unpublished rooms for public results.
+4. It excludes rooms with an unexpired overlapping booking in `pending`, `confirmed`, or `checked_in`.
+5. It ignores `checked_out`, `cancelled`, and `rejected` bookings.
+6. It applies:
 
-Its purpose is to ensure that developers, designers, testers, and project managers have a shared understanding of how the hotel operates before implementation begins.
+   `existing.check_in < requested.check_out AND existing.check_out > requested.check_in`
 
-This document serves as the bridge between business requirements and technical design.
+7. It returns a calculated result. No stored room status changes.
 
----
+# 5. Guest Booking Flow
 
-# 2. Business Objectives
+Page route: `/booking`
+JSON endpoint: `POST /api/v1/bookings`
 
-The system shall:
+1. Guest selects exactly one room.
+2. Guest supplies full name, email, phone, occupancy, dates, special request where applicable, and policy acceptance.
+3. Request class validates the payload and occupancy.
+4. Booking Service opens a database transaction.
+5. Availability is checked again inside the transaction.
+6. Booking Service stores guest/contact and NPR price snapshots, policy acceptance timestamp, secure booking reference, and confirmation deadline.
+7. Booking status is stored as `pending`.
+8. Exactly one `booking_rooms` record is stored.
+9. A permanent booking-created event is appended.
+10. The transaction commits.
+11. The system sends an in-app Administrator notification and attempts transactional SMTP booking-received email.
+12. Email failure is logged and does not roll back the booking.
 
-- Standardize hotel operations.
-- Improve customer experience.
-- Reduce manual work.
-- Improve booking management.
-- Improve payment verification.
-- Support future scalability.
-- Maintain complete audit history.
+A payment record is not automatically required. The booking may have zero payment attempts until payment information is submitted.
 
----
+# 6. Guest Payment-Submission Flow
 
-# 3. Booking Process
+JSON endpoint: `POST /api/v1/payments`
 
-## Workflow
+1. Guest uses the secure booking-access mechanism supplied by the booking flow.
+2. Guest selects an active configured manual payment method.
+3. Payment Service creates an attempt as `pending` if no attempt has yet been created for this submission flow.
+4. Guest supplies amount, transaction/reference code, notes, and proof where required.
+5. Upload and input validation run.
+6. Payment Service changes that attempt to `submitted` and records `submitted_at`.
+7. Administrator receives an in-app notification and transactional SMTP notification may be sent.
 
-Guest
+If an earlier attempt is `rejected`, resubmission creates a new attempt. It does not reset the rejected record.
 
-↓
+# 7. Administrator Payment Verification Flow
 
-Browse Rooms
+Page route: `/admin/payments`
+JSON endpoint: `PATCH /api/v1/admin/payments/{id}/status`
 
-↓
+1. Administrator session, authorization, and CSRF are validated.
+2. Administrator reviews a `submitted` payment attempt.
+3. Administrator selects `verified` or `rejected` and supplies the required note.
+4. Payment Service validates and records the transition with actor and timestamp.
+5. When a payment becomes `verified`, Payment Service notifies Booking Service.
+6. Booking Service may transition the booking from `pending` to `confirmed`, records `confirmed_at`, and appends the booking event.
+7. Confirmation notifications/email are attempted after commit.
+8. A rejected attempt leaves the booking `pending` until its deadline unless the Booking Service separately cancels/rejects it.
 
-View Room Details
+Payment status remains on payment records. It is never represented as Pending Payment or Payment Verified booking status.
 
-↓
+# 8. Pending Booking Expiry
 
-Check Availability
+1. A supported scheduled process finds `pending` bookings beyond `confirmation_deadline_at`.
+2. They stop blocking availability.
+3. Booking Service may transition each to `cancelled` with an expiry reason and timestamp.
+4. A booking event and applicable notification are recorded.
 
-↓
+The exact deadline and cron interval require approved configuration.
 
-Select Room
+# 9. Check-In Flow
 
-↓
+Page route: `/admin/bookings/{id}`
+JSON endpoint: `PATCH /api/v1/admin/bookings/{id}/status`
 
-Choose Check-in & Check-out Dates
+1. Administrator requests transition from `confirmed` to `checked_in`.
+2. Booking Service validates the current state and check-in policy.
+3. It stores `booking_status = checked_in` and `checked_in_at`.
+4. It appends the booking event and commits.
 
-↓
+The room operational status is not changed to occupied. Current occupancy is calculated from the checked-in booking.
 
-Enter Guest Information
+# 10. Check-Out Flow
 
-↓
+Page route: `/admin/bookings/{id}`
+JSON endpoint: `PATCH /api/v1/admin/bookings/{id}/status`
 
-Submit Reservation
+1. Administrator requests transition from `checked_in` to `checked_out`.
+2. Booking Service stores `booking_status = checked_out` and `checked_out_at`.
+3. It appends the booking event and commits.
+4. Review Service may create a secure single-use review invitation.
+5. Review-invitation email is attempted and failures are logged.
 
-↓
+`checked_out` is the terminal successful booking status. There is no Booking Completed state. The room operational status is not changed to available; date availability is recalculated from bookings.
 
-Booking Created (Pending Payment)
+# 11. Cancellation and Rejection
 
-↓
+JSON endpoint: `PATCH /api/v1/admin/bookings/{id}/status`
 
-Payment Process Begins
+- `pending → cancelled`: record `cancelled_at` and cancellation reason.
+- `pending → rejected`: record `rejected_at` and rejection reason.
+- `confirmed → cancelled`: record `cancelled_at` and reason subject to approved booking policy.
 
-↓
+The change is made only by Booking Service, appended to booking history, and reflected automatically in calculated availability.
 
-Payment Verified
+# 12. Invoice Flow
 
-↓
+1. A verified payment allows confirmation.
+2. Administrator requests invoice issue through the Invoice Service.
+3. Invoice Service uses booking and verified-payment NPR snapshots.
+4. It creates a stable unique invoice number and immutable issued values.
+5. The invoice may be rendered/printed again after checkout without changing its number.
+6. Corrections are audited; issued invoices are not deleted.
 
-Booking Confirmed
+Client tax/VAT presentation remains **Architect/Client Confirmation Required**.
 
-↓
+# 13. Review Flow
 
-Guest Receives Confirmation
+Public JSON endpoint: `POST /api/v1/reviews`
+Administrator JSON endpoint: `PATCH /api/v1/admin/reviews/{id}/status`
 
-↓
+1. Review Service hashes/validates the single-use token.
+2. It verifies the related booking has `booking_status = checked_out` and has no existing review.
+3. It creates one review as `pending` and consumes the invitation.
+4. Administrator changes `pending` to `approved` or `rejected`.
+5. Only approved reviews appear publicly.
 
-Check-in
+# 14. CMS, Activity, and Gallery Flow
 
-↓
+- Settings changes update site-wide configuration through protected Administrator endpoints.
+- Structured pages move among `draft`, `published`, and `archived` through CMS Service.
+- Activities and gallery items use separate active and publication controls.
+- Only active and published activity/gallery records are public.
+- All publication and important settings changes are audited.
 
-Stay
+# 15. Contact Flow
 
-↓
+Public endpoint: `POST /api/v1/contact`
+Administrator endpoints: `/api/v1/admin/contact-messages...`
 
-Check-out
+1. Guest submits validated contact data.
+2. Contact Service stores the message.
+3. Administrator receives an in-app notification and optional transactional SMTP notice.
+4. Administrator views/updates the message through protected endpoints.
 
-↓
+Retention, assignment, and response-SLA policies remain **Architect/Client Confirmation Required**.
 
-Review Invitation
+# 16. Authentication Flow
 
----
+1. Administrator submits login to `POST /api/v1/admin/auth/login`.
+2. Credentials and rate limit are validated.
+3. Session ID is regenerated and a secure PHP session is created.
+4. Protected page/API requests validate session, authorization, and CSRF where state changes occur.
+5. Logout through `POST /api/v1/admin/auth/logout` destroys the session.
 
-## Business Rules
+Version 1 does not issue JWT, access tokens, or refresh tokens.
 
-- Guest cannot reserve unavailable rooms.
-- Check-out date must be after check-in.
-- Reservation expires if payment is not received within the configured time limit.
-- Booking reference must be unique.
-- Booking status shall be tracked throughout its lifecycle.
+# 17. Failure and Audit Rules
 
----
-
-## Database Tables
-
-- bookings
-- booking_rooms
-- rooms
-- payments
-- users
-- notifications
-
----
-
-## APIs
-
-POST /bookings
-
-GET /rooms
-
-GET /availability
-
-PUT /bookings/{id}
-
----
-
-# 4. Payment Process
-
-## Workflow
-
-Booking Created
-
-↓
-
-Awaiting Payment
-
-↓
-
-Guest Selects Payment Method
-
-↓
-
-Uploads Payment Proof
-
-↓
-
-Payment Submitted
-
-↓
-
-Admin Verification
-
-↓
-
-Payment Approved
-
-↓
-
-Invoice Generated
-
-↓
-
-Booking Confirmed
-
----
-
-## Business Rules
-
-- Every payment belongs to one booking.
-- Duplicate transaction references are not allowed.
-- Every verification action shall be logged.
-- Payment timeline shall be preserved permanently.
-
----
-
-## Database Tables
-
-- payments
-- payment_methods
-- invoices
-- bookings
-- audit_logs
-
----
-
-## APIs
-
-POST /payments
-
-POST /payments/{id}/verify
-
-GET /payments
-
----
-
-# 5. Check-in Process
-
-## Workflow
-
-Booking Confirmed
-
-↓
-
-Guest Arrives
-
-↓
-
-Identity Verification
-
-↓
-
-Assign Room
-
-↓
-
-Booking Status = Checked In
-
-↓
-
-Room Status = Occupied
-
----
-
-## Business Rules
-
-- Only confirmed bookings may check in.
-- Room must be available.
-- Check-in date cannot be before reservation date.
-- Identity verification should be completed by staff.
-
----
-
-# 6. Check-out Process
-
-## Workflow
-
-Guest Requests Check-out
-
-↓
-
-Room Inspection
-
-↓
-
-Outstanding Balance Check
-
-↓
-
-Invoice Finalization
-
-↓
-
-Payment Verification
-
-↓
-
-Booking Completed
-
-↓
-
-Room Status = Available
-
-↓
-
-Review Invitation
-
----
-
-## Business Rules
-
-- Outstanding payments must be resolved before completion.
-- Room status changes back to available after successful check-out.
-- Completed bookings become read-only except for administrative updates.
-
----
-
-# 7. Room Management Process
-
-## Workflow
-
-Administrator
-
-↓
-
-Create Room
-
-↓
-
-Upload Images
-
-↓
-
-Assign Room Type
-
-↓
-
-Assign Amenities
-
-↓
-
-Set Pricing
-
-↓
-
-Publish Room
-
-↓
-
-Visible on Website
-
-↓
-
-Customer Booking
-
----
-
-## Business Rules
-
-- Room number must be unique.
-- Inactive rooms are hidden from guests.
-- Room prices are managed only by administrators.
-
----
-
-# 8. Activity Management Process
-
-## Workflow
-
-Administrator
-
-↓
-
-Create Activity
-
-↓
-
-Set Description
-
-↓
-
-Upload Images
-
-↓
-
-Set Price
-
-↓
-
-Publish
-
-↓
-
-Visible on Website
-
-↓
-
-Customer Includes Activity During Booking
-
----
-
-## Business Rules
-
-- Activities can be enabled or disabled.
-- Activity prices are managed through the admin panel.
-- Activities may be booked independently or together with room reservations (future enhancement).
-
----
-
-# 9. Gallery Management Process
-
-## Workflow
-
-Administrator
-
-↓
-
-Upload Images
-
-↓
-
-Optimize Image
-
-↓
-
-Assign Category
-
-↓
-
-Publish
-
-↓
-
-Visible on Website
-
----
-
-## Business Rules
-
-- Only administrators can manage gallery content.
-- Images shall support captions and alt text for accessibility.
-- Gallery categories should be configurable.
-
----
-
-# 10. Content Management Process
-
-## Workflow
-
-Administrator
-
-↓
-
-Select Website Page
-
-↓
-
-Edit Content
-
-↓
-
-Preview Changes
-
-↓
-
-Publish
-
-↓
-
-Website Updated
-
----
-
-## Business Rules
-
-- Draft changes shall not appear publicly until published.
-- Previous versions may be retained for rollback (future enhancement).
-- Only authorized administrators may publish content.
-
----
-
-# 11. Review Process
-
-## Workflow
-
-Guest Completes Stay
-
-↓
-
-Review Invitation
-
-↓
-
-Guest Submits Review
-
-↓
-
-Review Status = Pending
-
-↓
-
-Administrator Moderation
-
-↓
-
-Approved
-
-↓
-
-Published
-
-↓
-
-Admin Reply (Optional)
-
----
-
-## Business Rules
-
-- Reviews should be linked to completed bookings.
-- Only approved reviews are publicly visible.
-- All moderation actions are recorded in the audit log.
-
----
-
-# 12. Contact Process
-
-## Workflow
-
-Guest Submits Contact Form
-
-↓
-
-System Stores Message
-
-↓
-
-Administrator Notification
-
-↓
-
-Administrator Reviews Message
-
-↓
-
-Reply Sent
-
-↓
-
-Message Closed
-
----
-
-## Business Rules
-
-- Contact messages shall be retained for reference.
-- Administrators may mark messages as resolved.
-
----
-
-# 13. Authentication Process
-
-## Workflow
-
-User Login
-
-↓
-
-Credential Validation
-
-↓
-
-Permission Check
-
-↓
-
-Dashboard Access
-
-↓
-
-Session Created
-
-↓
-
-Logout
-
-↓
-
-Session Destroyed
-
----
-
-## Business Rules
-
-- Only active users may log in.
-- Passwords shall be securely hashed.
-- Failed login attempts shall be logged.
-- Sessions expire after inactivity.
-
----
-
-# 14. Notification Process
-
-## Workflow
-
-Business Event
-
-↓
-
-Notification Created
-
-↓
-
-Stored in Notification Center
-
-↓
-
-Email Sent
-
-↓
-
-Recipient Reads Notification
-
-↓
-
-Notification Marked as Read
-
----
-
-## Business Rules
-
-- Notifications shall respect user permissions.
-- Critical notifications require acknowledgement.
-- Notification history shall be retained.
-
----
-
-# 15. Related Modules
-
-- Booking Management
-- Room Management
-- Payment Management
-- Review System
-- CMS
-- Gallery Management
-- Notification System
-- Authentication
-- Admin Dashboard
-
----
-
-# End of Document
+- Business transactions commit before non-critical email delivery.
+- Validation failures do not change state.
+- Services control all transitions.
+- Booking events permanently record booking state changes.
+- Audit logs record important Administrator/security changes.
+- Public error messages are generic; private logs contain diagnostic detail.

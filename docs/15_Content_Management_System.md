@@ -1,358 +1,164 @@
-# Tara Guest House Management System
+# Tara Guest House Content Management System Specification
 
-# Content Management System (CMS) Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 site-wide settings and structured pages
+* Related contracts: `10_Database_Dictionary.md`, `23_REST_API_Specification.md`, `34_UI_UX_Screen_Specification.md`
 
-# Document Control
+## 1. Purpose
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Content Management System (CMS) Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+The Version 1 CMS lets an authenticated Administrator manage approved site-wide configuration and structured public page content without editing application code. It does not duplicate records owned by the Rooms, Activities, Gallery, Reviews or Payment Method modules.
 
----
+## 2. Version 1 CMS Components
 
-# Change Log
+Version 1 uses only two CMS data sources:
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial CMS Specification created |
+1. `settings` for site-wide values.
+2. `pages` for structured public content.
 
----
+## 3. Settings
 
-# Table of Contents
+Settings may store validated site-wide values such as:
 
-1. Purpose
-2. Scope
-3. Actors
-4. Business Objectives
-5. CMS Modules
-6. Homepage Management
-7. About Us Management
-8. Contact Information
-9. Policies Management
-10. Homepage Sections
-11. SEO Management
-12. Social Media Management
-13. Business Rules
-14. Validation Rules
-15. Security Requirements
-16. Future Enhancements
+* hotel name and branding identifiers;
+* address, phone, email and other contact information;
+* social links;
+* business hours;
+* global/default SEO values;
+* global/default Open Graph image;
+* homepage hero text and one configured hero image;
+* homepage section visibility and approved configuration;
+* footer/global presentation configuration.
 
----
+The `settings` persistence contract uses `id`, unique `setting_key`, `setting_value`, `value_type`, `is_public`, `updated_by`, `created_at` and `updated_at`.
 
-# 1. Purpose
+Secrets do not belong in public settings. `is_public` controls which approved values may be returned by the public settings endpoint.
 
-The Content Management System (CMS) allows Tara Guest House administrators to manage website content without modifying source code.
+## 4. Structured Pages
 
-The CMS provides a user-friendly interface for updating pages, images, text, contact details, and other website content.
+Pages manage structured content such as:
 
----
+* About;
+* booking/cancellation and other policies;
+* terms and conditions;
+* privacy;
+* FAQ where required.
 
-# 2. Scope
+### Page fields
 
-The CMS includes:
+| Field | Rule |
+|---|---|
+| `id` | Primary key assigned by persistence |
+| `title` | Required page title |
+| `slug` | Required unique public slug |
+| `content` | Required sanitized structured body |
+| `meta_title` | Optional page SEO title |
+| `meta_description` | Optional page SEO description |
+| `status` | `draft`, `published`, `archived` |
+| `published_at` | Set/updated by the approved publication transition |
+| `created_by`, `updated_by` | Administrator actors |
+| `created_at`, `updated_at` | Record timestamps |
 
-- Homepage
-- Hero Banner
-- About Us
-- Contact Details
-- Policies
-- Homepage Sections
-- Gallery Integration
-- Activities Integration
-- Room Integration
-- SEO Settings
-- Footer Content
-- Social Media Links
+These fields match `10_Database_Dictionary.md`. Version 1 defines no page soft-delete field. Content that is no longer current moves to `archived` through CMS Service.
 
-Excluded:
+## 5. Page Publishing Workflow
 
-- Booking Logic
-- Payment Processing
-- User Authentication
+Canonical page statuses:
 
----
+* `draft`
+* `published`
+* `archived`
 
-# 3. Actors
+New pages begin as `draft`. Only `published` pages are public. Allowed status changes are performed through CMS Service, validate required content/slug/metadata, record Administrator/time, and produce audit evidence. Archived pages are retained but are not publicly visible.
 
-## Guest
+Version 1 has no content scheduling or content-version history/rollback workflow.
 
-Can
+## 6. Homepage Composition
 
-- View published content
+The homepage uses:
 
-Cannot
+* settings for hero text, one configured hero image and section visibility/configuration;
+* a Room Preview queried from the Rooms module;
+* an Activities preview queried from active, published Activities records;
+* a Gallery preview queried from active, published Gallery records;
+* a Reviews preview queried from approved Reviews records;
+* approved global contact/footer settings.
 
-- Edit website content
+The CMS does not create duplicate room, activity, gallery or review records. It does not require featured-room or featured-activity flags. Preview selection uses approved module filtering/order/configuration rather than duplicate CMS content.
 
----
+## 7. Payment Instructions
 
-## Administrator
+Payment instructions, account references, QR path and proof requirements belong to Payment Method Management in `payment_methods`. They are not generic CMS page/settings content.
 
-Can
+## 8. SEO Contract
 
-- Create content
-- Edit content
-- Publish content
-- Unpublish content
-- Schedule content (Future)
-- Upload media
-- Manage SEO
-- Manage homepage sections
+Version 1 SEO includes:
 
----
-
-# 4. Business Objectives
-
-The CMS should:
-
-- Eliminate the need for developers to update content.
-- Allow hotel staff to manage the website independently.
-- Maintain consistent branding.
-- Improve SEO.
-- Support future website expansion.
-
----
-
-# 5. CMS Modules
-
-The administrator shall be able to manage:
-
-- Homepage
-- Hero Banner
-- About Us
-- Contact Information
-- Gallery
-- Activities
-- Rooms
-- Hotel Policies
-- FAQ
-- Footer
-- Social Media
-- SEO Settings
-- Payment Instructions
-- Announcements
-
----
-
-# 6. Homepage Management
-
-Homepage elements:
-
-- Hero Banner
-- Welcome Text
-- Featured Rooms
-- Featured Activities
-- Gallery Preview
-- Customer Reviews
-- Booking Call-to-Action
-- Promotional Banner
-- Footer Preview
-
-Administrator can:
-
-- Edit text
-- Upload banner images
-- Change display order
-- Enable/disable sections
-
----
-
-# 7. About Us Management
-
-Administrator can edit:
-
-- Hotel history
-- Mission
-- Vision
-- Owner message
-- Staff introduction
-- Why choose us
-- Awards
-- Certifications
-
-Supports:
-
-- Rich text editor
-- Image upload
-- Multiple images
-
----
-
-# 8. Contact Information
-
-Editable fields:
-
-- Hotel Name
-- Address
-- Phone Numbers
-- Email
-- WhatsApp
-- Google Maps Embed
-- Business Hours
-- Emergency Contact
-
----
-
-# 9. Policies Management
-
-Manage:
-
-- Check-in Policy
-- Check-out Policy
-- Cancellation Policy
-- Refund Policy
-- Privacy Policy
-- Terms & Conditions
-- Child Policy
-- Pet Policy
-- Smoking Policy
-
-Each policy supports rich text editing.
-
----
-
-# 10. Homepage Sections
-
-Each section can be:
-
-- Enabled
-- Disabled
-- Reordered
-- Previewed
-
-Sections:
-
-- Hero Banner
-- Featured Rooms
-- Activities
-- Reviews
-- Gallery
-- About Us
-- CTA Banner
-- Contact
-
----
-
-# 11. SEO Management
-
-Editable SEO fields:
-
-- Page Title
-- Meta Description
-- Meta Keywords
-- Canonical URL
-- Open Graph Image
-- Open Graph Title
-- Open Graph Description
-- Twitter Card Image
-
-Generate XML sitemap (Future).
-
----
-
-# 12. Social Media Management
-
-Administrator can manage:
-
-- Facebook
-- Instagram
-- TikTok
-- YouTube
-- LinkedIn
-- TripAdvisor
-- Google Business Profile
-
-Each link should be validated.
-
----
-
-# 13. Business Rules
-
-- Content drafts should not be visible publicly.
-- Published content appears immediately.
-- Deleted content uses Soft Delete.
-- Every page must have an SEO title.
-- Homepage must always contain at least one hero banner.
-
----
-
-# 14. Validation Rules
-
-- Hero title: maximum 100 characters.
-- Meta description: maximum 160 characters.
-- About Us: maximum 10,000 characters.
-- Phone numbers must follow valid formats.
-- Uploaded images: JPG, PNG, WEBP.
-
----
-
-# 15. Security Requirements
-
-- Only administrators may modify content.
-- Rich text must be sanitized.
-- HTML input should prevent XSS.
-- Image uploads must be validated.
-- All changes recorded in Audit Log.
-
----
-
-# 16. Future Enhancements
-
-- Page Builder
-- Drag-and-drop editor
-- Multi-language content
-- Content scheduling
-- Content version history
-- AI writing assistant
-- AI SEO suggestions
-- Blog module
-- News & Events
-- Newsletter integration
-- Backup & Restore
-- Content approval workflow
-
----
-
-# Related Database Tables
-
-- settings
-- pages
-- page_sections
-- media_files
-- users
-- audit_logs
-
----
-
-# Related API Endpoints
-
-GET /admin/cms
-
-PUT /admin/cms
-
-GET /pages/{slug}
-
-POST /admin/upload
-
----
-
-# Success Criteria
-
-The CMS is considered complete when:
-
-- Administrators can manage all website content without code changes.
-- Changes are reflected immediately after publishing.
-- All content is secure, validated, and audit logged.
-- SEO settings are configurable for every public page.
-
----
-
-# End of Document
+* SEO-friendly public routes/slugs;
+* page `meta_title` and `meta_description`;
+* a canonical URL derived from the current public route;
+* Open Graph title and description derived from page metadata, with approved global defaults from settings where page values are absent;
+* one global/default Open Graph image stored in settings;
+* XML sitemap generation from public routes and published records;
+* schema markup where appropriate to the public page/content type.
+
+Meta keywords are not required. There are no per-page Open Graph image fields in Version 1.
+
+## 9. Exact Routes and APIs
+
+Public:
+
+* `GET /api/v1/pages/{slug}` — return a published page only.
+* `GET /api/v1/settings/public` — return allowlisted public settings only.
+
+Administrator:
+
+* `GET /api/v1/admin/pages`
+* `POST /api/v1/admin/pages`
+* `GET /api/v1/admin/pages/{id}`
+* `PUT /api/v1/admin/pages/{id}`
+* `PATCH /api/v1/admin/pages/{id}/status`
+* `GET /api/v1/admin/settings`
+* `PUT /api/v1/admin/settings`
+
+PHP-rendered pages use their normal public and `/admin/pages` or `/admin/settings` routes. No additional CMS JSON endpoint is defined.
+
+## 10. Validation and Security
+
+* Only an authenticated Administrator may mutate settings/pages.
+* State-changing requests require CSRF and authorization.
+* Slugs and setting keys are unique and allowlisted/validated.
+* Rich content is sanitized and output is contextually escaped.
+* Public settings expose only approved `is_public` keys.
+* Hero/default Open Graph image upload uses approved upload configuration and non-executable storage.
+* CMS Service owns rules/transitions/transactions; Repositories own PDO/SQL; Models/entities contain data only.
+* Mutations and publication actions are audited.
+
+## 11. Acceptance Tests
+
+1. Settings and pages use only dictionary fields.
+2. New page begins `draft`; only `published` is public.
+3. Archive removes public visibility without soft deletion.
+4. Page API rejects unpublished/unknown slugs.
+5. Public settings endpoint returns only approved public keys.
+6. Homepage previews read their owning module records without duplication.
+7. Booking confirmation/payment instructions are not controlled by CMS.
+8. Canonical/OG/sitemap behavior follows the SEO contract.
+9. No meta-keyword or per-page OG-image field is required.
+10. Only the exact documented CMS/settings endpoints are used.
+
+## 12. Future Enhancements
+
+The following are outside Version 1 and require later synchronized decisions:
+
+* featured-room or featured-activity database flags;
+* multiple page images;
+* separate hero-banner table;
+* announcements module;
+* meta keywords;
+* per-page Open Graph image fields;
+* content version history and rollback;
+* page builder/drag-and-drop editor;
+* content scheduling;
+* multi-language content, blog/news, newsletters and AI content tools.

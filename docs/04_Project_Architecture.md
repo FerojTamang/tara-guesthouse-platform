@@ -1,5 +1,7 @@
 # Project Architecture
 
+> **Approved Version 1 architecture:** PHP-rendered Bootstrap 5 views with vanilla JavaScript and selective Fetch/AJAX; server-side PHP sessions; normal page routes plus versioned same-origin `/api/v1/...` JSON endpoints; layered PHP flow `Route → Middleware → Controller → Request Validation → Service → Repository → Database`; migrations as executable database truth; and cPanel/shared hosting. JWT, SPA frameworks, Redis, WebSockets, Docker, cloud deployment, and public third-party APIs are future enhancements. See `00_V1_ARCHITECT_DECISIONS.md`.
+
 ## Project Information
 
 | Item | Details |
@@ -7,7 +9,7 @@
 | **Project** | Tara Guest House Management System |
 | **Document** | Project Architecture |
 | **Version** | 1.1 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -66,7 +68,7 @@ Business rules remain independent from presentation logic, making the applicatio
                     Repository Layer
                            │
                            ▼
-                        Model Layer
+                  PDO Persistence Layer
                            │
                            ▼
                      MariaDB Database
@@ -291,7 +293,7 @@ Business rules must never exist inside Controllers or Views.
 app/Repositories/
 ```
 
-Repositories provide an abstraction between Services and Models.
+Repositories provide the persistence boundary used by Services and map database rows to Models/entities.
 
 ### Responsibilities
 
@@ -312,14 +314,14 @@ Repositories allow future migration to different storage technologies without ch
 app/Models/
 ```
 
-Models interact directly with the database using PDO.
+Models/entities represent domain data and behavior that does not require persistence access. They do not execute SQL or use PDO.
 
 ### Responsibilities
 
-- Execute SQL
-- Return Data Objects
-- Map Database Records
-- Handle CRUD Operations
+- Represent validated domain data
+- Expose domain-safe values to Services and views
+- Support row-to-entity mapping performed by Repositories
+- Contain no SQL, PDO or persistence operations
 
 ### Examples
 
@@ -392,7 +394,7 @@ Business Service
 Repository
       │
       ▼
-Model (PDO)
+PDO Persistence
       │
       ▼
 MariaDB Database
@@ -489,7 +491,7 @@ Booking Model
 Database
       │
       ▼
-Pending Payment
+Pending Booking (no payment attempt is created until submission)
 ```
 
 ### Business Rules
@@ -510,7 +512,7 @@ The payment module records guest payments while maintaining financial integrity.
 ## Payment Flow
 
 ```text
-Booking Confirmed
+Pending Booking
        │
        ▼
 Payment Form
@@ -536,10 +538,10 @@ Invoice Generation
 
 ### Responsibilities
 
-- Verify payment amount.
-- Record payment.
-- Update booking status.
-- Generate invoice.
+- Record each payment submission as a separate attempt.
+- Permit only an Administrator to verify or reject a submitted attempt.
+- On verification, coordinate with Booking Service so it alone may transition `pending` to `confirmed`.
+- Preserve fixed-precision NPR snapshots and audit history.
 - Notify administrator.
 
 ---
@@ -731,7 +733,7 @@ The architecture supports future system growth without major redesign.
 - REST API Expansion
 - Mobile Application
 - Online Payment Gateway
-- Email Notifications
+- SMS, WhatsApp, and push notifications (transactional SMTP email is Version 1)
 - SMS Notifications
 - Multi-language Support
 - Multiple Guest Houses
@@ -751,11 +753,11 @@ The following architectural decisions apply throughout the project.
 - Request validation occurs before business processing.
 - Services contain business rules.
 - Repositories manage data access.
-- Models execute database operations.
+- Models/entities represent domain data and execute no SQL.
 - Views display data only.
 - Middleware protects routes.
 - Business logic never belongs in Views.
-- SQL queries remain inside Models and Repositories.
+- SQL queries and PDO calls remain inside Repositories only.
 - Configuration values are stored inside configuration files or the database, never hardcoded.
 - All database interactions use prepared statements.
 
@@ -787,7 +789,7 @@ This document should be read together with the following project documentation.
 - 08_Database_Design.md
 - 09_ER_Diagram.md
 - 10_Database_Dictionary.md
-- 11–22_Module_Specifications.md
+- Numbered module and process specifications `11_Booking_System_Specification.md` through `22_System_State_Machine.md` (see `33_Documentation_Index.md` for each exact filename)
 - 23_REST_API_Specification.md
 
 ---
@@ -796,8 +798,8 @@ This document should be read together with the following project documentation.
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Development Team | Pending | Pending |
 
 

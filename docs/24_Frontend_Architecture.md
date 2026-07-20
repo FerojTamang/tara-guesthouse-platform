@@ -1,5 +1,7 @@
 # Frontend Architecture
 
+> **Approved Version 1 frontend:** PHP-rendered views use HTML5, CSS3, Bootstrap 5, and vanilla JavaScript ES6+. Fetch/AJAX is selective and same-origin through `/api/v1/...`; protected admin JSON calls use `/api/v1/admin/...` and the PHP session with CSRF. This is not an SPA. Customer-portal UI, WebSockets, and other advanced client applications are future enhancements.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Frontend Architecture |
 | **Document No.** | 24 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -82,10 +84,8 @@ The frontend uses the following technologies.
 | JavaScript ES6 | Client Logic |
 | AJAX | Asynchronous Requests |
 | Fetch API | Backend Communication |
-| Chart.js | Dashboard Charts |
-| SweetAlert2 | Alerts & Notifications |
-| Flatpickr | Date Picker |
-| Font Awesome | Icons |
+
+Chart.js, SweetAlert2, Flatpickr and Font Awesome are not approved Version 1 dependencies. Dashboard data uses accessible HTML/CSS/Bootstrap presentation; confirmations/alerts use approved Bootstrap/native patterns; date fields use accessible native inputs unless a later dependency decision is recorded.
 
 The frontend architecture intentionally avoids heavy JavaScript frameworks to maintain simplicity, performance, and compatibility with the project's PHP MVC backend.
 
@@ -305,7 +305,7 @@ This document has been designed to align with:
 - 08_Database_Design.md
 - 09_ER_Diagram.md
 - 10_Database_Dictionary.md
-- 11–22_Module_Specifications.md
+- Numbered module and process specifications `11_Booking_System_Specification.md` through `22_System_State_Machine.md` (see `33_Documentation_Index.md` for each exact filename)
 - 23_REST_API_Specification.md
 
 All frontend implementation must remain consistent with these documents.
@@ -526,13 +526,11 @@ utilities.css
 
 ---
 
-## Vendor Libraries
+## Approved Vendor Libraries
 
-- Bootstrap
-- Chart.js
-- SweetAlert2
-- Flatpickr
-- Font Awesome
+- Bootstrap 5
+
+Any additional frontend library requires explicit technical-architect approval, a pinned/versioned dependency declaration, setup instructions, license/security review and tests before generated or handwritten code may use it.
 
 ---
 
@@ -728,8 +726,8 @@ The architecture provides a strong foundation for both the public website and ad
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Frontend Developer | Saroj | Pending |
 | Backend Developer | Rijan | Pending |
 | QA Engineer | Pallawi | Pending |
