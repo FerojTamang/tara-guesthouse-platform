@@ -1,86 +1,131 @@
 # 🏨 Tara Guest House Management System
 
-![Project Status](https://img.shields.io/badge/Status-Development-blue)
-![Documentation](https://img.shields.io/badge/Documentation-Complete-success)
-![Node.js](https://img.shields.io/badge/Backend-Node.js-339933?logo=node.js&logoColor=white)
-![Express.js](https://img.shields.io/badge/Framework-Express-black?logo=express)
-![Vue.js](https://img.shields.io/badge/Frontend-Vue.js-4FC08D?logo=vuedotjs&logoColor=white)
-![MariaDB](https://img.shields.io/badge/Database-MariaDB-003545?logo=mariadb&logoColor=white)
+> A modern hotel website and administration platform developed for **Tara Guest House, Sauraha, Chitwan, Nepal**.
+
+![Status](https://img.shields.io/badge/Status-In%20Development-orange)
+![Version](https://img.shields.io/badge/Version-1.0-blue)
 ![License](https://img.shields.io/badge/License-Private-red)
 
 ---
 
-## 📖 Overview
+# 📖 About The Project
 
-The **Tara Guest House Management System** is a modern full-stack web application designed to simplify and automate the daily operations of a guest house.
+The **Tara Guest House Management System** is a commercial web application designed to modernize the online presence and daily operations of Tara Guest House.
 
-The system provides an integrated platform for guest registration, room management, booking management, payment processing, notifications, customer reviews, website content management, and administrative reporting.
+The project replaces the client's existing website with a secure, responsive, and maintainable platform that combines a professional public-facing hotel website with a comprehensive administration system.
 
-The project follows a layered architecture and RESTful API design principles to ensure scalability, maintainability, and long-term extensibility.
+The application enables customers to browse rooms, activities, galleries, and hotel information while providing administrators with complete control over bookings, content, payments, customer reviews, and hotel operations.
 
----
-
-# ✨ Features
-
-- 🔐 User Authentication & Authorization
-- 👤 User Management
-- 🛏️ Room Management
-- 📅 Booking Management
-- 💳 Payment Management
-- 🔔 Notification System
-- ⭐ Review Management
-- 📰 Content Management System (CMS)
-- 📊 Administrative Dashboard
-- 📈 Reporting & Analytics
+This project is developed by **fero.dev** as its first commercial software project.
 
 ---
 
-# 🏗️ System Architecture
+# 🎯 Project Objectives
 
-```mermaid
-graph TD
+- Modernize the hotel's online presence
+- Increase online reservations
+- Improve customer experience
+- Reduce manual administrative work
+- Provide an easy-to-use Content Management System (CMS)
+- Improve search engine visibility (SEO)
+- Ensure responsive design across all devices
+- Build a secure and scalable platform for future growth
 
-A[Frontend]
+---
 
--->
+# ✨ Core Features
 
-B[REST API]
+## Public Website
 
--->
+- Homepage
+- About Us
+- Rooms
+- Activities
+- Gallery
+- Contact Page
+- Customer Reviews
+- Online Reservation Request
 
-C[Controllers]
+## Administration Panel
 
--->
+- Secure Authentication
+- Dashboard
+- Booking Management
+- Room Management
+- Activity Management
+- Gallery Management
+- Review Management
+- Payment Verification
+- Invoice Generation
+- Content Management System (CMS)
+- Notification Management
 
-D[Services]
+---
 
--->
+# 🏗 System Architecture
 
-E[Repositories]
+The project follows a custom **MVC-inspired architecture** designed to separate presentation, business logic, and data access.
 
--->
-
-F[(MariaDB)]
+```text
+Client Browser
+        │
+        ▼
+ Apache Web Server
+        │
+        ▼
+ PHP Application
+        │
+ ┌──────┼──────┐
+ │      │      │
+ ▼      ▼      ▼
+Models Controllers Views
+        │
+        ▼
+ Business Logic
+        │
+        ▼
+ MariaDB Database
 ```
 
-The project follows a layered architecture where each layer has a single responsibility.
+The architecture emphasizes:
+
+- Separation of Concerns
+- Maintainability
+- Scalability
+- Secure Database Access
+- Reusable Components
 
 ---
 
-# 🛠️ Technology Stack
+# 💻 Technology Stack
 
 | Layer | Technology |
-|---------|------------|
-| Frontend | Vue.js |
-| Backend | Node.js |
-| Framework | Express.js |
-| Database | MariaDB |
-| ORM | Sequelize |
-| Authentication | JWT |
-| Password Security | bcrypt |
-| Styling | Tailwind CSS |
-| API | RESTful API |
+|--------|------------|
+| Frontend | HTML5, Bootstrap 5, JavaScript |
+| Backend | PHP 8.x |
+| Database | MariaDB / MySQL |
+| Web Server | Apache |
+| Development Environment | XAMPP |
+| Production Environment | cPanel Shared Hosting |
 | Version Control | Git & GitHub |
+| Architecture | Custom MVC-inspired PHP Architecture |
+
+---
+
+# 🔒 Security
+
+Security is integrated throughout the application.
+
+Implemented security measures include:
+
+- Password Hashing
+- Prepared Statements (PDO)
+- Session Security
+- CSRF Protection
+- Input Validation
+- Output Escaping
+- Authentication & Authorization
+- Role-Based Access Control (RBAC)
 
 ---
 
@@ -88,134 +133,92 @@ The project follows a layered architecture where each layer has a single respons
 
 ```text
 tara-guest-house/
+
+├── app/
+│   ├── Controllers/
+│   ├── Models/
+│   ├── Views/
+│   ├── Core/
+│   ├── Helpers/
+│   ├── Middleware/
+│   └── Services/
 │
-├── backend/
-│   ├── controllers/
-│   ├── services/
-│   ├── repositories/
-│   ├── routes/
-│   ├── models/
-│   ├── middlewares/
-│   ├── validators/
-│   ├── config/
-│   └── utils/
-│
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   └── assets/
+├── public/
 │
 ├── database/
 │
 ├── docs/
-│   ├── 01_Project_Charter.md
-│   ├── ...
-│   └── 38_Development_Handbook.md
+│
+├── uploads/
 │
 ├── tests/
 │
-├── assets/
+├── vendor/
 │
+├── .env.example
+├── .gitignore
 ├── README.md
-│
 └── LICENSE
 ```
 
+> The exact project structure follows the official project documentation.
+
 ---
 
-# 🚀 Getting Started
+# 📚 Documentation
 
-## Clone Repository
+Complete project documentation is available in the **docs/** directory.
 
-```bash
-git clone https://github.com/your-username/tara-guest-house.git
+The documentation includes:
 
-cd tara-guest-house
+- Project Overview
+- Client Requirements
+- Project Objectives
+- Team Organization
+- Folder Structure
+- Coding Standards
+- Git Workflow
+- Database Design
+- Entity Relationship Diagram (ERD)
+- Database Dictionary
+- Authentication Specification
+- Module Specifications
+- REST/API Documentation (where applicable)
+- Frontend Architecture
+- Backend Architecture
+- Testing Strategy
+- UI/UX Specifications
+- Requirements Traceability Matrix
+- Development Handbook
+
+**Project documentation is the single source of truth throughout development.**
+
+---
+
+# 🚀 Development Workflow
+
+The project follows an Agile, sprint-based workflow.
+
+```text
+Planning
+    │
+    ▼
+Documentation
+    │
+    ▼
+Development
+    │
+    ▼
+Code Review
+    │
+    ▼
+Testing
+    │
+    ▼
+Deployment
 ```
 
----
-
-## Backend Setup
-
-```bash
-cd backend
-
-npm install
-
-npm run dev
-```
-
----
-
-## Frontend Setup
-
-```bash
-cd frontend
-
-npm install
-
-npm run dev
-```
-
----
-
-## Environment Variables
-
-Create a `.env` file inside the backend directory.
-
-Example:
-
-```env
-DB_HOST=
-
-DB_PORT=
-
-DB_NAME=
-
-DB_USER=
-
-DB_PASSWORD=
-
-JWT_SECRET=
-
-EMAIL_HOST=
-
-EMAIL_PORT=
-
-EMAIL_USERNAME=
-
-EMAIL_PASSWORD=
-```
-
----
-
-# 📚 Project Documentation
-
-Complete project documentation is available inside the `docs/` directory.
-
-| No | Document |
-|----|----------|
-| 01 | Project Charter |
-| 02 | Software Requirements Specification |
-| 03 | Stakeholder Analysis |
-| 04 | Project Scope Statement |
-| 05 | Functional Requirements |
-| 06 | Non-Functional Requirements |
-| 07 | Use Case Specifications |
-| 08 | User Stories |
-| 09 | Entity Relationship Diagram (ERD) |
-| 10 | Database Design |
-| 11 | Authentication Specification |
-| 12 | User Management Specification |
-| 13 | Room Management Specification |
-| 14 | Booking Management Specification |
-| 15 | Payment Management Specification |
-| 16 | Notification System Specification |
-| 17 | Review Management Specification |
-| 18 | Content Management System Specification |
-| 19 | Admin Dashboard Specification |
-| ... | Additional Design & Planning Documents |
-| 38 | Development Handbook |
+Every feature is developed according to the documented requirements before implementation.
 
 ---
 
@@ -223,152 +226,70 @@ Complete project documentation is available inside the `docs/` directory.
 
 | Role | Responsibility |
 |------|----------------|
-| Project Manager | Project Planning & Architecture |
-| Backend Developer | API & Database Development |
+| Project Manager | Project Planning, Architecture & Code Review |
+| Backend Developer | Backend Development & Database |
 | Frontend Developer | User Interface Development |
 | QA Engineer | Testing & Quality Assurance |
 
 ---
 
-# 🔄 Development Workflow
+# 📈 Current Status
 
-```mermaid
-flowchart LR
-
-Issue
-
--->
-
-Feature
-
--->
-
-Development
-
--->
-
-Pull_Request
-
--->
-
-Code_Review
-
--->
-
-Testing
-
--->
-
-Merge_Develop
-
--->
-
-Release
-```
-
----
-
-# 🌱 Git Branch Strategy
-
-| Branch | Purpose |
-|----------|----------|
-| `main` | Production-ready code |
-| `develop` | Integration branch |
-| `feature/*` | Feature development |
-| `hotfix/*` | Emergency fixes |
-
----
-
-# 📌 Project Status
-
-| Module | Status |
-|----------|--------|
-| Documentation | ✅ Complete |
-| System Design | ✅ Complete |
-| Database Design | ✅ Complete |
-| Backend Development | 🚧 In Progress |
-| Frontend Development | 🚧 In Progress |
-| Testing | ⏳ Planned |
-| Deployment | ⏳ Planned |
+| Component | Status |
+|-----------|--------|
+| Project Planning | ✅ Completed |
+| Documentation | ✅ Completed |
+| System Design | ✅ Completed |
+| Database Design | ✅ Completed |
+| Development | 🚧 In Progress |
+| Testing | ⏳ Pending |
+| Deployment | ⏳ Pending |
 
 ---
 
 # 📋 Development Standards
 
-This project follows:
+The project follows documented engineering standards covering:
 
-- Layered Architecture
-- Repository Pattern
-- RESTful API Design
-- JWT Authentication
-- Role-Based Access Control (RBAC)
-- Secure Password Hashing (bcrypt)
-- Standardized API Responses
-- Git Flow Workflow
+- Coding Standards
+- Git Workflow
+- Project Architecture
+- Secure Development Practices
+- Documentation Standards
 - Code Review Process
+- Testing Strategy
 
-Complete development guidelines are documented in:
-
-**📄 38_Development_Handbook.md**
+All contributors are expected to follow the project documentation throughout the development lifecycle.
 
 ---
 
 # 🧪 Testing
 
-Testing activities include:
+Testing includes:
 
-- Unit Testing
+- Functional Testing
 - Integration Testing
-- API Testing
-- UI Testing
+- User Acceptance Testing (UAT)
+- Security Testing
 - Regression Testing
 
 ---
 
-# 🔮 Roadmap
+# 📌 Version
 
-### Sprint 1
-
-- Authentication
-- User Management
-- Room Management
-
-### Sprint 2
-
-- Booking Management
-- Payment Management
-- Notification System
-
-### Sprint 3
-
-- Review System
-- CMS
-- Admin Dashboard
-
-### Sprint 4
-
-- Testing
-- Bug Fixes
-- Deployment
-- Documentation Review
+**Current Version:** 1.0
 
 ---
 
 # 📄 License
 
-This repository is currently maintained as a **Private Project**.
+This repository is maintained as a **private commercial project**.
 
-All rights reserved.
+Copyright © fero.dev. All rights reserved.
 
----
-
-# 🙏 Acknowledgements
-
-Special thanks to every contributor involved in the planning, design, development, testing, and documentation of the Tara Guest House Management System.
+Unauthorized copying, modification, distribution, or commercial use of this software is prohibited without written permission.
 
 ---
 
-<p align="center">
-Developed with ❤️ using Vue.js, Node.js, Express.js and MariaDB.
-</p>
 
+Developed by **InternTeam** **FESARIPA** **Tivrasoft**
