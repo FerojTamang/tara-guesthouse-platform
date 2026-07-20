@@ -224,12 +224,12 @@ Every feature is developed according to the documented requirements before imple
 
 # 👥 Development Team
 
-| Role | Responsibility |
-|------|----------------|
-| Project Manager | Project Planning, Architecture & Code Review |
-| Backend Developer | Backend Development & Database |
-| Frontend Developer | User Interface Development |
-| QA Engineer | Testing & Quality Assurance |
+| Team Member | Role | Responsibility |
+|-------------|------|----------------|
+| **Feroj Tamang** | Project Manager / Technical Architect | Project Planning, System Architecture, Documentation, Code Review |
+| **Rijan Mahato** | Backend Developer | Backend Development, Database Design & API Development |
+| **Saroj Tamang** | Frontend Developer | User Interface Development & Frontend Integration |
+| **Pallawi Tamang Dong** | QA Engineer / Content Manager | Testing, Quality Assurance & Content Management |
 
 ---
 
