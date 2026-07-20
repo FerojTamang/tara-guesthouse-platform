@@ -1,0 +1,40 @@
+{
+    "name": "fero-dev/tara-guest-house-management-system",
+    "description": "Tara Guest House website and administration system",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-mbstring": "*",
+        "ext-fileinfo": "*",
+        "ext-openssl": "*",
+        "vlucas/phpdotenv": "^5.6",
+        "monolog/monolog": "^3.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {},
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "@php vendor/bin/phpunit",
+        "test:unit": "@php vendor/bin/phpunit --testsuite Unit",
+        "test:integration": "@php vendor/bin/phpunit --testsuite Integration",
+        "test:feature": "@php vendor/bin/phpunit --testsuite Feature"
+    }
+}

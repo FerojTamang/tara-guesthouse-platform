@@ -61,6 +61,28 @@ Route -> Middleware -> Controller -> Request Validation
       -> Service -> Repository -> Database
 ```
 
+## Repository Setup
+
+The development environment requires PHP 8.3 or newer, Composer 2, and the PHP extensions declared in `composer.json`.
+
+```bash
+composer install
+cp .env.example .env
+composer test
+```
+
+On Windows PowerShell, copy the environment template with:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
+
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, and `composer test:feature`. The test harness is intentionally empty until real reviewed tests are introduced with application tickets.
+
+Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
+
 ## Repository Structure
 
 ```text

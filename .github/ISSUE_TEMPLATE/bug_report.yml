@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible defect in approved project scope.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, personal data, session identifiers, payment proofs, or other secrets.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Local, testing, staging, or production, including relevant PHP/browser details.
+    validations:
+      required: true
+  - type: input
+    id: branch_commit
+    attributes:
+      label: Branch or commit
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Provide a minimal numbered sequence.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: dropdown
+    id: security
+    attributes:
+      label: Possible security or privacy impact?
+      options:
+        - "No"
+        - "Yes - report privately to the project owner before adding details"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Non-sensitive evidence
+      description: Add sanitized logs, screenshots, or other evidence if available.
