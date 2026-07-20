@@ -1,5 +1,7 @@
 # Framework Architecture
 
+> **Approved Version 1 framework boundary:** This custom PHP foundation uses Composer, routes, middleware, controllers, request validation, services, repositories, models/entities, PDO, PHP-rendered views, PHP sessions, CSRF, and `/api/v1/...` JSON responses. It is not a full third-party framework and does not include JWT, Redis, WebSockets, or SPA infrastructure in Version 1.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Framework Architecture |
 | **Document No.** | 31 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -69,7 +71,7 @@ Service Layer
 Repository Layer
         │
         ▼
-Model Layer
+PDO Persistence Layer
         │
         ▼
 Database Layer
@@ -216,10 +218,11 @@ The Router is responsible for matching incoming requests to their respective con
 ## Example
 
 ```php
-GET    /rooms
-POST   /bookings
-PUT    /bookings/{id}
-DELETE /reviews/{id}
+GET    /rooms                              (server-rendered page)
+POST   /api/v1/bookings                    (JSON)
+PATCH  /api/v1/admin/bookings/{id}/status  (JSON)
+GET    /api/v1/admin/reviews/{id}           (protected JSON detail)
+PATCH  /api/v1/admin/reviews/{id}/status    (protected moderation)
 ```
 
 ---
@@ -351,8 +354,9 @@ Models represent database entities.
 ## Responsibilities
 
 - Map Database Tables
-- Execute Queries
-- Return Data Objects
+- Represent domain fields and values
+- Return domain-safe data to Services/views
+- Never execute SQL or use PDO
 
 ---
 
@@ -761,8 +765,8 @@ The framework serves as the foundation for all current and future applications d
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Backend Developer | Rijan | Pending |
 | System Architect | Pending | Pending |
 | Development Team | Pending | Pending |

@@ -1,476 +1,94 @@
-# Tara Guest House Management System
+# Tara Guest House Payment Management Specification
 
-# Payment Management System Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 manual payment methods, submissions and Administrator verification
 
-# Document Control
+## 1. Core Rules
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Payment Management System Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+* Booking creation creates no payment record.
+* A payment attempt begins only when payment information is submitted.
+* One booking has zero or more retained payment attempts.
+* Payment statuses are `pending`, `submitted`, `verified`, `rejected`, `refunded`.
+* Only Administrator verifies/rejects.
+* Verification permits Booking Service to confirm a pending booking.
+* A rejected attempt does not reject/cancel the booking and is never overwritten.
+* Gateway callbacks and automatic processing are Future Enhancements.
 
----
+## 2. Data Contract
 
-# Change Log
+### Payment methods
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Payment Management System Specification created |
+`payment_methods` stores configured manual method name, instructions, account reference, optional QR image path, proof requirement, active control and timestamps.
 
----
+### Payment attempts
 
-# Table of Contents
+| Field | Purpose |
+|---|---|
+| `booking_id`, `payment_method_id` | Required relationships |
+| `currency`, `amount` | Fixed-precision NPR submission snapshot |
+| `transaction_reference`, `proof_path`, `guest_notes` | Submitted evidence |
+| `payment_status` | Canonical state |
+| `submitted_at` | Submission time |
+| `verified_at`, `verified_by` | Verification evidence |
+| `rejected_at`, `rejected_by` | Rejection evidence |
+| `verification_note` | Verification/rejection note |
+| timestamps | Record history |
 
-1. Purpose
-2. Scope
-3. Actors
-4. User Stories
-5. Business Objectives
-6. Payment Workflow
-7. Payment Methods
-8. Payment Verification
-9. Invoice Management
-10. Refund Management
-11. Functional Requirements
-12. Business Rules
-13. Validation Rules
-14. Security Requirements
-15. Performance Requirements
-16. Accessibility Requirements
-17. Acceptance Criteria
-18. Future Enhancements
-19. Related Database Tables
-20. Related API Endpoints
-21. Related Modules
+No payment-event table is required. Submission/verification/rejection history is retained through the attempt's status/actor/timestamp/note fields plus append-only `audit_logs`. Each resubmission is a new attempt, preserving prior states.
 
----
+Refund amount and final refund-specific fields are not approved until the refund policy decision.
 
-# 1. Purpose
+## 3. Submission Workflow
 
-The Payment Management System records, verifies, and manages guest payments for reservations.
+* Page: `/booking/payment`
+* `GET /api/v1/payment-methods`
+* `POST /api/v1/payments`
 
-Version 1 focuses on manual payment verification while providing a foundation for future online payment gateway integration.
+The Guest proves secure booking access and submits `booking_reference`, signed access value, `payment_method_id`, NPR `amount`, transaction reference, optional notes and proof where configured. Payment Service validates the booking/deadline/method/amount/evidence, stores a new attempt as `submitted`, and commits before notification.
 
----
+There is no automatically created `pending` attempt during booking. `pending` remains a canonical value only for an explicitly created-but-not-submitted attempt if a later approved service flow uses it; the active Guest endpoint creates `submitted` after complete validation.
 
-# 2. Scope
+## 4. Administrator Verification
 
-Included
+* Pages: `/admin/payments`, `/admin/payments/{id}`
+* `GET /api/v1/admin/payments`
+* `GET /api/v1/admin/payments/{id}`
+* `PATCH /api/v1/admin/payments/{id}/status`
 
-- QR Payment
-- Bank Transfer
-- Cash Payment
-- Payment Verification
-- Payment History
-- Invoice Generation
-- Refund Recording
+Only a `submitted` attempt may transition to `verified` or `rejected`. Payment Service records Administrator, time and note. Verification coordinates with Booking Service so only it may transition a currently `pending` booking to `confirmed`. Duplicate qualifying verification is prevented transactionally.
 
-Excluded
+## 5. Refund Boundary
 
-- Online Gateway Integration
-- Automatic Refund Processing
+`refunded` is a canonical status for later approved manual recording, but implementation is blocked. Full-versus-partial behavior, amount representation, approval authority, accounting treatment and audit procedure require Architect/Client Confirmation.
 
----
+Version 1 documentation defines no refund button, request payload, mutation endpoint or completed refund acceptance criterion. Developers must not infer one.
 
-# 3. Actors
+## 6. Proof Upload
 
-## Guest
+Proof uploads use approved configuration for size, MIME, extension and storage. Filenames are randomized, content is validated, and storage cannot execute PHP. No numeric maximum is hardcoded here.
 
-Can
+## 7. Security and Responsibilities
 
-- View payment instructions
-- Upload payment proof
-- Submit transaction reference
-- View payment status
-- Download invoice
+Payment Service owns validation, transitions, transactions and Booking Service coordination. Payment Repository owns PDO/SQL. Payment entities contain data and execute no SQL. Controllers/views never query the database. Guest submission is signed/rate-limited; Administrator mutations require session, authorization and CSRF. Sensitive evidence access is protected and audited.
 
-Cannot
+## 8. Notifications
 
-- Approve payments
+Guests receive transactional SMTP email for submitted/verified/rejected events. Administrators receive in-app notifications and may also receive configured transactional email. Delivery failures do not roll back committed payment/booking transitions.
 
----
+## 9. Acceptance Tests
 
-## Administrator
+* Booking creation leaves zero payment rows.
+* Each submission creates a distinct `submitted` attempt.
+* Rejected attempts remain retained and resubmission creates another row.
+* Guest cannot set verified/rejected/refunded.
+* Only Administrator can verify/reject a submitted attempt.
+* Verification permits Booking Service confirmation; rejection does not mutate booking state.
+* Duplicate qualifying verification is blocked.
+* Upload rules come from configuration.
+* No refund implementation is accepted until policy approval.
 
-Can
+## 10. Future Enhancements
 
-- Verify payments
-- Reject payments
-- Record cash payments
-- Generate invoices
-- Record refunds
-- View payment reports
-
----
-
-# 4. User Stories
-
-### As a Guest
-
-I want to upload my payment proof
-
-So that the hotel can verify my reservation.
-
----
-
-### As an Administrator
-
-I want to verify guest payments
-
-So that only valid reservations are confirmed.
-
----
-
-### As an Administrator
-
-I want to generate invoices
-
-So guests receive proper payment records.
-
----
-
-# 5. Business Objectives
-
-The payment system shall
-
-- Track every payment
-- Prevent fraud
-- Maintain complete financial records
-- Support future gateway integration
-- Simplify payment verification
-
----
-
-# 6. Payment Workflow
-
-Reservation Created
-
-↓
-
-Pending Payment
-
-↓
-
-Guest Selects Payment Method
-
-↓
-
-Guest Uploads Payment Proof
-
-↓
-
-Administrator Reviews Payment
-
-↓
-
-Approve or Reject
-
-↓
-
-Booking Confirmed
-
-↓
-
-Invoice Generated
-
----
-
-# 7. Payment Methods
-
-Version 1
-
-- QR Code
-- Bank Transfer
-- Cash
-
-Future
-
-- eSewa
-- Khalti
-- Fonepay
-- Stripe
-- PayPal
-- Visa / Mastercard
-
----
-
-# 8. Payment Verification
-
-Guest submits
-
-- Transaction ID
-- Amount
-- Payment Date
-- Payment Screenshot
-
-Administrator reviews
-
-- Amount
-- Transaction ID
-- Screenshot
-- Booking
-
-Status
-
-- Pending
-- Verified
-- Rejected
-- Refunded
-
----
-
-# 8.1 Payment Status Timeline
-
-Every payment shall progress through a predefined status timeline.
-
-Workflow
-
-Reservation Created
-
-↓
-
-Awaiting Payment
-
-↓
-
-Payment Submitted
-
-↓
-
-Payment Under Verification
-
-↓
-
-Payment Verified
-
-↓
-
-Booking Confirmed
-
-↓
-
-Invoice Generated
-
-↓
-
-Stay Completed
-
-↓
-
-Archived
-
-The current payment status shall be visible to both the guest and administrator.
-
-Each status transition shall record:
-
-- Date
-- Time
-- Performed By
-- Notes (Optional)
-
-Status history shall never be deleted and must be available for auditing.
-
----
-
-# 9. Invoice Management
-
-Each invoice shall include
-
-- Invoice Number
-- Booking Reference
-- Guest Name
-- Payment Method
-- Amount
-- Tax
-- Discount
-- Total
-- Payment Status
-- Issue Date
-
-Invoices shall be printable as PDF.
-
----
-
-# 10. Refund Management
-
-Administrator may record
-
-- Refund Amount
-- Refund Reason
-- Refund Date
-- Refund Method
-- Notes
-
-Refund history shall be retained.
-
----
-
-# 11. Functional Requirements
-
-The system shall provide
-
-- Payment submission
-- Payment verification
-- Payment history
-- Invoice generation
-- Refund recording
-- Payment search
-- Payment reports
-
----
-
-# 12. Business Rules
-
-Payments must be linked to bookings.
-
-Only verified payments confirm reservations.
-
-Every payment must have a status.
-
-Invoices cannot be deleted.
-
-Refunds must reference an existing payment.
-
----
-
-# 13. Validation Rules
-
-Amount
-
-Greater than zero
-
-Transaction Reference
-
-Maximum 100 characters
-
-Payment Screenshot
-
-JPG
-
-PNG
-
-WEBP
-
-Maximum 10 MB
-
----
-
-# 14. Security Requirements
-
-Only administrators may verify payments.
-
-Payment uploads must be validated.
-
-All financial actions shall be recorded in the audit log.
-
-Prevent duplicate payment submissions.
-
-Sensitive payment data shall be protected.
-
----
-
-# 15. Performance Requirements
-
-Payment submission
-
-Less than 3 seconds
-
-Invoice generation
-
-Less than 5 seconds
-
-Payment search
-
-Less than 2 seconds
-
----
-
-# 16. Accessibility Requirements
-
-The payment module shall
-
-- Support keyboard navigation
-- Meet WCAG 2.1 AA
-- Display accessible validation messages
-- Support screen readers
-
----
-
-# 17. Acceptance Criteria
-
-The module is complete when
-
-- Guests can submit payment information.
-- Administrators can verify payments.
-- Payment status updates correctly.
-- Invoices are generated successfully.
-- Refunds are recorded.
-- Audit logs capture all payment actions.
-
----
-
-# 18. Future Enhancements
-
-- eSewa Integration
-- Khalti Integration
-- Fonepay Integration
-- Stripe Integration
-- PayPal Integration
-- Automated Refunds
-- Multi-Currency Support
-- Tax Calculation Engine
-- Payment Analytics Dashboard
-- Scheduled Payment Reminders
-
----
-
-# 19. Related Database Tables
-
-- payments
-- payment_methods
-- invoices
-- invoice_items
-- bookings
-- users
-- audit_logs
-
----
-
-# 20. Related API Endpoints
-
-GET /payments
-
-GET /payments/{id}
-
-POST /payments
-
-PUT /payments/{id}
-
-POST /payments/{id}/verify
-
-POST /payments/{id}/reject
-
-GET /invoices/{id}
-
-GET /payments/report
-
----
-
-# 21. Related Modules
-
-- Booking System
-- Authentication
-- Admin Dashboard
-- Notification System
-- Invoice Management
-
----
-
-# End of Document
+Gateway checkout/callbacks, automatic verification/refunds, installment/partial-payment policy, advanced reconciliation and refund implementation require later approved contracts.

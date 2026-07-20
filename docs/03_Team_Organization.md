@@ -1,5 +1,7 @@
 # Team Organization & Responsibilities
 
+> **Application-role clarification:** Team job titles and development responsibilities in this document do not create application authorization roles. Under `00_V1_ARCHITECT_DECISIONS.md` DEC-005, Version 1 application actors are Guest and Administrator only. Manager, Receptionist, Accountant, and Content Manager permission systems are future enhancements.
+
 ## Project Information
 
 | Item | Details |
@@ -395,7 +397,7 @@ Ownership means the assigned developer is responsible for implementing, maintain
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
+| Project Manager | Feroj | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

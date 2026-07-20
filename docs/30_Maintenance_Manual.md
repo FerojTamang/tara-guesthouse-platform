@@ -1,5 +1,7 @@
 # Maintenance Manual
 
+> **Version 1 operations:** Maintain the cPanel/shared-hosting deployment, Apache/PHP/MariaDB runtime, HTTPS, environment configuration, migrations, backups/restoration tests, application/security/audit logs, SMTP email, upload safety, and supported cron retries. VPS/cloud, Docker, Redis, WebSockets, and permanent workers are Future Infrastructure.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Maintenance Manual |
 | **Document No.** | 30 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -681,8 +683,8 @@ This document shall be reviewed periodically and updated whenever operational pr
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | System Administrator | Pending |
 | DevOps Engineer | Pending |
 | Technical Support | Pending |

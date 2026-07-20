@@ -1,5 +1,7 @@
 # Testing Strategy
 
+> **Approved Version 1 traceability:** Critical automated tests must cover Administrator session login/logout and authorization, CSRF, room CRUD/publication, overlap and concurrency protection, one-room booking creation, every allowed/forbidden canonical booking transition, multiple payment attempts and verification, invoices, check-in/check-out, verified-stay reviews, uploads, and `/api/v1/...` response contracts. A feature is not complete until these applicable tests pass and documentation is synchronized.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Testing Strategy |
 | **Document No.** | 27 |
 | **Version** | 1.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -497,9 +499,8 @@ Test data must be managed separately from production data.
 
 ```text
 Administrator
-Manager
-Receptionist
-Customer
+Guest booking data (not an authenticated user)
+Future role fixtures only when those roles are approved
 ```
 
 ---
@@ -691,8 +692,8 @@ Testing is an essential component of the software development lifecycle and must
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | QA Engineer | Pallawi | Pending |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |

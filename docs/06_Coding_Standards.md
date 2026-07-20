@@ -1,5 +1,7 @@
 # Coding Standards & Best Practices
 
+> **Approved constraints:** Code must follow the layered PHP architecture and canonical terms in `00_V1_ARCHITECT_DECISIONS.md`. AI-generated code must not invent columns, statuses, routes, roles, frameworks, or future features; place SQL in controllers; place business logic in views; bypass validation, authorization, CSRF, session, upload, or audit controls; or modify unrelated modules. Any uncovered conflict must be reported before implementation.
+
 ## Project Information
 
 | Item | Details |
@@ -7,7 +9,7 @@
 | **Project** | Tara Guest House Management System |
 | **Document** | Coding Standards & Best Practices |
 | **Version** | 1.0 |
-| **Status** | Draft |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -140,7 +142,8 @@ $sql = "SELECT * FROM users WHERE email='$email'";
 
 - Never concatenate SQL using user input.
 - Always bind parameters.
-- Keep SQL queries inside Models or Repositories.
+- Keep all SQL queries and PDO calls inside Repositories.
+- Models/entities represent domain data and never execute SQL.
 - Never execute raw SQL from Views or Controllers.
 
 ---
@@ -476,7 +479,7 @@ The team follows these widely accepted software engineering principles:
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
+| Project Manager | Feroj | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

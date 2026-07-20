@@ -1,749 +1,229 @@
 # Tara Guest House Management System
 
-**Document:** Database Design
+# 08. Database Design
 
-**Project:** Tara Guest House Management System
+## Document Control
 
-**Prepared By:** fero.dev
-
-**Version:** 1.0
-
-**Status:** Draft
-
-**Owner:** Feroj
-
----
+| Field | Value |
+|---|---|
+| Version | 1.2 |
+| Status | Synchronized — Review Required |
+| Authority | `00_V1_ARCHITECT_DECISIONS.md` |
+| Database | MariaDB/MySQL |
+| Executable source of truth | Versioned database migrations |
 
 # 1. Purpose
 
-This document defines the complete database architecture for the Tara Guest House Management System.
+This document defines the approved Version 1 relational data design. The database dictionary and ER diagram must match the migrations. `database/schema.sql` is an optional installation snapshot and must not override migrations.
 
-The database has been designed with scalability, security, normalization, maintainability, and future expansion in mind.
+# 2. Standards
 
-The goal is to provide a flexible foundation that can support both the current client requirements and future enhancements without major redesign.
+- Use InnoDB, foreign keys, indexes, and transactions.
+- Use snake_case table and column names.
+- Use unsigned integer primary keys unless an approved migration specifies another strategy.
+- Use `DECIMAL(12,2)` or an approved equivalent for NPR financial values. Floating-point storage is prohibited.
+- Store workflow statuses as short strings controlled by PHP domain constants and validated by Services.
+- Store timestamps consistently and display them in `Asia/Kathmandu`.
+- Use `created_at` and `updated_at`; add `deleted_at` only where soft deletion is approved.
+- Records referenced by bookings, payments, invoices, reviews, or audits are not physically deleted through normal administration.
 
----
+# 3. Version 1 Data Modules
 
-# 2. Database Engine
+| Module | Tables |
+|---|---|
+| Administrator authentication | `roles`, `users`, `password_resets` |
+| Rooms | `room_types`, `rooms`, `room_images`, `amenities`, `room_amenities` |
+| Bookings | `bookings`, `booking_rooms`, `booking_events` |
+| Payments and invoices | `payment_methods`, `payments`, `invoices`, `invoice_items` |
+| Activities and gallery | `activities`, `gallery_categories`, `gallery` |
+| Reviews | `reviews`, `review_invitations` |
+| Contact and CMS | `contact_messages`, `settings`, `pages` |
+| Operations | `notifications`, `audit_logs` |
 
-Database Server
+# 4. Authentication and Users
 
-MariaDB 10.x / MySQL 8.x
+Version 1 stores Administrator staff accounts only. Guest is an unauthenticated actor and is not stored as a role. The `roles` structure may remain future-ready, but Version 1 seed data requires only Administrator.
 
-Development Environment
+Customer registration and the customer portal are future enhancements. A nullable future customer/user relationship may exist on a booking, but Version 1 booking creation must not require it.
 
-XAMPP
+Password-reset records apply only to staff Administrator accounts and must store hashed tokens, expiry, and single-use state.
 
-Production Environment
+# 5. Room Model
 
-cPanel Shared Hosting
+## 5.1 Operational Status
 
-Storage Engine
+`rooms.operational_status` uses exactly:
 
-InnoDB
+- `active`
+- `maintenance`
+- `inactive`
 
-Character Set
+## 5.2 Publication
 
-utf8mb4
+`rooms.is_published` is separate from operational status. A room is publicly visible only when `operational_status = active` and `is_published = true`.
 
-Collation
+## 5.3 Calculated Availability and Occupancy
 
-utf8mb4_unicode_ci
+Available, reserved, and occupied are calculated conditions, not stored room operational statuses.
 
----
+For a requested range, a room is unavailable when an unexpired booking with status `pending`, `confirmed`, or `checked_in` overlaps:
 
-# 3. Database Principles
+`existing.check_in < requested.check_out AND existing.check_out > requested.check_in`
 
-The database follows these principles:
+Bookings with status `checked_out`, `cancelled`, or `rejected` do not block. Maintenance and inactive rooms always block.
 
-- Third Normal Form (3NF)
-- Referential Integrity
-- Data Consistency
-- No Duplicate Information
-- Foreign Key Constraints
-- Cascading Rules
-- Audit Fields
-- Scalability
-- Security First
+# 6. Booking Model
 
----
+## 6.1 Guest Snapshot
 
-# 4. Naming Convention
+Each booking stores an immutable-at-booking-time guest and policy snapshot:
 
-## Tables
+- guest full name;
+- email;
+- phone;
+- adults and children or equivalent occupancy values;
+- check-in and check-out dates;
+- booking reference;
+- special request where supplied;
+- agreed room-price snapshot;
+- terms/policy acceptance timestamp;
+- optional policy/version identifier when available.
 
-Lowercase plural
+No registered customer account is required.
 
-Example
+## 6.2 Cardinality
 
-users
+Version 1 permits exactly one room per booking. The `booking_rooms` junction remains future-ready, but a migration constraint where practical plus Request/Service validation and tests must enforce one `booking_rooms` row per booking in Version 1.
 
-rooms
+## 6.3 Booking Status
 
-bookings
+Canonical values:
 
-reviews
+- `pending`
+- `confirmed`
+- `checked_in`
+- `checked_out`
+- `cancelled`
+- `rejected`
 
-gallery
+There is no Version 1 `completed` or workflow `archived` booking status.
 
-activities
+## 6.4 Operational Timestamps and Deadline
 
-payments
+The booking design includes:
 
----
+- `confirmation_deadline_at` for the configurable payment/confirmation deadline;
+- `confirmed_at`;
+- `checked_in_at`;
+- `checked_out_at`;
+- `cancelled_at`;
+- `cancellation_reason`;
+- `rejected_at` and `rejection_reason` where rejected.
 
-## Columns
+Expired pending bookings cease blocking availability and may be changed to `cancelled` with a recorded reason.
 
-snake_case
+## 6.5 Permanent Transition History
 
-Examples
+Every booking transition is appended to `booking_events` with booking, from-status, to-status, event type, actor when applicable, reason/notes, and event timestamp. History is never updated into a different event and is not deleted through normal administration.
 
-user_id
+# 7. Payment Model
 
-room_type_id
+A booking has zero or more payment attempts. A payment record is not required at booking creation.
 
-booking_status
+Canonical payment statuses:
 
-created_at
+- `pending`
+- `submitted`
+- `verified`
+- `rejected`
+- `refunded`
 
-updated_at
+Each attempt stores booking, method, amount, transaction/reference code, proof path when required, guest notes, Administrator verification/rejection data, and timestamps. One verified payment is expected to cover the required Version 1 booking amount. Duplicate verification is prohibited.
 
----
+Payment verification may allow the Booking Service to transition a booking from `pending` to `confirmed`. Rejecting one attempt does not reject the booking; a new attempt may be created before the booking deadline.
 
-## Primary Keys
+Automatic gateway callbacks and gateway refunds are future. The client policy for full versus partial manual refund recording remains **Architect/Client Confirmation Required**.
 
-Always
+# 8. Invoice Model
 
-id
+- Invoice numbers are unique and stable.
+- Monetary values are fixed-precision NPR snapshots derived from booking and verified-payment data.
+- Later room-price changes do not alter issued invoices.
+- Issued invoices are not deleted; corrections are audited.
+- Invoice issue and correction events are audited.
+- Client-specific tax/VAT presentation remains **Architect/Client Confirmation Required**.
 
----
+# 9. CMS and Settings
 
-## Foreign Keys
+Version 1 uses two structures:
 
-table_name_id
+1. `settings` for site-wide configuration such as contact information, social links, booking policies, and operational settings.
+2. `pages` for structured About, policy, and other public content.
 
-Examples
+`pages.status` uses exactly `draft`, `published`, or `archived`. Only published pages are public. Full version history and rollback are future enhancements.
 
-room_id
+# 10. Activities and Gallery
 
-booking_id
+Activities and gallery items each have separate controls for business activity and publication:
 
-payment_id
+- `is_active` controls operational use;
+- `is_published` controls public visibility.
 
-user_id
+Only active and published records are public. These controls must not be collapsed into one ambiguous status.
 
----
+# 11. Reviews
 
-## Index Names
+A review is eligible only for a booking whose `booking_status = checked_out`.
 
-idx_table_column
+- One review per booking.
+- Status values: `pending`, `approved`, `rejected`.
+- Only approved reviews are public.
+- Customer login is not required.
+- `review_invitations` stores a securely generated token hash, booking, expiry, use timestamp, and creation timestamp.
+- The invitation is single-use and cannot create a second review for the same booking.
 
-Example
+# 12. Notifications and Email
 
-idx_rooms_status
+Version 1 stores in-app Administrator notifications and logs transactional SMTP delivery attempts/failures as appropriate. An email failure does not roll back a committed booking or payment transaction.
 
-idx_bookings_check_in
+SMS, WhatsApp, push, WebSockets, and permanent queue-worker data are future enhancements.
 
----
+# 13. Audit and Retention
 
-# 5. Database Relationships
+Audit logs cover Administrator login/security events, booking transitions, payment verify/reject, invoice issue, room/pricing changes, CMS publication, review moderation, staff/settings changes, and important backup actions. A later approved refund implementation must also be audited, but no current refund fields or workflow are defined.
 
-Users
+Audit and booking-event records are retained and are not editable through normal administration.
 
-↓
+# 14. Migration and Seeder Requirements
 
-Bookings
+Migrations must create all approved Version 1 tables, fields, foreign keys, indexes, and constraints in dependency order. Seeders create:
 
-↓
+- the Administrator role;
+- the initial Administrator account through a secure deployment process;
+- essential settings;
+- configured manual payment methods.
 
-Booking Rooms
+# 15. Required Database Tests
 
-↓
+- overlap boundary and blocking-status queries;
+- expired pending-booking behavior;
+- one-room-per-booking enforcement;
+- concurrent booking creation protection;
+- allowed/forbidden booking transitions and event history;
+- multiple payment attempts and duplicate-verification prevention;
+- checked-out review eligibility and single-use invitation;
+- fixed-precision historical booking/invoice snapshots;
+- operational/publication filtering;
+- soft-deletion and audit-retention rules.
 
-Payments
+# 16. Unresolved Policies
 
-↓
+The database implementation must not guess these values:
 
-Invoices
+- exact pending-booking deadline;
+- full versus partial manual refund policy;
+- invoice tax/VAT presentation;
+- review-invitation expiry;
+- contact-message retention duration.
 
-Rooms
-
-↓
-
-Room Images
-
-↓
-
-Amenities
-
-Activities
-
-↓
-
-Bookings
-
-Reviews
-
-↓
-
-Users
-
-↓
-
-Rooms
-
-Gallery
-
-↓
-
-Images
-
-CMS
-
-↓
-
-Settings
-
----
-
-# 6. Core Database Modules
-
-The application database is divided into several modules.
-
-Authentication
-
-Room Management
-
-Reservation
-
-Payments
-
-Invoices
-
-Activities
-
-Gallery
-
-CMS
-
-Reviews
-
-Contact Messages
-
-Website Settings
-
-Audit Logs
-
----
-
-# 7. Planned Tables
-
-Authentication
-
-- users
-- roles
-- permissions
-
-Hotel
-
-- room_types
-- rooms
-- room_images
-- room_amenities
-- amenities
-
-Reservation
-
-- bookings
-- booking_rooms
-- booking_status
-
-Payment
-
-- payments
-- payment_methods
-
-Invoice
-
-- invoices
-- invoice_items
-
-Website
-
-- gallery
-- gallery_categories
-- activities
-- reviews
-- contact_messages
-- settings
-
-System
-
-- audit_logs
-- notifications
-
----
-
-# 8. Audit Fields
-
-Every major table should contain:
-
-created_at
-
-updated_at
-
-created_by
-
-updated_by
-
-deleted_at (Soft Delete)
-
-This allows proper tracking of every record.
-
----
-
-# 9. Primary Keys
-
-Every table uses
-
-AUTO_INCREMENT
-
-Example
-
-id
-
-INT
-
-AUTO_INCREMENT
-
-PRIMARY KEY
-
----
-
-# 10. Foreign Keys
-
-Relationships must always use Foreign Keys.
-
-Example
-
-bookings.user_id
-
-↓
-
-users.id
-
-rooms.room_type_id
-
-↓
-
-room_types.id
-
-reviews.room_id
-
-↓
-
-rooms.id
-
----
-
-# 11. Cascading Rules
-
-Delete User
-
-↓
-
-Do NOT delete bookings.
-
-Instead
-
-Restrict
-
-Delete Room
-
-↓
-
-Do NOT delete booking history.
-
-Restrict
-
-Delete Gallery Image
-
-↓
-
-Cascade Image Metadata
-
-Delete Activity
-
-↓
-
-Restrict if bookings exist.
-
----
-
-# 12. Soft Delete Policy
-
-Important business data should never be permanently deleted.
-
-Instead use
-
-deleted_at
-
-NULL
-
-↓
-
-Record Active
-
-deleted_at
-
-Timestamp
-
-↓
-
-Record Deleted
-
-This applies to
-
-Users
-
-Rooms
-
-Bookings
-
-Reviews
-
-Activities
-
-Gallery
-
----
-
-# 13. Booking Workflow
-
-Customer
-
-↓
-
-Choose Room
-
-↓
-
-Availability Check
-
-↓
-
-Create Booking
-
-↓
-
-Pending Payment
-
-↓
-
-Payment Verification
-
-↓
-
-Confirmed
-
-↓
-
-Invoice Generated
-
-↓
-
-Stay Completed
-
----
-
-# 14. Room Workflow
-
-Admin
-
-↓
-
-Create Room
-
-↓
-
-Upload Images
-
-↓
-
-Set Price
-
-↓
-
-Assign Amenities
-
-↓
-
-Publish
-
-↓
-
-Visible on Website
-
----
-
-# 15. Review Workflow
-
-Customer
-
-↓
-
-Complete Stay
-
-↓
-
-Submit Review
-
-↓
-
-Pending Moderation
-
-↓
-
-Admin Approval
-
-↓
-
-Visible on Website
-
----
-
-# 16. Payment Workflow
-
-Customer
-
-↓
-
-QR Payment
-
-or
-
-Bank Transfer
-
-↓
-
-Upload Voucher
-
-↓
-
-Transaction ID
-
-↓
-
-Admin Verification
-
-↓
-
-Payment Approved
-
-↓
-
-Booking Confirmed
-
----
-
-# 17. CMS Workflow
-
-Admin
-
-↓
-
-Dashboard
-
-↓
-
-Edit Content
-
-↓
-
-Database Updated
-
-↓
-
-Website Automatically Updated
-
----
-
-# 18. Security Standards
-
-Passwords
-
-Never stored in plain text.
-
-Use
-
-password_hash()
-
-Verification
-
-password_verify()
-
-All SQL
-
-Prepared Statements
-
-PDO
-
-CSRF Protection
-
-Required
-
-Input Validation
-
-Required
-
-Output Escaping
-
-Required
-
----
-
-# 19. Performance Strategy
-
-Indexes should be created for
-
-email
-
-username
-
-room_number
-
-booking_reference
-
-check_in
-
-check_out
-
-created_at
-
-status
-
-Indexes improve search performance significantly.
-
----
-
-# 20. Backup Strategy
-
-Daily Database Backup
-
-Weekly Full Backup
-
-Monthly Archive Backup
-
-Store backups separately from the production server.
-
----
-
-# 21. Future Expansion
-
-The database has been designed to support future modules without redesign.
-
-Possible future modules
-
-Online Payment Gateway
-
-Multi-language Website
-
-Hotel Branches
-
-Staff Management
-
-Loyalty Program
-
-Discount Coupons
-
-Travel Packages
-
-Airport Pickup
-
-Restaurant Ordering
-
-Laundry Service
-
-Inventory Management
-
-Mobile Application
-
-REST API
-
----
-
-# 22. Data Integrity Rules
-
-Every booking must belong to one customer.
-
-Every room must have one room type.
-
-Every payment must belong to one booking.
-
-Every review must belong to one completed booking.
-
-Every gallery image must have an upload date.
-
-Every activity must have a status.
-
----
-
-# 23. Database Standards
-
-Every table must include
-
-Primary Key
-
-Indexes
-
-Created Date
-
-Updated Date
-
-Foreign Keys where applicable
-
-Meaningful Naming
-
-Normalized Structure
-
----
-
-# 24. Error Prevention
-
-Never
-
-Store duplicate information.
-
-Never
-
-Store calculated totals unnecessarily.
-
-Never
-
-Delete important records permanently.
-
-Always
-
-Validate before inserting.
-
-Always
-
-Use Transactions for critical operations.
-
----
-
-# 25. Conclusion
-
-The database architecture has been designed to provide a secure, maintainable, and scalable foundation for the Tara Guest House Management System.
-
-Following these standards will ensure high performance, data integrity, and future extensibility while supporting the long-term growth of both the client and fero.dev.
-
----
-
-# Technical Architect Notes
-
-This database is intentionally designed as a reusable hospitality platform rather than a single-project database.
-
-By keeping the schema generic (rooms, bookings, payments, settings, reviews, etc.), the same architecture can be adapted for future hotels with minimal changes.
-
-The goal is to create a professional software product that can evolve into a reusable Hotel Management System rather than a one-off website.
+They require an approved client/architect policy or implementation ticket before related constraints are finalized.

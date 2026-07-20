@@ -1,392 +1,76 @@
-# Tara Guest House Management System
+# Tara Guest House Notification System Specification
 
-# Notification System Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 Administrator in-app notifications and transactional SMTP email
 
-# Document Control
+## 1. Channel and Audience Contract
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Notification System Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+| Audience | Version 1 channel |
+|---|---|
+| Administrator | In-app notification centre; transactional SMTP email where configured |
+| Guest | Transactional SMTP email only |
 
----
+Guests have no account, notification table relationship, in-app notification centre or notification API in Version 1. SMS, WhatsApp, push and WebSocket delivery are Future Enhancements.
 
-# Change Log
+## 2. Administrator In-App Notifications
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Notification System Specification created |
+`notifications` stores Administrator `user_id`, type, title, message, optional related entity identifiers, `read_at` and `created_at`.
 
----
+Exact protected endpoints:
 
-# Table of Contents
+* `GET /api/v1/admin/notifications`
+* `PATCH /api/v1/admin/notifications/{id}/read`
+* `PATCH /api/v1/admin/notifications/read-all`
 
-1. Purpose
-2. Scope
-3. Actors
-4. Notification Channels
-5. Business Objectives
-6. Notification Events
-7. Notification Workflow
-8. Notification Center
-9. Administrator Features
-10. Guest Notifications
-11. Functional Requirements
-12. Business Rules
-13. Validation Rules
-14. Security Requirements
-15. Performance Requirements
-16. Accessibility Requirements
-17. Acceptance Criteria
-18. Future Enhancements
-19. Related Database Tables
-20. Related API Endpoints
-21. Related Modules
+There are no unversioned `/notifications` endpoints and no Version 1 archive/delete action.
 
----
+## 3. Transactional Email
 
-# 1. Purpose
+SMTP email may be generated after successful events such as:
 
-The Notification System keeps guests and administrators informed about important events throughout the hotel management process.
+* booking received, confirmed, cancelled or rejected;
+* payment submitted, verified or rejected;
+* Administrator password reset;
+* review invitation after checkout.
 
-Notifications improve communication, reduce manual follow-up, and ensure timely actions.
+Templates use approved site settings and escape untrusted content. Email recipients/subjects/bodies contain only necessary information; secure links use signed/single-use values and never expose booking data by reference alone.
 
----
+## 4. Event Workflow
 
-# 2. Scope
+1. Owning Service completes and commits the domain transaction.
+2. It records/dispatches the approved notification event.
+3. Notification Service creates the Administrator in-app record where relevant.
+4. Email Service sends through configured SMTP.
+5. Failure is logged with safe metadata and scheduled/retried according to supported configuration.
 
-Included
+A failed notification/email never rolls back an already committed booking/payment/check-out transaction. Permanent background workers are not required; a cPanel cron retry may be used when supported.
 
-- Email Notifications
-- In-System Notifications
-- Booking Notifications
-- Payment Notifications
-- Review Notifications
-- Contact Message Notifications
+## 5. In-App UI
 
-Excluded
+The PHP-rendered Administrator header/page displays unread count and a paginated list. Selective Fetch calls only the three approved endpoints. Read actions affect only notifications belonging to the authenticated Administrator.
 
-- SMS Notifications
-- WhatsApp Notifications
-- Push Notifications
+## 6. Responsibilities and Security
 
----
+Notification Service owns audience/channel/template/delivery rules. Notification Repository owns PDO/SQL. Notification entities contain data and execute no SQL. Controllers/views do not query the database.
 
-# 3. Actors
+Administrator APIs require PHP session/authorization/CSRF for mutations. SMTP credentials remain in environment configuration, never documentation/source control. Logs exclude passwords, session IDs and raw secure tokens.
 
-## Guest
+## 7. Configuration Required
 
-Can
+SMTP host/port/encryption/sender credentials, retry count/backoff and retention require Architect/Security/Operations Configuration. Values are not hardcoded in this specification.
 
-- Receive booking updates
-- Receive payment updates
-- Receive invoice notifications
-- Receive booking reminders
+## 8. Acceptance Tests
 
----
+* Guest has no in-app notification centre/API.
+* Administrator sees only their notifications.
+* Only the three approved JSON endpoints are registered.
+* Read-one/read-all set `read_at` without deleting rows.
+* Committed domain events survive email failure.
+* SMTP secrets/tokens do not appear in logs.
+* SMS/WhatsApp/push/WebSocket behavior is absent.
 
-## Administrator
+## 9. Future Enhancements
 
-Can
-
-- Receive new booking alerts
-- Receive payment verification requests
-- Receive new review alerts
-- Receive contact form alerts
-- Mark notifications as read
-
----
-
-# 4. Notification Channels
-
-Version 1
-
-- In-App Notification Center
-- Email
-
-Future
-
-- SMS
-- WhatsApp
-- Push Notification
-- Telegram
-- Microsoft Teams
-- Slack
-
----
-
-# 5. Business Objectives
-
-The notification system shall
-
-- Improve communication
-- Reduce missed bookings
-- Speed up payment verification
-- Keep guests informed
-- Reduce manual administration
-
----
-
-# 6. Notification Events
-
-Guest
-
-- Booking Submitted
-- Booking Confirmed
-- Booking Cancelled
-- Payment Received
-- Payment Verified
-- Invoice Generated
-- Reminder Before Check-in
-- Reminder Before Check-out
-
-Administrator
-
-- New Booking
-- Payment Awaiting Verification
-- Booking Cancellation
-- New Contact Message
-- New Review Submitted
-- System Warning
-
----
-
-# 7. Notification Workflow
-
-Booking Created
-
-↓
-
-Notification Generated
-
-↓
-
-Stored in Notification Center
-
-↓
-
-Email Sent
-
-↓
-
-Recipient Reads Notification
-
-↓
-
-Notification Marked as Read
-
----
-
-# 8. Notification Center
-
-The system shall provide an in-app notification center.
-
-Each notification shall display:
-
-- Title
-- Description
-- Category
-- Priority
-- Date & Time
-- Status (Read / Unread)
-- Related Record
-- Action Link
-
-Notifications should support filtering by:
-
-- All
-- Unread
-- Booking
-- Payment
-- Review
-- Contact
-- System
-
----
-
-# 9. Administrator Features
-
-Administrators can:
-
-- View all notifications
-- Filter notifications
-- Search notifications
-- Mark as Read
-- Mark All as Read
-- Archive notifications
-- Open related records directly
-
----
-
-# 10. Guest Notifications
-
-Guests shall receive:
-
-- Booking confirmation
-- Payment instructions
-- Payment verification result
-- Invoice availability
-- Reservation reminder
-- Cancellation confirmation
-
----
-
-# 11. Functional Requirements
-
-The system shall support:
-
-- Notification creation
-- Notification delivery
-- Notification history
-- Read status
-- Notification search
-- Category filtering
-- Priority levels
-
----
-
-# 12. Business Rules
-
-Notifications shall never be sent to inactive users.
-
-Every notification shall reference the related business record where applicable.
-
-Critical notifications shall remain visible until acknowledged.
-
-Notification history shall be retained for auditing.
-
----
-
-# 13. Validation Rules
-
-Title
-
-Maximum 150 characters
-
-Message
-
-Maximum 2000 characters
-
-Category
-
-Must be a valid notification type
-
-Priority
-
-- Low
-- Medium
-- High
-- Critical
-
----
-
-# 14. Security Requirements
-
-Notifications shall respect user permissions.
-
-Sensitive information shall not be exposed in notification previews.
-
-All notification events shall be logged.
-
-Users shall only view notifications intended for them.
-
----
-
-# 15. Performance Requirements
-
-Notification creation
-
-Less than 1 second
-
-Notification delivery (email queue)
-
-Less than 60 seconds
-
-Notification Center load time
-
-Less than 2 seconds
-
----
-
-# 16. Accessibility Requirements
-
-The notification system shall:
-
-- Support keyboard navigation
-- Meet WCAG 2.1 AA
-- Clearly distinguish read and unread notifications
-- Support screen readers
-
----
-
-# 17. Acceptance Criteria
-
-The module is complete when:
-
-- Notifications are created automatically for supported events.
-- Guests receive booking and payment updates.
-- Administrators receive operational alerts.
-- Read/unread status functions correctly.
-- Notification history is retained.
-
----
-
-# 18. Future Enhancements
-
-- SMS Integration
-- WhatsApp Integration
-- Push Notifications
-- Scheduled Notifications
-- Notification Templates
-- Multi-language Notifications
-- Notification Preferences
-- AI Notification Prioritization
-
----
-
-# 19. Related Database Tables
-
-- notifications
-- users
-- bookings
-- payments
-- reviews
-- contact_messages
-- audit_logs
-
----
-
-# 20. Related API Endpoints
-
-GET /notifications
-
-GET /notifications/unread
-
-POST /notifications/read
-
-POST /notifications/read-all
-
-DELETE /notifications/{id}
-
----
-
-# 21. Related Modules
-
-- Authentication
-- Booking Management
-- Payment Management
-- Review System
-- Admin Dashboard
-- CMS
-- Contact System
-
----
-
-# End of Document
+Customer accounts/inbox, SMS, WhatsApp, push, WebSockets, permanent workers and archive/delete workflows require later approval and synchronized data/API/UI changes.

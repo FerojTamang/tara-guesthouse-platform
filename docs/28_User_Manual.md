@@ -1,732 +1,252 @@
-# User Manual
+# Tara Guest House User Manual
 
-## Project Information
+## Document Information
 
-| Item | Details |
-|------|---------|
-| **Project** | Tara Guest House Management System |
-| **Document** | User Manual |
-| **Document No.** | 28 |
-| **Version** | 1.0 |
-| **Status** | Approved |
-| **Prepared By** | fero.dev |
-| **Project Owner** | Feroj |
-| **Date** | July 2026 |
+* Status: Synchronized — Review Required
+* Authority: `00_V1_ARCHITECT_DECISIONS.md`
+* Scope: Version 1 Guest and Administrator workflows
 
----
+## 1. Version 1 Users
 
-# 1. Purpose
+Version 1 supports two user-facing actors:
 
-This document provides instructions for using the Tara Guest House Management System.
+* **Guest** uses public pages without registration or login.
+* **Administrator** signs in with an Administrator account and a PHP session.
 
-It is intended for:
+Guest is not a stored/authenticated role. Customer accounts, a Customer Portal, Receptionist, Manager, Accountant and Content Manager access are Future Enhancements.
 
-- Administrators
-- Managers
-- Receptionists
-- Customers
+## 2. Guest Website
 
-The objective of this manual is to help users understand and operate the system efficiently and effectively.
+### 2.1 Browse rooms
 
----
+Use the Rooms page to view published rooms. Operational status, publication status and booking availability are separate concepts. Only rooms that are operationally `active`, publicly published and available for the requested dates can be selected for a public booking.
 
-# 2. Introduction
+Availability is calculated from bookings and dates. The system does not store Available, Reserved or Occupied as room operational statuses.
 
-The Tara Guest House Management System is a web-based application designed to manage guest house operations.
+### 2.2 Check availability
 
-The system provides functionality for:
+1. Enter the check-in date.
+2. Enter a check-out date later than the check-in date.
+3. Enter the guest count.
+4. Submit the search.
+5. Review the rooms that are available for the complete date range.
 
-- Room Management
-- Booking Management
-- Payment Management
-- Invoice Management
-- Review Management
-- Gallery Management
-- Activity Management
-- CMS Management
-- Notifications
-- Reports
-- User Management
+A room is unavailable when a blocking booking overlaps the requested stay. Results can change until a booking is successfully created.
 
----
+### 2.3 Create a booking
 
-# 3. System Overview
+Version 1 creates one room per booking and does not require a customer account.
 
-The system consists of two primary areas:
+1. Select one available room.
+2. Confirm the stay dates and guest count.
+3. Enter the Guest contact snapshot: full name, email and phone.
+4. Enter any permitted special request.
+5. Read and accept the displayed booking terms/policy.
+6. Submit the booking.
 
-```text
-Public Website
-      │
-      ▼
-- Homepage
-- Rooms
-- Activities
-- Gallery
-- Reviews
-- Contact
-```
+The booking starts as `pending`. Save the booking reference and secure access link/token shown by the application. The booking is subject to a payment/confirmation deadline displayed in the confirmation instructions.
 
-```text
-Administration Panel
-      │
-      ▼
-- Dashboard
-- Users
-- Bookings
-- Payments
-- Reports
-- CMS
-- Settings
-```
+### 2.4 Submit payment information
 
----
+A new booking does not automatically create a payment record. When payment information is available:
 
-# 4. User Roles
+1. Open the secure booking-payment flow.
+2. Select an enabled payment method.
+3. Enter the payment reference and amount.
+4. Upload permitted proof when required.
+5. Submit the payment information.
 
-The system supports the following roles.
+The submission creates a payment attempt. Payment attempts use:
 
-| Role | Description |
-|------|-------------|
-| Administrator | Full system access |
-| Manager | Operational management |
-| Receptionist | Booking and payment management |
-| Customer | Booking and profile management |
+* `pending`
+* `submitted`
+* `verified`
+* `rejected`
+* `refunded`
 
----
+The Guest may submit another attempt when the flow permits it; earlier attempts remain in the audit history. Only an Administrator verifies or rejects payment in Version 1. A verified payment permits Booking Service to move the booking from `pending` to `confirmed`.
 
-## Role Responsibilities
+### 2.5 Booking status meaning
 
-### Administrator
+* `pending`: booking created and awaiting confirmation requirements.
+* `confirmed`: payment has been verified and the stay is confirmed.
+* `checked_in`: the Guest has been checked in.
+* `checked_out`: the stay has ended successfully; this is the final successful status.
+* `cancelled`: the booking was cancelled according to the applicable policy.
+An overdue `pending` booking no longer blocks availability and may be changed to `cancelled` with a recorded deadline-expiry reason. `expired` is not a booking status.
 
-- Manage Users
-- Manage CMS
-- View Reports
-- Configure Settings
-- Monitor System Activity
+There is no Version 1 booking status named Completed or Archived.
 
-### Manager
+### 2.6 Submit a review
 
-- Monitor Operations
-- Manage Rooms
-- Review Reports
-- Approve Activities
+Reviews are verified-stay reviews. The system may issue a secure, single-use invitation only when `booking_status = checked_out`.
 
-### Receptionist
+1. Open the review invitation before it expires.
+2. Enter the rating and permitted review details.
+3. Submit once.
 
-- Manage Bookings
-- Verify Payments
-- Generate Invoices
-- Assist Customers
+The review remains subject to moderation before public publication. A used, invalid or expired invitation cannot be reused.
 
-### Customer
+### 2.7 Contact the guest house
 
-- View Rooms
-- Create Bookings
-- Submit Reviews
-- Manage Profile
+Use the public contact form to submit a name, email, phone when requested, subject and message. The system records the message and may send an SMTP email notification. Do not include payment secrets or other highly sensitive data in a contact message.
 
----
+## 3. Administrator Access
 
-# 5. Login
+### 3.1 Sign in
 
-To access the administration panel:
+1. Open the Administrator login page.
+2. Enter the Administrator email and password.
+3. Submit the form.
 
-1. Open the application URL.
-2. Navigate to the Login page.
-3. Enter your email address.
-4. Enter your password.
-5. Click the "Login" button.
+The application creates a server-side PHP session. If the session expires because of configured inactivity or absolute lifetime, sign in again. Version 1 does not use JWT access or refresh tokens.
 
----
+### 3.2 Sign out
 
-## Login Flow
+Use the Sign Out action when work is complete, especially on a shared device. Signing out destroys the active server-side session.
 
-```text
-Open Website
-      │
-      ▼
-Login Page
-      │
-      ▼
-Enter Credentials
-      │
-      ▼
-Authentication
-      │
-      ▼
-Dashboard
-```
+## 4. Administrator Dashboard
 
----
+The dashboard summarizes authoritative records, such as current stays, pending bookings, submitted payments and recent activity. Dashboard metrics are read-only projections; viewing the dashboard does not change a booking, payment or room status.
 
-## Login Errors
+## 5. Room Management
 
-| Error | Description |
-|------|-------------|
-| Invalid Credentials | Email or password incorrect |
-| Account Disabled | Contact Administrator |
-| Session Expired | Login again |
+### 5.1 Operational status
 
----
+Administrators may manage these room operational statuses:
 
-# 6. Dashboard
+* `active`
+* `maintenance`
+* `inactive`
 
-The Dashboard provides an overview of system activities.
+Operational status describes whether the room can be offered operationally. It is not booking availability.
 
-## Dashboard Widgets
+### 5.2 Publication and availability
 
-- Total Bookings
-- Available Rooms
-- Pending Payments
-- Recent Reviews
-- Notifications
-- Revenue Summary
+Publication is controlled separately from operational status. Administrator screens must display:
 
----
+* operational status;
+* publication status;
+* calculated current occupancy;
+* calculated availability for selected dates.
 
-## Example Dashboard
+Reserved and Occupied are derived booking conditions and must not be selected as room operational statuses.
 
-```text
----------------------------------
-Total Rooms         : 25
-Available Rooms     : 10
-Today's Bookings    : 8
-Pending Payments    : 2
-Monthly Revenue     : NPR 250,000
----------------------------------
-```
+### 5.3 Room records
 
----
+Administrators may create and update room details, room type, capacity, NPR rate snapshots for future bookings, amenities and images. A room referenced by booking history should be made `inactive` rather than hard-deleted.
 
-# 7. Room Management
+## 6. Booking Management
 
-Room Management allows authorized users to manage room information.
+### 6.1 Create a booking for a Guest
 
-## Available Actions
+The Administrator Create Booking screen uses Guest contact snapshot fields. It does not search for or require a registered customer.
 
-- Create Room
-- Update Room
-- Delete Room
-- Upload Images
-- Assign Amenities
+1. Select dates and check calculated availability.
+2. Select exactly one eligible room.
+3. Enter the Guest name, email and phone.
+4. Enter guest count and any permitted special request.
+5. Record terms/policy acceptance as required by the workflow.
+6. Create the booking.
 
----
+The new booking always starts as `pending`. The form does not allow an arbitrary booking or payment status to be selected and does not always create a payment attempt.
 
-## Create Room
+### 6.2 Booking actions
 
-1. Navigate to Rooms.
-2. Click "Add Room."
-3. Enter room details.
-4. Upload images.
-5. Save the room.
+Administrators use explicit actions rather than editing the status field directly:
 
----
+* Cancel a `pending` or `confirmed` booking according to policy.
+* Check in a `confirmed` booking; it becomes `checked_in`.
+* Check out a `checked_in` booking; it becomes `checked_out`.
 
-## Room Information
+Every transition is validated and retained in permanent booking event history. The system never changes a room operational status to Reserved, Occupied or Available during these actions.
 
-- Room Name
-- Room Type
-- Price
-- Capacity
-- Description
-- Amenities
-- Images
+## 7. Payment Management
 
----
+The payment queue shows individual submissions, including multiple attempts for the same booking.
 
-# 8. Booking Management
+### 7.1 Verify payment
 
-Booking Management allows users to manage reservations.
+1. Open a `submitted` payment attempt.
+2. Compare the reference, proof, amount and booking financial snapshot.
+3. Choose Verify only when the manual evidence is sufficient.
+4. Confirm the action.
 
-## Booking Actions
+The attempt becomes `verified`. Payment verification permits Booking Service to confirm a `pending` booking. Verification is Administrator-only and no payment gateway is used in Version 1.
 
-- Create Booking
-- Edit Booking
-- Cancel Booking
-- View Booking History
+### 7.2 Reject payment
 
----
+1. Open the submitted attempt.
+2. Enter the required rejection reason.
+3. Confirm rejection.
 
-## Booking Workflow
+The attempt becomes `rejected`; the booking is not confirmed by that attempt. Do not overwrite or delete the rejected record.
 
-```text
-Select Room
-      │
-      ▼
-Choose Dates
-      │
-      ▼
-Confirm Booking
-      │
-      ▼
-Payment
-      │
-      ▼
-Booking Confirmation
-```
+### 7.3 Refunds
 
----
+The system can record a `refunded` payment status, but the full-versus-partial refund policy, approval authority and accounting treatment require Architect/Client Confirmation. Administrators must follow an approved operational policy and must not infer an unapproved refund workflow from this manual.
 
-## Booking Status
+## 8. Invoice Management
 
-| Status | Description |
-|------|-------------|
-| Pending | Awaiting Approval |
-| Confirmed | Reservation Approved |
-| Completed | Stay Completed |
-| Cancelled | Reservation Cancelled |
+Invoices preserve fixed-precision NPR snapshots and line items. Administrators may view and generate invoices only through the documented booking/invoice workflow. Later room-rate changes must not change an existing booking or invoice snapshot. Tax, service-charge and rounding policy require approval before final financial behavior is implemented.
 
----
+## 9. Activities and Gallery
 
-# 9. Payment Management
+Activities and gallery items keep their active control separate from their publication control. An item can be operationally retained but not publicly published. Administrators should review content, media and publication settings before making an item public.
 
-The system supports payment tracking and verification.
+## 10. CMS and Settings
 
-## Payment Actions
+Use Settings for simple site configuration. Use structured CMS page/content records for managed pages.
 
-- View Payments
-- Verify Payments
-- Update Payment Status
-- Generate Receipts
+CMS content uses:
 
----
+* `draft`
+* `published`
+* `archived`
 
-## Payment Status
+Only `published` content appears publicly. CMS `archived` is a content status and must not be confused with a booking status.
 
-| Status | Description |
-|------|-------------|
-| Pending | Awaiting Verification |
-| Paid | Payment Received |
-| Failed | Payment Failed |
-| Refunded | Payment Returned |
+## 11. Review Moderation
 
----
+Administrators review verified-stay submissions and apply the documented moderation action. Eligibility remains tied to a checked-out booking and a valid invitation; moderation cannot make an ineligible submission valid.
 
-## Payment Workflow
+## 12. Contacts and Notifications
 
-```text
-Booking
-   │
-   ▼
-Payment
-   │
-   ▼
-Verification
-   │
-   ▼
-Confirmation
-```
+Administrators may review contact messages and in-app notifications. Version 1 notification channels are in-app notifications and SMTP email. SMS, push and WhatsApp are Future Enhancements.
 
----
+Failed email delivery does not reverse a successful booking, payment or check-out transaction. Delivery failures are recorded for operational follow-up.
 
-# 10. Invoice Management
+## 13. Administrator Accounts, Backups and Audit
 
-Invoices are automatically generated after successful payment.
+Version 1 Administrator-account management must not offer Guest or specialized staff roles. Administrators with the authorized account-management capability may manage other Administrator records according to the approved security rules.
 
-## Invoice Information
+Backup and audit actions are protected Administrator functions. A backup operation must report success or failure honestly. Audit records must not be edited to hide an action.
 
-- Invoice Number
-- Booking ID
-- Customer Name
-- Payment Details
-- Total Amount
-- Invoice Date
+## 14. Common Problems
 
----
+### Session expired
 
-## Invoice Actions
+Sign in again. If sessions expire unexpectedly often, report the time and page to the technical team; do not request or paste session cookie values.
 
-- View Invoice
-- Download Invoice
-- Print Invoice
+### Room does not appear as available
 
----
+Confirm that the room is `active`, published, suitable for the guest count and free of blocking booking overlaps for the complete date range.
 
-## End of Part 1
+### Booking remains pending after payment submission
 
-Part 2 includes:
+Submission alone does not confirm a booking. An Administrator must manually verify a submitted attempt, after which Booking Service may transition the booking to `confirmed`.
 
-- Gallery Management
-- Activity Management
-- CMS Management
-- Review Management
-- Notification Management
-- Reports
-- Settings
-- Logout
-- FAQ
-- Troubleshooting
-- Conclusion
-- Approval
+### Review link does not work
 
----
+Confirm that the booking is `checked_out`, the invitation has not expired and it has not already been used. Contact the guest house without sending the full token in an insecure channel.
 
-# 11. Gallery Management
+## 15. Future Enhancements
 
-Gallery Management allows administrators to manage images displayed on the website.
+The following are not Version 1 user workflows:
 
-## Available Actions
-
-- Upload Images
-- Edit Gallery Items
-- Delete Images
-- Assign Categories
-
----
-
-## Gallery Categories
-
-- Rooms
-- Activities
-- Events
-- Guest Experiences
-- Facilities
-
----
-
-## Upload Process
-
-```text
-Select Image
-      │
-      ▼
-Validate File
-      │
-      ▼
-Upload
-      │
-      ▼
-Save Information
-      │
-      ▼
-Display on Website
-```
-
----
-
-# 12. Activity Management
-
-Activities represent services or experiences offered by the guest house.
-
-## Examples
-
-- Jungle Safari
-- Canoeing
-- Cultural Programs
-- Cycling
-- Local Tours
-
----
-
-## Activity Actions
-
-- Add Activity
-- Update Activity
-- Delete Activity
-- Upload Images
-
----
-
-## Activity Information
-
-- Activity Name
-- Description
-- Price
-- Duration
-- Availability
-- Images
-
----
-
-# 13. CMS Management
-
-The Content Management System (CMS) allows administrators to manage website content without modifying source code.
-
-## Editable Sections
-
-- Homepage Banner
-- About Us
-- Contact Information
-- Social Media Links
-- SEO Settings
-- Footer Content
-
----
-
-## CMS Workflow
-
-```text
-Administrator
-       │
-       ▼
-Edit Content
-       │
-       ▼
-Save Changes
-       │
-       ▼
-Database Updated
-       │
-       ▼
-Website Updated
-```
-
----
-
-# 14. Review Management
-
-Customers may submit reviews after completing their stay.
-
-## Review Actions
-
-- Submit Review
-- View Reviews
-- Approve Reviews
-- Delete Reviews
-
----
-
-## Review Workflow
-
-```text
-Completed Booking
-        │
-        ▼
-Submit Review
-        │
-        ▼
-Admin Approval
-        │
-        ▼
-Display on Website
-```
-
----
-
-## Review Information
-
-- Customer Name
-- Rating
-- Comment
-- Review Date
-
----
-
-# 15. Notification Management
-
-Notifications inform users about important events.
-
-## Notification Examples
-
-- Booking Confirmed
-- Payment Received
-- Booking Cancelled
-- New Review Submitted
-- System Updates
-
----
-
-## Notification Flow
-
-```text
-Event Occurs
-      │
-      ▼
-Create Notification
-      │
-      ▼
-Store Notification
-      │
-      ▼
-Display to User
-```
-
----
-
-# 16. Reports
-
-The Reports module provides operational insights.
-
-## Available Reports
-
-- Booking Reports
-- Revenue Reports
-- Payment Reports
-- Customer Reports
-- Room Occupancy Reports
-
----
-
-## Report Actions
-
-- View Reports
-- Filter Reports
-- Export Reports
-- Print Reports
-
----
-
-# 17. Settings
-
-The Settings module allows administrators to configure system preferences.
-
-## Settings Categories
-
-- General Settings
-- Contact Information
-- Email Settings
-- SEO Settings
-- System Configuration
-
----
-
-## Examples
-
-```text
-Guest House Name
-Address
-Phone Number
-Email Address
-Logo
-Timezone
-Currency
-```
-
----
-
-# 18. Logout
-
-Users should always logout after completing their work.
-
-## Logout Procedure
-
-1. Click the user profile menu.
-2. Select "Logout."
-3. Wait for confirmation.
-4. Close the browser if using a shared device.
-
----
-
-## Logout Flow
-
-```text
-Dashboard
-    │
-    ▼
-Logout Button
-    │
-    ▼
-Destroy Session
-    │
-    ▼
-Login Page
-```
-
----
-
-# 19. Frequently Asked Questions (FAQ)
-
-### Q1. I forgot my password.
-
-Contact the system administrator to reset your password.
-
----
-
-### Q2. Why can't I access certain pages?
-
-Your user role may not have sufficient permissions.
-
----
-
-### Q3. My booking is not visible.
-
-Refresh the page and verify the booking status. If the issue persists, contact support.
-
----
-
-### Q4. I cannot upload images.
-
-Verify:
-
-- File size
-- File type
-- Internet connection
-
----
-
-### Q5. Why am I automatically logged out?
-
-Your session may have expired due to inactivity.
-
----
-
-# 20. Troubleshooting
-
-| Problem | Solution |
-|--------|---------|
-| Cannot Login | Verify credentials |
-| Booking Failure | Verify room availability |
-| Payment Issue | Contact Administrator |
-| Missing Images | Re-upload images |
-| Slow Performance | Refresh the application |
-| Access Denied | Verify permissions |
-
----
-
-## Support Procedure
-
-```text
-User Problem
-      │
-      ▼
-Check User Manual
-      │
-      ▼
-Contact Reception
-      │
-      ▼
-Contact Administrator
-      │
-      ▼
-Technical Support
-```
-
----
-
-# 21. Related Documents
-
-This document should be used together with:
-
-- 04_Project_Architecture.md
-- 24_Frontend_Architecture.md
-- 25_Backend_Architecture.md
-- 27_Testing_Strategy.md
-- 29_Developer_Guide.md
-
----
-
-# 22. Conclusion
-
-The User Manual provides guidance for operating the Tara Guest House Management System effectively.
-
-By following this manual, users can:
-
-- Navigate the system confidently.
-- Perform daily tasks efficiently.
-- Resolve common issues.
-- Understand system workflows.
-- Use the application securely.
-
-This manual should be updated whenever significant functionality is added or modified.
-
----
-
-# Document Approval
-
-| Role | Name | Status |
-|------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
-| Administrator | Pending | Pending |
-| Receptionist | Pending | Pending |
-| Customer Representative | Pending | Pending |
+* Customer registration, login, profile and Customer Portal;
+* Customer Management screens;
+* Receptionist, Manager, Accountant and Content Manager access;
+* multi-room booking;
+* payment gateway processing;
+* SMS, push and WhatsApp notifications.

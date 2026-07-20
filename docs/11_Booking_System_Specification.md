@@ -1,779 +1,214 @@
-# Tara Guest House Management System
+# Tara Guest House Booking System Specification
 
-# Booking System Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 Guest and Administrator booking workflows
+* Related contracts: `10_Database_Dictionary.md`, `22_System_State_Machine.md`, `23_REST_API_Specification.md`, `34_UI_UX_Screen_Specification.md`
 
-## Document Control
+## 1. Purpose
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Booking System Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
-| Review Frequency | Every Sprint |
+The Booking System creates and manages one-room Guest bookings while preventing overlapping stays, preserving Guest and financial snapshots, and enforcing the approved state machine.
 
----
+## 2. Actors
 
-# Change Log
+### Guest
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Booking System Specification created. |
+An unauthenticated Guest may search availability, create a booking without an account, securely submit payment information later, and receive transactional SMTP email.
 
----
+### Administrator
 
-# Table of Contents
+An authenticated Administrator may view bookings, create a booking from the same Guest snapshot, reject/cancel eligible bookings, verify payment through Payment Service, and perform permitted check-in/check-out actions.
 
-1. Purpose
-2. Scope
-3. Actors
-4. Business Objectives
-5. Booking Workflow
-6. Customer Journey
-7. Booking States
-8. Business Rules
-9. Functional Requirements
-10. Non-Functional Requirements
-11. Future Enhancements
+Guest is not a stored role. Customer accounts and specialized staff roles are Future Enhancements.
 
----
+## 3. Separate Version 1 Processes
 
-# 1. Purpose
+The following are distinct use cases and must not be merged into one form or transaction:
 
-The Booking System is the core functionality of the Tara Guest House Management System.
+1. Booking creation.
+2. Payment submission.
+3. Administrator payment verification.
+4. Booking confirmation through Booking Service after verification.
 
-It enables customers to browse rooms, check availability, submit reservations, upload payment proof (if applicable), and receive booking confirmation after administrator verification.
+Booking creation never creates a payment row. Payment submission never lets the Guest select a booking state. Administrator verification changes the payment state and permits Booking Service—not frontend code or Payment Service—to confirm the booking.
 
-The system is designed to minimize manual work for staff while providing guests with a smooth, secure, and modern reservation experience.
+## 4. Booking Creation
 
----
+### 4.1 Routes
 
-# 2. Scope
+* PHP-rendered page: `/booking`
+* Guest JSON endpoint: `POST /api/v1/bookings`
+* Administrator page: `/admin/bookings/create`
+* Administrator JSON endpoint: `POST /api/v1/admin/bookings`
 
-This specification covers:
+### 4.2 Input Fields
 
-- Room availability
-- Reservation creation
-- Customer information collection
-- Payment submission
-- Booking verification
-- Booking confirmation
-- Booking cancellation
-- Invoice generation
-- Notification process
+| API field | Database destination | Required | Rule |
+|---|---|---:|---|
+| `room_id` | exactly one `booking_rooms.room_id` | Yes | Scalar; room must be eligible and available |
+| `guest_full_name` | `bookings.guest_full_name` | Yes | Guest contact snapshot |
+| `guest_email` | `bookings.guest_email` | Yes | Valid normalized email |
+| `guest_phone` | `bookings.guest_phone` | Yes | Valid configured phone format |
+| `check_in` | `bookings.check_in` | Yes | Valid arrival date |
+| `check_out` | `bookings.check_out` | Yes | Later than check-in |
+| `adults` | `bookings.adults` | Yes | Positive and within capacity |
+| `children` | `bookings.children` | Yes | Non-negative and within capacity |
+| `special_request` | `bookings.special_request` | No | Length-limited plain text |
+| `terms_accepted` | `bookings.terms_accepted_at` | Yes | Must be true; server records timestamp |
+| `policy_version` | `bookings.policy_version` | No | Approved displayed policy identifier |
 
-This document does not cover:
+Nationality, passport data and address are not approved required Version 1 fields. If the client or law requires them, an explicit decision must update the dictionary, API, UI, privacy/retention rules and tests together.
 
-- Online payment gateway integration (future version)
-- Restaurant reservations
-- Event bookings
-- Multi-property reservations
+Payment method, transaction reference and payment voucher/proof are not booking-form fields. They belong only to the separate payment-submission process.
 
----
-
-# 3. Actors
-
-## Guest
-
-A visitor who wants to reserve a room.
-
-Permissions:
-
-- Browse rooms
-- View room details
-- Check availability
-- Create booking
-- Upload payment proof
-- View booking status
-- Cancel booking (before confirmation)
-
----
-
-## Administrator
-
-Responsible for managing reservations.
-
-Permissions:
-
-- View bookings
-- Confirm bookings
-- Reject bookings
-- Edit bookings
-- Print invoices
-- Verify payments
-- Assign rooms
-- Change booking status
-
----
-
-## Receptionist (Future)
-
-Responsible for front desk operations.
-
-Permissions may include:
-
-- Walk-in bookings
-- Guest check-in
-- Guest check-out
-- Invoice printing
-- Booking modifications
-
----
-
-# 4. Business Objectives
-
-The booking system should:
-
-- Reduce manual reservation management.
-- Prevent double bookings.
-- Provide a simple booking experience.
-- Support manual payment verification.
-- Generate professional invoices.
-- Improve customer satisfaction.
-- Support future online payment gateways.
-
----
-
-# 5. Booking Workflow
-
-```
-Customer Visits Website
-        │
-        ▼
-Browse Available Rooms
-        │
-        ▼
-View Room Details
-        │
-        ▼
-Select Check-in & Check-out Dates
-        │
-        ▼
-System Checks Availability
-        │
-        ▼
-Available?
-        │
- ┌──────┴──────┐
- │             │
-No            Yes
- │             │
- ▼             ▼
-Show Message   Booking Form
-               │
-               ▼
-Customer Enters Information
-               │
-               ▼
-Select Payment Method
-               │
-               ▼
-Upload Payment Voucher (Optional)
-               │
-               ▼
-Booking Submitted
-               │
-               ▼
-Status = Pending
-               │
-               ▼
-Administrator Reviews Booking
-               │
- ┌──────┴──────┐
- │             │
-Reject      Approve
- │             │
- ▼             ▼
-Cancelled   Confirmed
-               │
-               ▼
-Invoice Generated
-               │
-               ▼
-Customer Notification
-```
-
----
-
-# 6. Customer Journey
-
-A typical customer experience:
-
-1. Open the Tara Guest House website.
-2. Browse available rooms.
-3. View room photos, amenities, and pricing.
-4. Choose check-in and check-out dates.
-5. Select the desired room.
-6. Complete the booking form.
-7. Choose a payment method.
-8. Upload payment proof if required.
-9. Submit the reservation.
-10. Receive confirmation that the booking is pending.
-11. Wait for administrator verification.
-12. Receive final confirmation.
-13. Arrive at the guest house and check in.
-
----
-
-# 7. Booking States
-
-Every booking must have one of the following statuses:
-
-| Status | Description |
-|---------|-------------|
-| Pending | Booking submitted and awaiting review |
-| Confirmed | Booking approved |
-| Cancelled | Booking cancelled |
-| Checked In | Guest has arrived |
-| Checked Out | Guest has departed |
-| Rejected | Booking rejected by administrator |
-
-The booking status must always be visible to administrators.
-
----
-
-# 8. Business Rules
-
-The following rules must always be enforced:
-
-- A room cannot be double-booked.
-- Check-out date must be later than check-in date.
-- Guests must provide their full name.
-- A valid phone number is required.
-- Maximum room occupancy must not be exceeded.
-- Only available rooms can be reserved.
-- Cancelled bookings release room availability.
-- Confirmed bookings generate an invoice.
-- Every booking must have a unique booking reference.
-- Payment verification must occur before confirmation when manual payment is used.
-- All booking activities must be recorded in the audit log.
-
----
-
-# 9. Functional Requirements
-
-The system shall allow guests to:
-
-- Search rooms
-- View room details
-- Check room availability
-- Make reservations
-- Upload payment vouchers
-- Receive booking confirmation
-- Cancel pending bookings
-
-The system shall allow administrators to:
-
-- View all bookings
-- Search bookings
-- Filter bookings by status
-- Approve bookings
-- Reject bookings
-- Print invoices
-- Update booking status
-- Verify payments
-- Export booking reports
-
----
-
-# 10. Non-Functional Requirements
-
-The booking system should:
-
-- Be responsive on mobile devices.
-- Complete booking submission within three seconds under normal conditions.
-- Validate all user input.
-- Protect against SQL Injection.
-- Protect against Cross-Site Scripting (XSS).
-- Protect against Cross-Site Request Forgery (CSRF).
-- Use secure password hashing where authentication is involved.
-- Maintain audit logs for important booking actions.
-
----
-
-# 11. Future Enhancements
-
-The booking system should be designed to support future improvements without major redesign.
-
-Potential enhancements include:
-
-- Online payments (eSewa, Khalti, FonePay, Stripe)
-- OTP verification
-- WhatsApp booking confirmation
-- Email confirmation
-- SMS notifications
-- Booking modification by customers
-- Seasonal pricing
-- Promotional discounts
-- Coupon codes
-- Multi-room booking
-- Group reservations
-- Multi-language support
-- Mobile application integration
-- AI-powered room recommendations
-
----
-
----
-
-# 12. Booking Form Specification
-
-The booking form is the primary entry point for customers making reservations.
-
-The form must be simple, responsive, and easy to complete within two minutes.
-
----
-
-## Customer Information
-
-| Field | Required | Validation | Example |
-|---------|----------|------------|----------|
-| Full Name | Yes | 3–100 characters | John Smith |
-| Phone Number | Yes | Valid phone number | +9779812345678 |
-| Email Address | Yes | Valid email format | john@example.com |
-| Nationality | Yes | Select list | Nepal |
-| Number of Adults | Yes | Minimum 1 | 2 |
-| Number of Children | No | Minimum 0 | 1 |
-| Special Requests | No | Maximum 500 characters | Extra pillow |
-
----
-
-## Reservation Information
-
-| Field | Required | Validation |
-|---------|----------|------------|
-| Check-in Date | Yes | Must be today or later |
-| Check-out Date | Yes | Must be after check-in |
-| Room Type | Yes | Must exist |
-| Selected Room | Yes | Must be available |
-| Number of Nights | Auto | Calculated |
-| Total Guests | Auto | Adults + Children |
+### 4.3 Service Behavior
 
----
+Booking Service must:
 
-## Payment Information
+1. Validate dates, occupancy, Guest snapshot and policy acceptance.
+2. Lock/recheck room eligibility and overlap in a database transaction.
+3. Accept exactly one room.
+4. Calculate nights and fixed-precision NPR snapshots.
+5. Generate a secure, non-sequential public booking reference with sufficient randomness.
+6. Set `booking_status = pending`.
+7. Set the configurable `confirmation_deadline_at`.
+8. Create the booking and exactly one `booking_rooms` row.
+9. Append the booking-created event.
+10. Commit before sending notifications.
+11. Create no payment row automatically.
 
-| Field | Required | Validation |
-|---------|----------|------------|
-| Payment Method | Yes | Active payment methods only |
-| Transaction Code | Optional | Required if manual transfer |
-| Payment Voucher | Optional | JPG, PNG, WEBP, PDF |
-| Payment Note | Optional | Maximum 500 characters |
+Predictable running references such as `TGH-2026-000001` are not approved public-reference designs. A reference alone must never authorize public booking access.
 
----
+## 5. Availability and Conflict Detection
 
-## Validation Errors
+A public room is bookable only when it is operationally `active`, published, within capacity, and has no unexpired overlapping blocking booking.
 
-Examples:
+Blocking booking statuses are `pending`, `confirmed` and `checked_in`. Non-blocking statuses are `checked_out`, `cancelled` and `rejected`.
 
-- Full name is required.
-- Please enter a valid phone number.
-- Check-out date must be after check-in.
-- Selected room is unavailable.
-- Maximum room capacity exceeded.
-- Invalid payment voucher.
-- Booking dates overlap an existing reservation.
+Approved overlap expression:
 
----
+`existing.check_in < requested.check_out AND existing.check_out > requested.check_in`
 
-# 13. Room Availability Logic
+Because both comparisons are strict, a new booking may start on the previous booking's checkout date. For example, an existing stay ending on 12 August does not overlap a new stay beginning on 12 August.
 
-The system shall determine room availability using the following process.
+Availability checking and booking creation run transactionally to reduce double-booking risk. Maintenance and inactive rooms always fail eligibility.
 
-1. Customer selects check-in date.
-2. Customer selects check-out date.
-3. Customer selects room type.
-4. System searches existing bookings.
-5. Rooms with overlapping confirmed bookings are excluded.
-6. Rooms under maintenance are excluded.
-7. Rooms marked inactive are excluded.
-8. Remaining rooms are displayed.
+## 6. Payment Submission
 
----
+### 6.1 Routes
 
-## Availability Rules
+* PHP-rendered secure page: `/booking/payment`
+* Payment-method endpoint: `GET /api/v1/payment-methods`
+* Submission endpoint: `POST /api/v1/payments`
 
-A room is available when:
+### 6.2 Fields
 
-- Status = Available
-- No overlapping confirmed booking
-- No maintenance schedule
+Payment submission accepts the secure booking-access proof, booking reference, configured `payment_method_id`, fixed-precision NPR `amount`, transaction/reference code, optional Guest notes and proof upload where the selected method requires it.
 
-A room is unavailable when:
+Each successful submission creates a new payment attempt with `payment_status = submitted`. A booking may have zero attempts and later multiple retained attempts. A rejected attempt is never overwritten or reset.
 
-- Status = Maintenance
-- Status = Inactive
-- Already reserved during selected dates
+Upload MIME, extension and size limits come from approved configuration. This specification does not hardcode a limit.
 
----
+## 7. Administrator Payment Verification
 
-# 14. Reservation Conflict Rules
+* Page: `/admin/payments/{id}`
+* JSON endpoint: `PATCH /api/v1/admin/payments/{id}/status`
 
-The system must prevent double bookings.
+Only a `submitted` attempt may be changed to `verified` or `rejected`, and only by an authenticated Administrator through Payment Service. Amount, reference and proof are reviewed against the booking snapshot. Actor, time and note are retained in payment fields and `audit_logs`.
 
-Example
+Rejecting a payment attempt does not reject or cancel the booking. The Guest may submit another attempt before the confirmation deadline.
 
-Existing Booking
+## 8. Booking Confirmation
 
-```
-Room 101
+When Payment Service verifies the qualifying payment, it coordinates a transaction/use case with Booking Service. Booking Service rechecks current booking state and payment rules, then may transition `pending` to `confirmed`, set `confirmed_at`, append `booking_events` and commit. Transactional email/in-app Administrator notifications occur after commit.
 
-Check-in
+The Administrator booking form and generic status UI must not offer arbitrary `confirmed` selection. There is no separate Approve Booking shortcut that bypasses payment verification.
 
-10 July
+## 9. Booking Statuses and Transitions
 
-Check-out
+Canonical statuses:
 
-13 July
-```
+* `pending`
+* `confirmed`
+* `checked_in`
+* `checked_out`
+* `cancelled`
+* `rejected`
 
-Customer tries
+| Current | Next | Trigger |
+|---|---|---|
+| new | `pending` | Booking Service creates valid booking |
+| `pending` | `confirmed` | Booking Service after verified payment |
+| `pending` | `rejected` | Administrator rejection through Booking Service |
+| `pending` | `cancelled` | Approved cancellation/deadline rule |
+| `confirmed` | `checked_in` | Administrator check-in through Booking Service |
+| `confirmed` | `cancelled` | Approved cancellation rule |
+| `checked_in` | `checked_out` | Administrator check-out through Booking Service |
 
-```
-Room 101
+`checked_out`, `cancelled` and `rejected` are terminal. A rejected booking becomes `rejected`, never `cancelled`. There is no `completed`, booking `archived` or booking `expired` state.
 
-Check-in
+An overdue pending booking ceases blocking availability and may be changed to `cancelled` with a recorded deadline-expiry reason. Deadline duration, cancellation window/fees and no-show handling require Architect/Client Confirmation.
 
-12 July
+## 10. Check-In and Check-Out
 
-Check-out
+The Administrator requests explicit actions through `PATCH /api/v1/admin/bookings/{id}/status`.
 
-15 July
-```
+* Check-in is allowed only from `confirmed`; Booking Service records `checked_in_at` and an event.
+* Check-out is allowed only from `checked_in`; Booking Service records `checked_out_at`, changes the final successful status to `checked_out`, and records an event.
 
-Result
+These actions do not write Available, Reserved or Occupied to the room. Current occupancy and future-date availability are recalculated from bookings.
 
-Booking rejected.
+## 11. Booking Editing and Retention
 
-Reason
+`PUT /api/v1/admin/bookings/{id}` may update only documented non-state fields when business rules permit. Status changes use the explicit transition endpoint/service.
 
-Date overlap detected.
+Normal booking-delete actions are not part of Version 1. Historical bookings, events, payments and invoices are retained according to approved retention/soft-deletion policy. Neither Guest nor Administrator UI presents a Delete Booking action.
 
----
+## 12. Invoice Relationship
 
-## Conflict Detection
+An invoice may be generated after a booking has a verified payment and is `confirmed`. Invoice creation is a separate Invoice Service use case and does not occur automatically merely because a booking or payment record exists. The invoice number remains stable when printed or regenerated after checkout.
 
-The following situations must be blocked:
+Tax/service-charge/rounding policy requires Architect/Client Confirmation.
 
-- Partial overlap
-- Full overlap
-- Same-day overlap
-- Duplicate booking attempt
+## 13. Notifications
 
----
+After successful commits, relevant events may create Administrator in-app notifications and transactional SMTP email to the Guest, including booking received, confirmed, cancelled/rejected, and payment submitted/verified/rejected. Guests do not have a notification centre.
 
-# 15. Booking Reference Generation
+Email failure is logged/retried and never rolls back a committed booking or payment transaction.
 
-Every booking shall receive a unique booking reference.
+## 14. Validation and Security
 
-Example
+* Server-side validation is authoritative.
+* Guest endpoints use rate limiting, anti-abuse/CSRF public-form controls and signed scoped access where needed.
+* Administrator endpoints require a valid PHP session, authorization and CSRF for state changes.
+* Controllers, views and Models/entities execute no SQL; Repositories use PDO/prepared statements.
+* Output is contextually escaped.
+* Uploads use approved MIME/extension/size configuration, randomized names and non-executable storage.
+* Booking references and signed access values are not logged as authorization secrets.
+* Sensitive changes create permanent events/audit records.
 
-```
-TGH-2026-000001
-TGH-2026-000002
-TGH-2026-000003
-```
+## 15. Acceptance Tests
 
-Structure
+1. Guest booking succeeds without an account and stores the required snapshot.
+2. Booking accepts exactly one room and rejects arrays/multiple rooms.
+3. Booking begins at `pending` and creates zero payment rows.
+4. Adjacent stays sharing the prior checkout/new check-in date do not overlap.
+5. Each payment submission creates a separate retained attempt.
+6. Only Administrator can verify/reject a submitted payment.
+7. Payment verification permits Booking Service to confirm; rejection does not reject the booking.
+8. Invalid booking transitions fail and do not mutate records.
+9. Check-out ends at `checked_out` and creates no stored room occupancy state.
+10. Rejected booking transition uses `rejected`, not `cancelled`.
+11. Public reference alone cannot expose booking details.
+12. No normal booking-delete endpoint/action exists.
 
-```
-Hotel Prefix
+## 16. Future Enhancements
 
-Year
-
-Running Number
-```
-
-Benefits
-
-- Easy searching
-- Professional invoices
-- Telephone support
-- Customer identification
-
----
-
-# 16. Booking Lifecycle
-
-```
-Pending
-
-↓
-
-Payment Verification
-
-↓
-
-Confirmed
-
-↓
-
-Checked In
-
-↓
-
-Checked Out
-
-↓
-
-Archived
-```
-
-Alternative Flow
-
-```
-Pending
-
-↓
-
-Rejected
-```
-
-Alternative Flow
-
-```
-Pending
-
-↓
-
-Cancelled by Customer
-```
-
----
-
-## Allowed Status Changes
-
-| Current | Next |
-|----------|------|
-| Pending | Confirmed |
-| Pending | Rejected |
-| Pending | Cancelled |
-| Confirmed | Checked In |
-| Checked In | Checked Out |
-
-Any other transition must be rejected.
-
----
-
-# 17. Payment Verification Workflow
-
-Customer
-
-↓
-
-Uploads voucher
-
-↓
-
-Booking Pending
-
-↓
-
-Administrator reviews payment
-
-↓
-
-Verified?
-
-↓
-
-Yes
-
-↓
-
-Booking Confirmed
-
-↓
-
-Invoice Generated
-
-↓
-
-Notification Sent
-
-OR
-
-↓
-
-Rejected
-
-↓
-
-Customer Notified
-
-↓
-
-Booking Remains Pending
-
----
-
-## Verification Checklist
-
-Administrator should verify:
-
-- Correct amount
-- Correct payment method
-- Valid transaction code
-- Voucher image readable
-- Payment date reasonable
-
----
-
-# 18. Invoice Generation
-
-Invoices are automatically generated after booking confirmation.
-
-Invoice contains
-
-- Invoice Number
-- Booking Reference
-- Guest Name
-- Room Details
-- Check-in Date
-- Check-out Date
-- Number of Nights
-- Room Charges
-- Taxes
-- Discounts
-- Total Amount
-- Payment Status
-- QR Code (Future)
-- Hotel Contact Details
-
-Invoices must be printable as PDF.
-
----
-
-# 19. Cancellation Policy
-
-Customer may cancel
-
-Only while booking is Pending.
-
-Administrator may cancel
-
-Any booking with proper reason.
-
-Cancellation Reasons
-
-- Guest Request
-- Payment Failure
-- Room Unavailable
-- Hotel Maintenance
-- Force Majeure
-
-Cancellation history should remain stored.
-
----
-
-# 20. Notification Flow
-
-Notifications should be generated for:
-
-Customer
-
-- Booking Submitted
-- Booking Confirmed
-- Booking Rejected
-- Booking Cancelled
-
-Administrator
-
-- New Booking
-- Payment Uploaded
-- Booking Cancelled
-
-Future Channels
-
-- Email
-- SMS
-- WhatsApp
-- Push Notification
-
----
-
-# 21. Booking Dashboard
-
-The administrator dashboard should display:
-
-Summary Cards
-
-- Pending Bookings
-- Confirmed Bookings
-- Today's Arrivals
-- Today's Departures
-- Monthly Revenue
-
-Booking Table
-
-Columns
-
-- Booking Reference
-- Guest Name
-- Room
-- Check-in
-- Check-out
-- Total Amount
-- Payment Status
-- Booking Status
-- Actions
-
-Actions
-
-- View
-- Edit
-- Confirm
-- Reject
-- Print Invoice
-- Delete (Soft Delete)
-
----
-
-# 22. Security Requirements
-
-The booking system must implement:
-
-- SQL Injection prevention
-- XSS prevention
-- CSRF protection
-- Server-side validation
-- Input sanitization
-- Output escaping
-- Audit logging
-- Role-based authorization
-- Secure file upload validation
-- Maximum upload limits
-- Rate limiting
-
----
-
-# 23. Future Improvements
-
-Future versions may include:
-
-- Online payment gateways
-- Dynamic pricing
-- Seasonal pricing
-- Discount coupons
-- Promo codes
-- Loyalty program
-- Referral rewards
-- AI room recommendations
-- Calendar synchronization
-- Google Hotel integration
-- Booking.com synchronization
-- Airbnb synchronization
-- Multi-property booking
-- Mobile application
-- Customer portal
-- Live chat
-- AI concierge
-
----
-
-# End of Booking System Specification
+* Customer accounts, Customer Portal and self-service booking history;
+* multiple rooms per booking;
+* payment gateways and automatic verification;
+* specialized staff roles;
+* SMS, push and WhatsApp notifications;
+* booking modification/cancellation self-service after an approved policy;
+* nationality/passport/address collection only if later legally/client-approved with full data-contract updates.

@@ -1,5 +1,7 @@
 # Folder Structure & Development Standards
 
+> **Version 1 synchronization:** This structure supports PHP-rendered views, PHP sessions, `/api/v1/...` JSON endpoints, migrations/seeders, and cPanel/shared hosting. Future-ready folders do not place JWT, customer accounts, multi-room UI, Redis, WebSockets, Docker, or cloud services in Version 1 scope. Database migrations are the executable source of truth; `schema.sql` is an installation snapshot only.
+
 ## Project Information
 
 | Item | Details |
@@ -8,7 +10,7 @@
 | **Document** | Folder Structure & Development Standards |
 | **Document ID** | TGH-SDS-005 |
 | **Version** | 2.0 |
-| **Status** | Approved |
+| **Status** | Synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
 | **Date** | July 2026 |
@@ -97,42 +99,25 @@ This directory structure directly supports the architectural principles defined 
 The official project directory is organized as follows.
 
 ```text
-tara-guesthouse-platform/
-│
-├
-│
-├── app/
-│
-├── client_assets/
-│
-├── config/
-│
-├── database/
-│
-├── design/
-│
-├── docs/
-│
-├── meetings/
-│
-├── public/
-│
-├── resources/
-│
-├── routes/
-│
-├── storage/
-│
-├── tests/
-│
-├── vendor/
-│
-├── composer.json
-├── composer.lock
-├── .env.example
-├── .gitignore
-├── LICENSE
-└── README.md
+tara-guest-house/
+|-- app/
+|-- config/
+|-- database/
+|-- public/
+|-- resources/
+|-- routes/
+|-- storage/
+|-- tests/
+|-- client-assets/
+|-- design/
+|-- meetings/
+|-- vendor/
+|-- docs/
+|-- .env.example
+|-- .gitignore
+|-- composer.json
+|-- composer.lock
+`-- README.md
 ```
 
 Every top-level directory has a dedicated responsibility.
@@ -146,7 +131,7 @@ Developers must not introduce new root-level folders without architectural appro
 | Directory | Responsibility |
 |------------|---------------|
 | `app/` | Core application source code |
-| `client_assets/` | Client-provided images, videos, documents, branding assets |
+| `client-assets/` | Client-provided images, videos, documents, branding assets |
 | `config/` | Application configuration files |
 | `database/` | Database schema, migrations, seeders, backups |
 | `design/` | UI/UX mockups, wireframes, prototypes |
@@ -247,7 +232,7 @@ Business logic must never bypass these layers.
 | Requests | Validate and sanitize incoming data |
 | Services | Execute business rules |
 | Repositories | Handle data access operations |
-| Models | Communicate with MariaDB |
+| Models/entities | Represent domain data; no SQL/PDO |
 | Middleware | Filter requests before Controllers |
 | Core | Framework infrastructure |
 | Helpers | Shared utility functions |
@@ -508,14 +493,14 @@ app/Models/
 
 ### Purpose
 
-Models communicate directly with the MariaDB database using prepared statements.
+Models/entities represent domain data and do not communicate with MariaDB or execute SQL. Repositories use PDO prepared statements and map rows to/from entities.
 
 ### Responsibilities
 
-- CRUD operations
-- Execute prepared statements
-- Return application data
-- Map database tables
+- Represent domain fields and values
+- Return domain-safe application data
+- Support persistence-independent behavior
+- Contain no SQL, PDO or CRUD persistence code
 
 ### Examples
 
@@ -741,7 +726,7 @@ database/
 
 ### Responsibilities
 
-- Store database schema
+- Store executable migrations and an optional installation snapshot
 - Version database changes
 - Populate development data
 - Maintain backup copies
@@ -750,11 +735,11 @@ database/
 
 #### schema.sql
 
-Contains the complete database structure.
+Contains a generated or maintained installation snapshot. It must not contradict migrations.
 
 #### migrations/
 
-Contains incremental database updates.
+Contains executable database changes and is the database source of truth.
 
 #### seeders/
 
@@ -803,7 +788,7 @@ public/
 └── uploads/
     ├── rooms/
     ├── gallery/
-    ├── activities/
+    ├── activities/ (future-ready; unused in Version 1)
     ├── profiles/
     └── payments/
 ```
@@ -848,7 +833,7 @@ Uploads include:
 
 - Room photographs
 - Gallery images
-- Activity images
+- The existing `activities/` upload directory is future-ready and unused in Version 1; Activity Images are not a current upload type.
 - User profile images
 - Payment receipts
 
@@ -1251,7 +1236,7 @@ Only documentation files belong in this directory.
 ## Directory
 
 ```text
-client_assets/
+client-assets/
 ```
 
 ### Purpose
@@ -1262,7 +1247,7 @@ Examples include:
 
 - Company Logos
 - Room Images
-- Activity Images
+- Activity reference material (not a Version 1 application-upload requirement)
 - Videos
 - Pricing Documents
 - Policies
@@ -1607,7 +1592,7 @@ Potential future enhancements include:
 - Mobile Application
 - Multi-Hotel Support
 - Online Payment Gateway
-- Email Notifications
+- SMS, WhatsApp, and push notifications (transactional SMTP email is Version 1)
 - SMS Notifications
 - Cloud Storage
 - Docker Deployment
@@ -1650,8 +1635,8 @@ This folder structure is considered the official standard for the project and sh
 
 | Role | Name | Status |
 |------|------|--------|
-| Project Manager | Feroj | Approved |
-| Technical Architect | fero.dev | Approved |
+| Project Manager | Feroj | Review Required |
+| Technical Architect | fero.dev | Review Required |
 | Backend Developer | Rijan | Pending |
 | Frontend Developer | Saroj | Pending |
 | QA Engineer | Pallawi | Pending |

@@ -1,417 +1,87 @@
-# Tara Guest House Management System
+# Tara Guest House Room Management Specification
 
-# Room Management Specification
+## Document Information
 
----
+* Status: Synchronized — Review Required
+* Scope: Version 1 room catalogue, media, amenities and calculated availability
 
-# Document Control
+## 1. Actors and Routes
 
-| Item | Value |
-|------|--------|
-| Project | Tara Guest House Management System |
-| Document | Room Management Specification |
-| Version | 1.0 |
-| Status | Draft |
-| Prepared By | fero.dev |
-| Owner | Feroj |
-| Last Updated | July 2026 |
+Guests may browse published rooms and calculate date availability. Administrators manage room records through PHP-rendered `/admin/rooms...` pages and the exact `/api/v1/admin/rooms...`, `/api/v1/admin/room-types...` and `/api/v1/admin/amenities...` endpoints in `23_REST_API_Specification.md`.
 
----
+## 2. Version 1 Data Contract
 
-# Change Log
+### 2.1 Room types
 
-| Version | Date | Author | Description |
-|----------|------|---------|-------------|
-| 1.0 | July 2026 | fero.dev | Initial Room Management Specification created |
+`room_types` fields are `id`, `name`, `slug`, `description`, `base_price`, `capacity_adults`, `capacity_children`, `is_active`, `created_at` and `updated_at`.
 
----
+### 2.2 Rooms
 
-# Table of Contents
+| Field | Purpose |
+|---|---|
+| `id` | Primary key |
+| `room_type_id` | Required room-type relationship |
+| `room_number` | Unique physical identifier |
+| `name`, `slug`, `description` | Public content |
+| `price_per_night` | Current fixed-precision NPR rate |
+| `capacity_adults`, `capacity_children` | Occupancy limits |
+| `operational_status` | `active`, `maintenance`, `inactive` |
+| `is_published` | Separate public-visibility control |
+| timestamps/`deleted_at` | History and soft-deactivation support |
 
-1. Purpose
-2. Scope
-3. Actors
-4. Business Objectives
-5. Room Categories
-6. Room Information
-7. Customer Journey
-8. Room Gallery
-9. Room Amenities
-10. Room Availability
-11. Admin Room Management
-12. Business Rules
-13. Validation Rules
-14. Security Requirements
-15. Future Enhancements
+Bed type, floor, room size and featured flag are not approved Version 1 room columns. They are Future Enhancements unless an explicit decision updates the dictionary, migrations, API, UI and tests together.
 
----
+### 2.3 Room images
 
-# 1. Purpose
+`room_images` stores `room_id`, `file_path`, optional `alt_text`, `sort_order`, `is_primary` and `created_at`. `is_primary` selects the thumbnail/primary display image. Generated thumbnail variants may be filesystem/cache implementation artifacts, but no thumbnail database column/table is required.
 
-The Room Management Module is responsible for managing every room offered by Tara Guest House.
+### 2.4 Amenities
 
-It allows customers to browse rooms and allows administrators to create, edit, activate, deactivate, and manage room information through the admin panel.
+`amenities` stores name, optional icon identifier, active control and timestamps. `room_amenities` provides the many-to-many assignment.
 
----
+## 3. Operational Status, Publication and Availability
 
-# 2. Scope
+Operational status values are only:
 
-This module includes:
+* `active`
+* `maintenance`
+* `inactive`
 
-- Room Categories
-- Room Listings
-- Room Details
-- Room Images
-- Room Pricing
-- Amenities
-- Occupancy
-- Availability
-- Featured Rooms
-- Room Status Management
+Publication is stored separately in `is_published`. Available, Reserved and Occupied are calculated conditions, not room operational statuses.
 
-Excluded:
+A public room is eligible only when it is `active`, published, within capacity and has no unexpired overlapping booking in `pending`, `confirmed` or `checked_in`. Current occupancy is derived from `checked_in` bookings.
 
-- Booking logic
-- Payment
-- Invoice generation
+## 4. Administrator Workflows
 
----
+Administrators may create/update room types and rooms, set operational status, set publication, upload/reorder/remove images, select one primary image and assign amenities. Rooms referenced by historical bookings are deactivated/soft-deleted rather than physically removed.
 
-# 3. Actors
+Room forms do not offer Featured, Bed Type, Floor or Room Size fields in Version 1. Lists show operational status, publication and calculated availability/occupancy in separate columns.
 
-## Guest
+## 5. Validation
 
-Can
+* Room number and slug are unique.
+* Prices are non-negative fixed-precision NPR values.
+* Capacities are non-negative and total permitted occupancy is positive.
+* Operational/publication values use their exact domains.
+* A primary image must belong to the same room; at most one image is primary.
+* Image MIME, extension, dimensions and size use approved upload configuration, not a hardcoded limit.
+* Image filenames are randomized and stored outside executable behavior.
 
-- Browse rooms
-- View details
-- View images
-- Check availability
-- Book room
+## 6. Security and Persistence
 
-Cannot
+Only authenticated Administrators may mutate room data. Controllers validate requests; Room Service enforces rules/transactions; Repositories contain PDO/SQL; Models/entities contain domain data only. All sensitive changes are audited.
 
-- Modify room information
+## 7. Acceptance Tests
 
----
+* Only active/published rooms appear publicly.
+* Maintenance/inactive rooms cannot be booked.
+* Availability overlap includes pending, confirmed and checked-in bookings.
+* Adjacent checkout/check-in dates do not overlap.
+* Operational status rejects Available/Reserved/Occupied.
+* Publication changes do not rewrite operational status.
+* Primary-image uniqueness and amenity relationships are enforced.
+* Historical booking relationships prevent destructive room deletion.
 
-## Administrator
+## 8. Future Enhancements
 
-Can
-
-- Create rooms
-- Edit rooms
-- Delete (Soft Delete)
-- Upload images
-- Set featured rooms
-- Activate/Deactivate rooms
-- Update pricing
-- Manage amenities
-
----
-
-# 4. Business Objectives
-
-The room module should
-
-- Showcase rooms professionally
-- Increase direct bookings
-- Provide complete room information
-- Allow staff to manage rooms without developer assistance
-- Support future room categories
-
----
-
-# 5. Room Categories
-
-Examples
-
-- Deluxe Room
-- Standard Room
-- Family Room
-- AC Room
-- Non-AC Room
-
-Each category should contain
-
-- Name
-- Description
-- Capacity
-- Default Amenities
-
----
-
-# 6. Room Information
-
-Every room shall contain
-
-| Field | Required |
-|---------|----------|
-| Room Number | Yes |
-| Room Name | Yes |
-| Category | Yes |
-| Description | Yes |
-| Base Price | Yes |
-| Maximum Guests | Yes |
-| Bed Type | Yes |
-| Floor | Yes |
-| Room Size | Optional |
-| Status | Yes |
-| Featured | Yes |
-| Thumbnail Image | Yes |
-
----
-
-## Room Description
-
-The room description should include
-
-- Overview
-- Comfort features
-- View
-- Bathroom
-- Balcony (if available)
-- Internet
-- Air Conditioning
-- Breakfast Information
-
----
-
-# 7. Customer Journey
-
-Customer
-
-↓
-
-Open Rooms Page
-
-↓
-
-View Room Cards
-
-↓
-
-Filter Rooms
-
-↓
-
-Open Room Details
-
-↓
-
-View Gallery
-
-↓
-
-View Amenities
-
-↓
-
-Check Availability
-
-↓
-
-Book Room
-
----
-
-# 8. Room Gallery
-
-Each room may have multiple images.
-
-Recommended images
-
-- Exterior
-- Bedroom
-- Bathroom
-- Balcony
-- View
-- Facilities
-
-The administrator may
-
-- Upload
-- Replace
-- Delete
-- Reorder
-
-Supported formats
-
-- JPG
-- PNG
-- WEBP
-
-Maximum upload
-
-5 MB
-
----
-
-# 9. Room Amenities
-
-Amenities should be managed independently.
-
-Examples
-
-- Free WiFi
-- Air Conditioning
-- Television
-- Balcony
-- Breakfast Included
-- Private Bathroom
-- Hot Water
-- Mountain View
-- Garden View
-- Mini Bar
-- Room Service
-- Parking
-
-A room may contain many amenities.
-
-An amenity may belong to many rooms.
-
-Relationship
-
-Many-to-Many
-
----
-
-# 10. Room Availability
-
-Availability depends on
-
-- Booking dates
-- Room status
-- Existing reservations
-
-Status
-
-Available
-
-Maintenance
-
-Inactive
-
-Booked
-
-Customers should only see available rooms.
-
----
-
-# 11. Administrator Room Management
-
-Administrator should be able to
-
-Create Room
-
-Edit Room
-
-Deactivate Room
-
-Delete Room (Soft Delete)
-
-Manage Images
-
-Manage Amenities
-
-Update Pricing
-
-Change Featured Status
-
-Search Rooms
-
-Filter Rooms
-
-Export Room List
-
----
-
-# 12. Business Rules
-
-Every room number must be unique.
-
-Inactive rooms cannot be booked.
-
-Rooms under maintenance cannot appear in searches.
-
-Deleting a room does not remove historical bookings.
-
-Every room must belong to one category.
-
-A room must contain at least one image.
-
-Featured rooms appear on the homepage.
-
----
-
-# 13. Validation Rules
-
-Room Name
-
-3–100 characters
-
-Base Price
-
-Greater than zero
-
-Capacity
-
-Minimum one guest
-
-Room Number
-
-Unique
-
-Images
-
-JPG
-
-PNG
-
-WEBP
-
-Maximum 5 MB
-
-Description
-
-Maximum 3000 characters
-
----
-
-# 14. Security Requirements
-
-Only administrators may modify rooms.
-
-Image uploads must be validated.
-
-Executable files must be rejected.
-
-File names should be randomized.
-
-Deleted rooms should use soft delete.
-
-All changes must be recorded in the audit log.
-
----
-
-# 15. Future Enhancements
-
-Future releases may support
-
-- Seasonal pricing
-- Weekend pricing
-- Promotional pricing
-- Room videos
-- 360° virtual tours
-- VR room preview
-- AI image optimization
-- Dynamic pricing
-- Occupancy analytics
-- Popular room ranking
-- Room comparison
-- Wishlist
-- Recently viewed rooms
-
----
-
-# End of Document
+Bed type, floor, room size, featured-room ranking, seasonal/dynamic pricing, videos, 360-degree media, room comparison, wishlists and advanced housekeeping require later approved contracts.

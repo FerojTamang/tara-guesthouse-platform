@@ -1,5 +1,7 @@
 # Tara Guest House Management System
 
+> **Version 1 scope authority:** `00_V1_ARCHITECT_DECISIONS.md` governs this overview. Version 1 is a server-rendered PHP 8.x application using Bootstrap 5, vanilla JavaScript, selective same-origin `/api/v1/...` JSON endpoints, PHP sessions, MariaDB/MySQL migrations, and cPanel/shared hosting. Public guests may create one-room bookings without accounts; only Administrators authenticate. Customer accounts, additional staff roles, JWT, multi-room booking, payment gateways, SMS/WhatsApp/push, and VPS/cloud infrastructure are future enhancements.
+
 **Version:** 1.0
 
 **Prepared By:**  
@@ -164,6 +166,6 @@ The project will be considered successful if:
 |------|-------|
 | Document Name | Project Overview |
 | Version | 1.0 |
-| Status | Draft |
+| Status | Synchronized — Review Required |
 | Last Updated | July 2026 |
 | Prepared By | fero.dev |
