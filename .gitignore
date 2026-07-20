@@ -1,7 +1,69 @@
-/vendor/
+# Environment and secrets
 /.env
+/.env.*
+!/.env.example
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Test and coverage output
+/.phpunit.cache/
+/coverage/
+/.coverage/
+
+# Runtime data
 /storage/logs/*
+!/storage/logs/.gitkeep
 /storage/cache/*
-node_modules/
-Thumbs.db
+!/storage/cache/.gitkeep
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+/storage/temp/*
+!/storage/temp/.gitkeep
+/storage/backups/*
+!/storage/backups/.gitkeep
+/storage/exports/*
+!/storage/exports/.gitkeep
+/storage/private/payment-proofs/*
+!/storage/private/payment-proofs/.gitkeep
+
+# Database backups
+/database/backups/*
+!/database/backups/.gitkeep
+
+# Public upload directories: retain structure and Apache protection only
+/public/uploads/*
+!/public/uploads/.htaccess
+!/public/uploads/*/
+/public/uploads/*/*
+!/public/uploads/*/.gitkeep
+!/public/uploads/*/.htaccess
+
+# Logs, temporary files, backups, and archives
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.swp
+*.swo
+*.sql.gz
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# IDE and editor files
+/.idea/
+/.vscode/
+*.code-workspace
+
+# Operating-system files
 .DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

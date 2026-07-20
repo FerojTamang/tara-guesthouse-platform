@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose work within the approved Tara Guest House scope.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Business need
+      description: Describe the problem and intended user outcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: version_scope
+    attributes:
+      label: Version 1 scope
+      options:
+        - Included by an approved Version 1 document
+        - Unclear - architecture review required
+        - Future enhancement - do not implement in Version 1
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Authoritative requirements
+      description: Cite the approved decisions, module specification, or client requirement.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: List observable positive and negative outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Architecture, data, API, security, and hosting impact
+    validations:
+      required: true
+  - type: textarea
+    id: unresolved
+    attributes:
+      label: Unresolved decisions
+      description: Identify policy or contract questions that must be approved before implementation.
