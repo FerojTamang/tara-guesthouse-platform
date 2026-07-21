@@ -79,7 +79,7 @@ Copy-Item .env.example .env
 
 Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
 
-Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, and `composer test:feature`. S0-002 includes genuine unit, integration, and feature coverage for the bootstrap and HTTP core.
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The Sprint 0 suite includes genuine unit, integration, feature, and isolated database coverage for the repository, HTTP, session/CSRF, database-runner, and view-renderer foundations.
 
 The core HTTP bootstrap is executable. After configuring the required local environment values, start PHP's development server from the repository root:
 
@@ -200,7 +200,7 @@ The required baseline includes unit, integration, feature, security, responsive/
 
 ## Current Status
 
-Documentation has been synchronized to the approved Version 1 decisions and awaits Project Manager/Technical Architect review. This status does not claim that application implementation, automated tests, UAT, or deployment are complete.
+Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented and have completed formal QA. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 0 closure still requires final Technical Architect approval; authentication, domain modules, final interfaces, UAT, and deployment remain unimplemented.
 
 ## Ownership
 
