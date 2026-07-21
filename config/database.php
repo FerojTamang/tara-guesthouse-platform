@@ -56,6 +56,10 @@ if ($username === '' || $username !== trim($username) || preg_match('/[\x00-\x1F
     throw new ConfigurationException('The database username must be non-empty and contain no prohibited characters.');
 }
 
+if (strcasecmp($username, 'root') === 0) {
+    throw new ConfigurationException('The configured database account is not allowed.');
+}
+
 $password = $literal('PASSWORD');
 
 if (in_array($environmentName, ['staging', 'production'], true) && $password === '') {

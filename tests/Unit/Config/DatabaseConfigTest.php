@@ -99,6 +99,38 @@ final class DatabaseConfigTest extends TestCase
         }
     }
 
+    public function testItRejectsTheRootAccountCaseInsensitivelyInEveryEnvironment(): void
+    {
+        foreach (['root', 'ROOT', 'Root'] as $username) {
+            foreach ([$this->localValues(), $this->testingValues()] as $values) {
+                $key = $values['APP_ENV'] === 'testing' ? 'TEST_DB_USERNAME' : 'DB_USERNAME';
+
+                try {
+                    $this->load(array_merge($values, [$key => $username]));
+                    self::fail('The root database account was accepted.');
+                } catch (ConfigurationException $exception) {
+                    self::assertStringNotContainsString($username, $exception->getMessage());
+                }
+            }
+        }
+
+        foreach (['staging', 'production'] as $environment) {
+            $values = array_merge($this->localValues(), [
+                'APP_ENV' => $environment,
+                'DB_USERNAME' => 'root',
+                'DB_PASSWORD' => 'test-only-nonempty-sentinel',
+            ]);
+
+            $this->expectRootRejection($values);
+        }
+    }
+
+    public function testValidNonRootAccountsRemainAccepted(): void
+    {
+        self::assertSame('tara_local', $this->load($this->localValues())['username']);
+        self::assertSame('tara_test', $this->load($this->testingValues())['username']);
+    }
+
     public function testPasswordRemainsLiteralAndBlankIsAllowedLocally(): void
     {
         $configuration = $this->load(array_merge($this->localValues(), ['DB_PASSWORD' => ' literal password ']));
@@ -238,5 +270,16 @@ final class DatabaseConfigTest extends TestCase
             dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'config',
             Environment::fromArray($values),
         );
+    }
+
+    /** @param array<string, string> $values */
+    private function expectRootRejection(array $values): void
+    {
+        try {
+            $this->load($values);
+            self::fail('The root database account was accepted.');
+        } catch (ConfigurationException $exception) {
+            self::assertStringNotContainsString($values['DB_USERNAME'], $exception->getMessage());
+        }
     }
 }
