@@ -7,7 +7,7 @@ namespace App\Core;
 use App\Exceptions\ConfigurationException;
 
 /**
- * Builds the minimal S0-002 application runtime.
+ * Builds the approved core application runtime.
  */
 final class Bootstrap
 {
@@ -47,11 +47,18 @@ final class Bootstrap
         $logger = LoggerFactory::create($config);
         $errorHandler = new ErrorHandler($logger, $config->require('app.debug') === true);
         $errorHandler->register();
+        $sessionConfiguration = $config->require('session');
+
+        if (!is_array($sessionConfiguration)) {
+            throw new ConfigurationException('The configured session settings are invalid.');
+        }
+
+        $session = Session::start($sessionConfiguration);
 
         $router = new Router();
         self::loadRoutes($router);
 
-        return new Application($router, $errorHandler);
+        return new Application($router, $errorHandler, $session);
     }
 
     private static function definePaths(string $basePath): void

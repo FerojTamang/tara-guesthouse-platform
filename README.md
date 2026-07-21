@@ -95,6 +95,10 @@ Run the genuine core test suite with:
 composer test
 ```
 
+Version 1 uses hardened native PHP sessions. The approved local settings use a 30-minute inactivity timeout, a 12-hour absolute lifetime, `SameSite=Lax`, `HttpOnly`, `Path=/`, and a non-Secure cookie only for local HTTP development. Staging and production require HTTPS with `SESSION_SECURE_COOKIE=true`. Private session files are stored in `storage/sessions/`, outside the public document root.
+
+The session-backed CSRF token primitives are available for future forms, but route-level enforcement is intentionally deferred until the first real state-changing form and its narrowly scoped middleware are implemented. Session identifiers, cookie contents, session values, and CSRF tokens must never be logged.
+
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 
 ## Repository Structure

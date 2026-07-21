@@ -9,12 +9,53 @@ use App\Core\ErrorHandler;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
+use App\Core\Session;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class HttpFoundationTest extends TestCase
 {
+    private string $savePath;
+
+    private Session $session;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->savePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tgh-http-feature-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($this->savePath, 0700));
+        $this->session = Session::start($this->sessionConfiguration());
+    }
+
+    protected function tearDown(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $this->session->destroy();
+        }
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_id('');
+        }
+
+        foreach (glob($this->savePath . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
+        }
+
+        if (is_dir($this->savePath)) {
+            rmdir($this->savePath);
+        }
+
+        parent::tearDown();
+    }
+
     public function testWelcomeRouteReturnsGenericSuccessfulResponse(): void
     {
         $response = $this->application()->handle(Request::create('GET', '/'));
@@ -39,6 +80,7 @@ final class HttpFoundationTest extends TestCase
 
         self::assertSame(405, $response->statusCode());
         self::assertSame('GET, HEAD', $response->headers()['Allow']);
+        self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testHeadReturnsNoBody(): void
@@ -55,7 +97,7 @@ final class HttpFoundationTest extends TestCase
         $router->get('/failure', static function (Request $request, array $parameters): Response {
             throw new RuntimeException('secret-value at C:\\private\\application.php');
         });
-        $application = new Application($router, new ErrorHandler(new NullLogger(), false));
+        $application = new Application($router, new ErrorHandler(new NullLogger(), false), $this->session);
 
         $response = $application->handle(Request::create('GET', '/failure'));
 
@@ -63,6 +105,7 @@ final class HttpFoundationTest extends TestCase
         self::assertSame('Internal Server Error', $response->body());
         self::assertStringNotContainsString('secret-value', $response->body());
         self::assertStringNotContainsString('C:\\private', $response->body());
+        self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
     private function application(): Application
@@ -74,6 +117,33 @@ final class HttpFoundationTest extends TestCase
             $registrar($router);
         }
 
-        return new Application($router, new ErrorHandler(new NullLogger(), false));
+        return new Application($router, new ErrorHandler(new NullLogger(), false), $this->session);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sessionConfiguration(): array
+    {
+        return [
+            'name' => 'tgh_' . bin2hex(random_bytes(8)),
+            'inactivity_timeout' => 1800,
+            'absolute_lifetime' => 43200,
+            'cookie' => [
+                'lifetime' => 0,
+                'secure' => false,
+                'http_only' => true,
+                'same_site' => 'Lax',
+                'path' => '/',
+                'domain' => null,
+            ],
+            'strict_mode' => true,
+            'use_cookies' => true,
+            'use_only_cookies' => true,
+            'use_trans_sid' => false,
+            'save_handler' => 'files',
+            'save_path' => realpath($this->savePath),
+            'gc_maxlifetime' => 43200,
+        ];
     }
 }
