@@ -32,7 +32,12 @@
         "sort-packages": true
     },
     "scripts": {
+        "database:status": "@php bin/database.php status",
+        "database:migrate": "@php bin/database.php migrate",
+        "database:rollback": "@php bin/database.php rollback",
+        "database:seed": "@php bin/database.php seed",
         "test": "@php vendor/bin/phpunit",
+        "test:database": "@php vendor/bin/phpunit --group database",
         "test:unit": "@php vendor/bin/phpunit --testsuite Unit",
         "test:integration": "@php vendor/bin/phpunit --testsuite Integration",
         "test:feature": "@php vendor/bin/phpunit --testsuite Feature"

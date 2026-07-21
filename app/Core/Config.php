@@ -19,7 +19,7 @@ final class Config
     }
 
     /**
-     * Loads only the configuration files approved through S0-003.
+     * Loads the configuration groups approved through S0-004.
      */
     public static function load(string $configPath, Environment $environment): self
     {
@@ -31,9 +31,26 @@ final class Config
 
         return new self([
             'app' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'app.php', $environment),
+            'database' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment),
             'logging' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'logging.php', $environment),
             'session' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'session.php', $environment),
         ]);
+    }
+
+    /**
+     * Loads only strict database configuration for CLI commands.
+     *
+     * @return array<string, mixed>
+     */
+    public static function loadDatabase(string $configPath, Environment $environment): array
+    {
+        $resolvedConfigPath = realpath($configPath);
+
+        if ($resolvedConfigPath === false || !is_dir($resolvedConfigPath)) {
+            throw new ConfigurationException('The configuration directory is invalid.');
+        }
+
+        return self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment);
     }
 
     /**
