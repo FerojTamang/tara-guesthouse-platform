@@ -25,6 +25,24 @@ final class RequestTest extends TestCase
         self::assertSame('request-1', $request->header('x-request-id'));
     }
 
+
+    public function testItProvidesParsedInputAndRawBody(): void
+    {
+        $request = Request::create(
+            'POST',
+            '/bookings',
+            [],
+            ['Content-Type' => 'application/json'],
+            ['guest_name' => 'Maya'],
+            '{"guest_name":"Maya"}',
+        );
+
+        self::assertSame(['guest_name' => 'Maya'], $request->input());
+        self::assertSame('Maya', $request->input('guest_name'));
+        self::assertSame('fallback', $request->input('missing', 'fallback'));
+        self::assertSame('{"guest_name":"Maya"}', $request->body());
+    }
+
     public function testItRejectsEncodedNullBytes(): void
     {
         $this->expectException(InvalidArgumentException::class);

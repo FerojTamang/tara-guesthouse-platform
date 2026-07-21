@@ -11,6 +11,7 @@ use App\Core\Response;
 use App\Core\Router;
 use App\Core\Session;
 use App\Core\ViewRenderer;
+use App\Middleware\Middleware;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -67,6 +68,29 @@ final class HttpFoundationTest extends TestCase
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringNotContainsString(PHP_VERSION, $response->body());
         self::assertStringNotContainsString(dirname(__DIR__, 2), $response->body());
+    }
+
+
+    public function testApplicationExecutesRouteMiddlewareWithParsedInput(): void
+    {
+        $router = new Router();
+        $middleware = new class implements Middleware {
+            public function process(Request $request, callable $next): Response
+            {
+                return $next($request)->withHeader('X-Middleware', 'executed');
+            }
+        };
+        $router->post('/submit', static function (Request $request, array $parameters): Response {
+            return Response::json(['name' => $request->input('name')], 202);
+        }, [$middleware]);
+        $application = new Application($router, new ErrorHandler(new NullLogger(), false), $this->session);
+
+        $response = $application->handle(Request::create('POST', '/submit', input: ['name' => 'Maya']));
+
+        self::assertSame(202, $response->statusCode());
+        self::assertSame('{"name":"Maya"}', $response->body());
+        self::assertSame('executed', $response->headers()['X-Middleware']);
+        self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testUnknownRouteReturnsNotFound(): void

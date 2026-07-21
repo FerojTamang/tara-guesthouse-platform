@@ -28,6 +28,43 @@ final class ResponseTest extends TestCase
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
     }
 
+
+    public function testJsonResponseUsesSafeEncodingAndUtf8ContentType(): void
+    {
+        $response = Response::json(['message' => 'Namasté', 'path' => '/admin'], 201);
+
+        self::assertSame(201, $response->statusCode());
+        self::assertSame('{"message":"Namasté","path":"/admin"}', $response->body());
+        self::assertSame('application/json; charset=UTF-8', $response->headers()['Content-Type']);
+    }
+
+    public function testRedirectResponseUsesAnInternalLocationAndEmptyBody(): void
+    {
+        $response = Response::redirect('/admin/login?expired=1', 303);
+
+        self::assertSame(303, $response->statusCode());
+        self::assertSame('', $response->body());
+        self::assertSame('/admin/login?expired=1', $response->headers()['Location']);
+    }
+
+    public function testRedirectResponseRejectsExternalLocations(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Response::redirect('https://example.com');
+    }
+
+    public function testRedirectResponseRejectsSchemeRelativeLocations(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Response::redirect('//example.com');
+    }
+
+    public function testRedirectResponseRejectsInvalidStatusCodes(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Response::redirect('/admin/login', 200);
+    }
+
     public function testHtmlResponseSupportsCustomStatusAndSafeHeaders(): void
     {
         $response = Response::html('<p>Created</p>', 201, ['X-Content-Type-Options' => 'nosniff']);

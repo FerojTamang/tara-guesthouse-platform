@@ -14,12 +14,15 @@ final class Request
     /**
      * @param array<string, mixed> $query
      * @param array<string, string> $headers
+     * @param array<string, mixed> $input
      */
     private function __construct(
         private readonly string $method,
         private readonly string $path,
         private readonly array $query,
         private readonly array $headers,
+        private readonly array $input,
+        private readonly string $body,
     ) {
     }
 
@@ -45,7 +48,13 @@ final class Request
             }
         }
 
-        return self::create($method, $uri, $_GET, $headers);
+        $body = file_get_contents('php://input');
+
+        if ($body === false) {
+            $body = '';
+        }
+
+        return self::create($method, $uri, $_GET, $headers, $_POST, $body);
     }
 
     /**
@@ -53,9 +62,16 @@ final class Request
      *
      * @param array<string, mixed>|null $query
      * @param array<string, string> $headers
+     * @param array<string, mixed> $input
      */
-    public static function create(string $method, string $uri, ?array $query = null, array $headers = []): self
-    {
+    public static function create(
+        string $method,
+        string $uri,
+        ?array $query = null,
+        array $headers = [],
+        array $input = [],
+        string $body = '',
+    ): self {
         $normalizedMethod = strtoupper(trim($method));
 
         if (preg_match('/^[A-Z][A-Z0-9!#$%&\'*+.^_`|~-]*$/', $normalizedMethod) !== 1) {
@@ -84,7 +100,7 @@ final class Request
             }
         }
 
-        return new self($normalizedMethod, $path, $query, $normalizedHeaders);
+        return new self($normalizedMethod, $path, $query, $normalizedHeaders, $input, $body);
     }
 
     /**
@@ -113,6 +129,26 @@ final class Request
         }
 
         return $this->query[$key] ?? $default;
+    }
+
+    /**
+     * Returns all parsed body input or one named value.
+     */
+    public function input(?string $key = null, mixed $default = null): mixed
+    {
+        if ($key === null) {
+            return $this->input;
+        }
+
+        return $this->input[$key] ?? $default;
+    }
+
+    /**
+     * Returns the exact raw request body.
+     */
+    public function body(): string
+    {
+        return $this->body;
     }
 
     /**
