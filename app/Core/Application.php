@@ -14,6 +14,7 @@ final class Application
     public function __construct(
         private readonly Router $router,
         private readonly ErrorHandler $errorHandler,
+        private readonly Session $session,
     ) {
     }
 
@@ -23,9 +24,17 @@ final class Application
     public function handle(Request $request): Response
     {
         try {
-            return $this->router->dispatch($request);
+            $response = $this->router->dispatch($request);
         } catch (Throwable $throwable) {
-            return $this->errorHandler->render($throwable);
+            $response = $this->errorHandler->render($throwable);
+        } finally {
+            try {
+                $this->session->close();
+            } catch (Throwable $throwable) {
+                $this->errorHandler->render($throwable);
+            }
         }
+
+        return $response;
     }
 }

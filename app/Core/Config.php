@@ -19,7 +19,7 @@ final class Config
     }
 
     /**
-     * Loads only the configuration files approved for S0-002.
+     * Loads only the configuration files approved through S0-003.
      */
     public static function load(string $configPath, Environment $environment): self
     {
@@ -32,6 +32,7 @@ final class Config
         return new self([
             'app' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'app.php', $environment),
             'logging' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'logging.php', $environment),
+            'session' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'session.php', $environment),
         ]);
     }
 

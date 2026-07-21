@@ -13,8 +13,12 @@ use App\Exceptions\ConfigurationException;
 use Monolog\Handler\ErrorLogHandler;
 use Monolog\Level;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class BootstrapTest extends TestCase
 {
     /** @var array<string, array{env: mixed, server: mixed, process: string|false}> */
@@ -23,6 +27,9 @@ final class BootstrapTest extends TestCase
     private string $logPath;
 
     private bool $handlersRegistered = false;
+
+    /** @var list<string> */
+    private array $sessionIds = [];
 
     protected function setUp(): void
     {
@@ -38,6 +45,14 @@ final class BootstrapTest extends TestCase
             'LOG_CHANNEL' => 'file',
             'LOG_LEVEL' => 'debug',
             'LOG_PATH' => $this->logPath,
+            'SESSION_NAME' => 'tgh_bootstrap_test',
+            'SESSION_INACTIVITY_TIMEOUT' => '1800',
+            'SESSION_ABSOLUTE_LIFETIME' => '43200',
+            'SESSION_SECURE_COOKIE' => 'false',
+            'SESSION_HTTP_ONLY' => 'true',
+            'SESSION_SAME_SITE' => 'Lax',
+            'SESSION_PATH' => '/',
+            'SESSION_DOMAIN' => '',
         ]);
     }
 
@@ -46,6 +61,22 @@ final class BootstrapTest extends TestCase
         if ($this->handlersRegistered) {
             restore_error_handler();
             restore_exception_handler();
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION = [];
+            session_destroy();
+        }
+
+        session_id('');
+
+        foreach ($this->sessionIds as $sessionId) {
+            $sessionFile = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'sessions'
+                . DIRECTORY_SEPARATOR . 'sess_' . $sessionId;
+
+            if (is_file($sessionFile)) {
+                unlink($sessionFile);
+            }
         }
 
         foreach ($this->originalEnvironment as $key => $original) {
@@ -80,6 +111,8 @@ final class BootstrapTest extends TestCase
         $sessionStatus = session_status();
         $application = Bootstrap::boot(dirname(__DIR__, 3));
         $this->handlersRegistered = true;
+        self::assertSame(PHP_SESSION_ACTIVE, session_status());
+        $this->sessionIds[] = session_id();
         $response = $application->handle(Request::create('GET', '/'));
 
         self::assertSame(200, $response->statusCode());
@@ -102,7 +135,7 @@ final class BootstrapTest extends TestCase
         self::assertTrue($config->has('logging'));
         self::assertFalse($config->has('database'));
         self::assertFalse($config->has('mail'));
-        self::assertFalse($config->has('session'));
+        self::assertTrue($config->has('session'));
         self::assertFalse($config->has('upload'));
     }
 

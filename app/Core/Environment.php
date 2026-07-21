@@ -66,6 +66,28 @@ final class Environment
     }
 
     /**
+     * Returns a string without trimming or otherwise normalizing its value.
+     */
+    public function literalString(string $key, ?string $default = null): string
+    {
+        if (!$this->has($key)) {
+            if ($default !== null) {
+                return $default;
+            }
+
+            throw new ConfigurationException(sprintf('Required environment variable %s is missing.', $key));
+        }
+
+        $value = $this->values[$key];
+
+        if (!is_string($value)) {
+            throw new ConfigurationException(sprintf('Environment variable %s must be a string.', $key));
+        }
+
+        return $value;
+    }
+
+    /**
      * Returns a required non-empty string or an explicit default.
      */
     public function string(string $key, ?string $default = null): string

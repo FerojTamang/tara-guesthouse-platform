@@ -73,6 +73,18 @@ final class EnvironmentTest extends TestCase
         self::assertNull($environment->nullableString('EMPTY'));
     }
 
+    public function testLiteralStringsAreReturnedWithoutNormalization(): void
+    {
+        $environment = Environment::fromArray([
+            'SPACED' => ' value ',
+            'EMPTY' => '',
+        ]);
+
+        self::assertSame(' value ', $environment->literalString('SPACED'));
+        self::assertSame('', $environment->literalString('EMPTY'));
+        self::assertSame('fallback', $environment->literalString('MISSING', 'fallback'));
+    }
+
     public function testExistingProcessValuesTakePrecedenceOverDotenvValues(): void
     {
         $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tgh-env-' . bin2hex(random_bytes(8));
