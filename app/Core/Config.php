@@ -19,7 +19,7 @@ final class Config
     }
 
     /**
-     * Loads the configuration groups approved through S0-004.
+     * Loads the approved application configuration groups.
      */
     public static function load(string $configPath, Environment $environment): self
     {
@@ -33,6 +33,7 @@ final class Config
             'app' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'app.php', $environment),
             'database' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment),
             'logging' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'logging.php', $environment),
+            'security' => self::loadSecurity($resolvedConfigPath, $environment),
             'session' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'session.php', $environment),
         ]);
     }
@@ -51,6 +52,27 @@ final class Config
         }
 
         return self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment);
+    }
+
+    /**
+     * Loads and validates the tracked non-secret security policy.
+     *
+     * @return array<string, mixed>
+     */
+    public static function loadSecurity(string $configPath, Environment $environment): array
+    {
+        $resolvedConfigPath = realpath($configPath);
+
+        if ($resolvedConfigPath === false || !is_dir($resolvedConfigPath)) {
+            throw new ConfigurationException('The configuration directory is invalid.');
+        }
+
+        $configuration = self::loadFile(
+            $resolvedConfigPath . DIRECTORY_SEPARATOR . 'security.php',
+            $environment,
+        );
+
+        return self::validateSecurity($configuration);
     }
 
     /**
@@ -116,6 +138,81 @@ final class Config
 
         if (!is_array($configuration)) {
             throw new ConfigurationException(sprintf('Configuration file %s must return an array.', basename($file)));
+        }
+
+        return $configuration;
+    }
+
+    /**
+     * @param array<string, mixed> $configuration
+     * @return array<string, mixed>
+     */
+    private static function validateSecurity(array $configuration): array
+    {
+        if (array_keys($configuration) !== ['administrator_bootstrap']) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        $policy = $configuration['administrator_bootstrap'];
+        $requiredKeys = [
+            'allowed_environments',
+            'force_required_environments',
+            'full_name_min_characters',
+            'full_name_max_characters',
+            'username_min_characters',
+            'username_max_characters',
+            'email_max_bytes',
+            'phone_max_characters',
+            'password_min_characters',
+            'password_max_bytes',
+        ];
+
+        if (!is_array($policy) || array_keys($policy) !== $requiredKeys) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        $supportedEnvironments = ['local', 'testing', 'staging', 'production'];
+        $allowed = $policy['allowed_environments'];
+        $forceRequired = $policy['force_required_environments'];
+
+        if (
+            !is_array($allowed)
+            || !is_array($forceRequired)
+            || $allowed === []
+            || count($allowed) !== count(array_unique($allowed, SORT_REGULAR))
+            || count($forceRequired) !== count(array_unique($forceRequired, SORT_REGULAR))
+        ) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        foreach (array_merge($allowed, $forceRequired) as $environment) {
+            if (!is_string($environment) || !in_array($environment, $supportedEnvironments, true)) {
+                throw new ConfigurationException('Security configuration is invalid.');
+            }
+        }
+
+        if (array_diff($forceRequired, $allowed) !== []) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        $numericKeys = array_slice($requiredKeys, 2);
+
+        foreach ($numericKeys as $key) {
+            if (!is_int($policy[$key]) || $policy[$key] <= 0) {
+                throw new ConfigurationException('Security configuration is invalid.');
+            }
+        }
+
+        if (
+            $policy['full_name_min_characters'] > $policy['full_name_max_characters']
+            || $policy['username_min_characters'] > $policy['username_max_characters']
+            || $policy['full_name_max_characters'] > 100
+            || $policy['username_max_characters'] > 50
+            || $policy['email_max_bytes'] > 150
+            || $policy['phone_max_characters'] > 20
+            || $policy['password_max_bytes'] > 72
+        ) {
+            throw new ConfigurationException('Security configuration is invalid.');
         }
 
         return $configuration;

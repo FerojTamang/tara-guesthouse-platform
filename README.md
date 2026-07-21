@@ -127,11 +127,27 @@ composer test:database
 
 The seed command requires an explicit `--group=production`, `--group=development`, `--group=testing`, or `--group=demo`. Production migration requires `--force`; production rollback is disabled; and production refuses development, testing, and demo seeders. Migration files use `YYYYMMDDHHMMSS_lowercase_description.php`, must return one `App\Core\Migration` instance, and must never be edited after application. Seeder files use lowercase snake case, return one `App\Core\Seeder` instance, and declare their group.
 
-## Administrator Authentication Data Foundation
+## Administrator Authentication Foundation
 
-Sprint 1 includes executable `roles` and `users` migrations, passive immutable Role/User models, and read-only Administrator repository lookups. The production seed group creates only the `Administrator` role. Guest remains an unauthenticated public actor and is not stored as a database role; no customer or future staff roles are seeded.
+Sprint 1 includes executable `roles` and `users` migrations, passive immutable Role/User models, read-only Administrator repository lookups, and a protected CLI mechanism for creating the initial Administrator account. The production seeder creates only the non-secret `Administrator` role prerequisite. Guest remains an unauthenticated public actor and is not stored as a database role; no customer or future staff roles are seeded.
 
-No Administrator account exists yet. Initial Administrator bootstrap, login/logout, session authentication identity, authorization middleware, rate limiting, and authentication interfaces remain deferred to later approved tickets. Never place an Administrator password or password hash in a migration, seeder, tracked environment file, or documentation.
+Run the deployment steps in this order:
+
+```bash
+composer database:migrate
+composer database:seed -- --group=production
+php bin/admin.php bootstrap
+```
+
+The interactive command prompts for identity values and reads the password twice through protected terminal input. Interactive identity prompts are preferred because identity flags may expose personal data in shell history or process listings. Controlled deployment tooling may instead supply all identity options and pipe exactly two newline-delimited password values to protected, non-terminal standard input:
+
+```bash
+php bin/admin.php bootstrap --full-name "<full name>" --username "<username>" --email "<email>" --password-stdin
+```
+
+An optional `--phone` identity value is supported. Staging and production require the exact `--force` flag; it does not bypass validation, prerequisite, conflict, database-account, or transaction safeguards. There is no password command-line flag, password-file option, or password environment-variable contract.
+
+Bootstrap is single-use. It never modifies, resets, activates, unlocks, restores, or replaces an existing account. Passwords and hashes must never be placed in migrations, seeders, tracked environment files, commands, or documentation. Persistent audit records, login/logout, session authentication identity, authorization middleware, rate limiting, password reset, and authentication views remain deferred to later approved tickets.
 
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 
@@ -206,7 +222,7 @@ The required baseline includes unit, integration, feature, security, responsive/
 
 ## Current Status
 
-Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented, formally approved, and merged. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 1 Administrator authentication data foundations are now under technical review; Administrator bootstrap, login/logout, authorization, domain modules, final interfaces, UAT, and deployment remain unimplemented.
+Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented, formally approved, and merged. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 1 Administrator authentication data and secure initial-account bootstrap foundations are now under technical review; login/logout, authorization, domain modules, final interfaces, UAT, and deployment remain unimplemented.
 
 ## Ownership
 
