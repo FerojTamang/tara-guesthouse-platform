@@ -47,12 +47,12 @@ Customer accounts/portal, JWT, specialized staff roles, multi-room booking, paym
 | Rendering | PHP-rendered views with selective Fetch/AJAX |
 | Backend | PHP 8.x, Composer PSR-4, custom layered MVC-inspired architecture |
 | Data access | Repositories using PDO prepared statements |
-| Database | MariaDB/MySQL; migrations are executable source of truth |
+| Database | MariaDB 11.8 (primary tested engine) through `pdo_mysql`; migrations are executable source of truth |
 | Authentication | Hardened server-side PHP sessions and CSRF protection |
 | Routes | Normal page routes plus `/api/v1/...` same-origin JSON endpoints |
 | Web server | Apache |
 | Production | HTTPS on cPanel/shared hosting |
-| Development | XAMPP or another compatible PHP/Apache/MySQL environment |
+| Development | PHP/Apache with the tested MariaDB 11.8 environment |
 
 The required backend flow is:
 
@@ -98,6 +98,26 @@ composer test
 Version 1 uses hardened native PHP sessions. The approved local settings use a 30-minute inactivity timeout, a 12-hour absolute lifetime, `SameSite=Lax`, `HttpOnly`, `Path=/`, and a non-Secure cookie only for local HTTP development. Staging and production require HTTPS with `SESSION_SECURE_COOKIE=true`. Private session files are stored in `storage/sessions/`, outside the public document root.
 
 The session-backed CSRF token primitives are available for future forms, but route-level enforcement is intentionally deferred until the first real state-changing form and its narrowly scoped middleware are implemented. Session identifiers, cookie contents, session values, and CSRF tokens must never be logged.
+
+## Database Foundation
+
+S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. It creates only the infrastructure-owned `schema_migrations` table; guest-house domain tables and seed data belong to later approved tickets.
+
+MariaDB 11.8 is the primary tested database engine. Connections use `utf8mb4`, `utf8mb4_unicode_ci`, UTC session time, native prepared statements, and a five-second timeout. Application display dates remain configured through `APP_TIMEZONE=Asia/Kathmandu`. HTTP bootstrap validates database settings but does not eagerly connect.
+
+Configure both the development and isolated test values shown in `.env.example`. Port `3307` is the current developer's local MariaDB setting, not a project-wide requirement; other developers and production must set the host-provided port through `.env` or protected environment configuration. Database credentials belong only in those private environment sources and must never be committed. The test database must differ from the development database and end in `_test` or `_testing`. Never run test or acceptance commands against the development database.
+
+Available commands are:
+
+```bash
+composer database:status
+composer database:migrate
+composer database:rollback
+composer database:seed -- --group=testing
+composer test:database
+```
+
+The seed command requires an explicit `--group=production`, `--group=development`, `--group=testing`, or `--group=demo`. Production migration requires `--force`; production rollback is disabled; and production refuses development, testing, and demo seeders. Migration files use `YYYYMMDDHHMMSS_lowercase_description.php`, must return one `App\Core\Migration` instance, and must never be edited after application. Seeder files use lowercase snake case, return one `App\Core\Seeder` instance, and declare their group. No production or domain seeder is included in this foundation.
 
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 

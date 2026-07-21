@@ -42,6 +42,28 @@ final class BootstrapTest extends TestCase
             'APP_DEBUG' => 'false',
             'APP_URL' => 'http://localhost',
             'APP_TIMEZONE' => 'Asia/Kathmandu',
+            'DB_DRIVER' => 'mysql',
+            'DB_HOST' => '127.0.0.1',
+            'DB_PORT' => '3307',
+            'DB_DATABASE' => 'tara_guest_house',
+            'DB_USERNAME' => 'tara_local',
+            'DB_PASSWORD' => 'test-only-password',
+            'DB_CHARSET' => 'utf8mb4',
+            'DB_COLLATION' => 'utf8mb4_unicode_ci',
+            'DB_TIMEZONE' => '+00:00',
+            'DB_CONNECT_TIMEOUT' => '5',
+            'DB_SSL_CA' => '',
+            'TEST_DB_DRIVER' => 'mysql',
+            'TEST_DB_HOST' => '127.0.0.1',
+            'TEST_DB_PORT' => '3307',
+            'TEST_DB_DATABASE' => 'tara_guest_house_test',
+            'TEST_DB_USERNAME' => 'tara_test',
+            'TEST_DB_PASSWORD' => '',
+            'TEST_DB_CHARSET' => 'utf8mb4',
+            'TEST_DB_COLLATION' => 'utf8mb4_unicode_ci',
+            'TEST_DB_TIMEZONE' => '+00:00',
+            'TEST_DB_CONNECT_TIMEOUT' => '5',
+            'TEST_DB_SSL_CA' => '',
             'LOG_CHANNEL' => 'file',
             'LOG_LEVEL' => 'debug',
             'LOG_PATH' => $this->logPath,
@@ -125,6 +147,12 @@ final class BootstrapTest extends TestCase
             'APP_ENV' => 'testing',
             'APP_DEBUG' => 'false',
             'APP_TIMEZONE' => 'Asia/Kathmandu',
+            'DB_DATABASE' => 'tara_guest_house',
+            'TEST_DB_HOST' => '127.0.0.1',
+            'TEST_DB_PORT' => '3307',
+            'TEST_DB_DATABASE' => 'tara_guest_house_test',
+            'TEST_DB_USERNAME' => 'tara_test',
+            'TEST_DB_PASSWORD' => '',
             'LOG_CHANNEL' => 'file',
             'LOG_LEVEL' => 'debug',
             'LOG_PATH' => $this->logPath,
@@ -133,7 +161,7 @@ final class BootstrapTest extends TestCase
 
         self::assertTrue($config->has('app'));
         self::assertTrue($config->has('logging'));
-        self::assertFalse($config->has('database'));
+        self::assertTrue($config->has('database'));
         self::assertFalse($config->has('mail'));
         self::assertTrue($config->has('session'));
         self::assertFalse($config->has('upload'));

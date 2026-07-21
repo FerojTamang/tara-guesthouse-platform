@@ -49,3 +49,62 @@ jobs:
 
       - name: Run PHPUnit tests
         run: composer test
+
+  database:
+    name: MariaDB 11.8 database integration checks
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_DATABASE: tara_guest_house_test
+          MARIADB_USER: tara_test
+          MARIADB_PASSWORD: tgh_ci_test_password
+          MARIADB_ROOT_PASSWORD: tgh_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_ENV: testing
+      DB_DRIVER: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: tara_guest_house_ci_guard
+      DB_USERNAME: unused_ci_user
+      DB_PASSWORD: unused_ci_password
+      DB_CHARSET: utf8mb4
+      DB_COLLATION: utf8mb4_unicode_ci
+      DB_TIMEZONE: '+00:00'
+      DB_CONNECT_TIMEOUT: 5
+      DB_SSL_CA: ''
+      TEST_DB_DRIVER: mysql
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: 3306
+      TEST_DB_DATABASE: tara_guest_house_test
+      TEST_DB_USERNAME: tara_test
+      TEST_DB_PASSWORD: tgh_ci_test_password
+      TEST_DB_CHARSET: utf8mb4
+      TEST_DB_COLLATION: utf8mb4_unicode_ci
+      TEST_DB_TIMEZONE: '+00:00'
+      TEST_DB_CONNECT_TIMEOUT: 5
+      TEST_DB_SSL_CA: ''
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, fileinfo, openssl
+          coverage: none
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run database integration tests
+        run: composer test:database
