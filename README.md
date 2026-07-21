@@ -125,7 +125,13 @@ composer database:seed -- --group=testing
 composer test:database
 ```
 
-The seed command requires an explicit `--group=production`, `--group=development`, `--group=testing`, or `--group=demo`. Production migration requires `--force`; production rollback is disabled; and production refuses development, testing, and demo seeders. Migration files use `YYYYMMDDHHMMSS_lowercase_description.php`, must return one `App\Core\Migration` instance, and must never be edited after application. Seeder files use lowercase snake case, return one `App\Core\Seeder` instance, and declare their group. No production or domain seeder is included in this foundation.
+The seed command requires an explicit `--group=production`, `--group=development`, `--group=testing`, or `--group=demo`. Production migration requires `--force`; production rollback is disabled; and production refuses development, testing, and demo seeders. Migration files use `YYYYMMDDHHMMSS_lowercase_description.php`, must return one `App\Core\Migration` instance, and must never be edited after application. Seeder files use lowercase snake case, return one `App\Core\Seeder` instance, and declare their group.
+
+## Administrator Authentication Data Foundation
+
+Sprint 1 includes executable `roles` and `users` migrations, passive immutable Role/User models, and read-only Administrator repository lookups. The production seed group creates only the `Administrator` role. Guest remains an unauthenticated public actor and is not stored as a database role; no customer or future staff roles are seeded.
+
+No Administrator account exists yet. Initial Administrator bootstrap, login/logout, session authentication identity, authorization middleware, rate limiting, and authentication interfaces remain deferred to later approved tickets. Never place an Administrator password or password hash in a migration, seeder, tracked environment file, or documentation.
 
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 
@@ -200,7 +206,7 @@ The required baseline includes unit, integration, feature, security, responsive/
 
 ## Current Status
 
-Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented and have completed formal QA. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 0 closure still requires final Technical Architect approval; authentication, domain modules, final interfaces, UAT, and deployment remain unimplemented.
+Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented, formally approved, and merged. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 1 Administrator authentication data foundations are now under technical review; Administrator bootstrap, login/logout, authorization, domain modules, final interfaces, UAT, and deployment remain unimplemented.
 
 ## Ownership
 

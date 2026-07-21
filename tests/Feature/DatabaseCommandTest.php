@@ -78,11 +78,11 @@ final class DatabaseCommandTest extends TestCase
 
         $status = $this->command(['status']);
         self::assertSame(0, $status['exit']);
-        self::assertStringContainsString('Pending migrations: 1', $status['stdout']);
+        self::assertStringContainsString('Pending migrations: 3', $status['stdout']);
 
         $migrate = $this->command(['migrate']);
         self::assertSame(0, $migrate['exit']);
-        self::assertStringContainsString('Applied migrations: 1', $migrate['stdout']);
+        self::assertStringContainsString('Applied migrations: 3', $migrate['stdout']);
 
         $repeat = $this->command(['migrate']);
         self::assertSame(0, $repeat['exit']);
@@ -90,11 +90,11 @@ final class DatabaseCommandTest extends TestCase
 
         $rollback = $this->command(['rollback']);
         self::assertSame(0, $rollback['exit']);
-        self::assertStringContainsString('Rolled back migrations: 1', $rollback['stdout']);
+        self::assertStringContainsString('Rolled back migrations: 3', $rollback['stdout']);
 
         $finalMigrate = $this->command(['migrate']);
         self::assertSame(0, $finalMigrate['exit']);
-        self::assertStringContainsString('Applied migrations: 1', $finalMigrate['stdout']);
+        self::assertStringContainsString('Applied migrations: 3', $finalMigrate['stdout']);
     }
 
     public function testApprovedTestingSeederGroupSucceeds(): void
@@ -154,7 +154,7 @@ final class DatabaseCommandTest extends TestCase
         $result = $this->command(['migrate', '--force'], $this->productionEnvironment());
 
         self::assertSame(0, $result['exit']);
-        self::assertStringContainsString('Applied migrations: 1', $result['stdout']);
+        self::assertStringContainsString('Applied migrations: 3', $result['stdout']);
         self::assertSame(1, (int) $this->connection->query(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 's0004_command_fixture'",
         )->fetchColumn());
@@ -305,7 +305,7 @@ PHP);
         $this->connection->exec('SET FOREIGN_KEY_CHECKS = 0');
 
         try {
-            foreach (['s0004_command_seed', 's0004_command_fixture', 'schema_migrations'] as $table) {
+            foreach (['users', 'roles', 's0004_command_seed', 's0004_command_fixture', 'schema_migrations'] as $table) {
                 $this->connection->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
             }
         } finally {
