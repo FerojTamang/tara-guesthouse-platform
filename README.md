@@ -89,6 +89,14 @@ php -S 127.0.0.1:8080 -t public public/index.php
 
 Open `http://127.0.0.1:8080/` to verify the temporary infrastructure welcome response. It confirms only that the bootstrap is running; it is not the production homepage. The production Apache/cPanel document root must point to `public/` so application source, configuration, logs, and private files remain outside direct web access.
 
+## View Foundation
+
+The application includes a secure PHP view renderer for trusted project templates under `resources/views/`. Application code selects views through strict lowercase dot names such as `infrastructure.welcome`; request values must never select template names. Layouts use the `layouts.*` prefix, reusable components use `components.*`, and components receive only explicitly supplied presentation data.
+
+Templates must escape HTML text and quoted attribute values through the provided `$e` helper. There is no raw HTML helper; renderer-owned layout content is the only approved unescaped composition value. The HTML helper is not a JavaScript, CSS, JSON, URL, or URL-scheme sanitizer. Templates must not access PDO, repositories, services, sessions, environment values, or configuration, and must not send headers, terminate execution, query data, or contain business logic.
+
+The current `/` page is infrastructure-only and confirms that the application and renderer are operational. Final Bootstrap styling, frontend assets, the public website layout, and the Administrator layout remain deferred to later approved tickets.
+
 Run the genuine core test suite with:
 
 ```bash

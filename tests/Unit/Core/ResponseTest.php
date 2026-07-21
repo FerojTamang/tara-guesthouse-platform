@@ -19,6 +19,46 @@ final class ResponseTest extends TestCase
         self::assertSame('text/plain; charset=UTF-8', $response->headers()['Content-Type']);
     }
 
+    public function testHtmlResponseUsesUtf8HtmlDefaults(): void
+    {
+        $response = Response::html('<main>Ready</main>');
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame('<main>Ready</main>', $response->body());
+        self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
+    }
+
+    public function testHtmlResponseSupportsCustomStatusAndSafeHeaders(): void
+    {
+        $response = Response::html('<p>Created</p>', 201, ['X-Content-Type-Options' => 'nosniff']);
+
+        self::assertSame(201, $response->statusCode());
+        self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
+    }
+
+    public function testHtmlResponsePreservesExplicitContentType(): void
+    {
+        $response = Response::html('<p>Ready</p>', headers: ['content-type' => 'application/xhtml+xml']);
+
+        self::assertSame(['content-type' => 'application/xhtml+xml'], $response->headers());
+    }
+
+    public function testHtmlResponseRejectsHeaderInjection(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Response::html('No', headers: ['X-Test' => "value\r\nInjected: true"]);
+    }
+
+    public function testHtmlResponseRemainsImmutable(): void
+    {
+        $original = Response::html('<p>Ready</p>');
+        $updated = $original->withHeader('X-Frame-Options', 'DENY');
+
+        self::assertArrayNotHasKey('X-Frame-Options', $original->headers());
+        self::assertSame('DENY', $updated->headers()['X-Frame-Options']);
+        self::assertSame('text/html; charset=UTF-8', $updated->headers()['Content-Type']);
+    }
+
     public function testItIsImmutableWhenAddingHeaders(): void
     {
         $original = Response::text('Ready');

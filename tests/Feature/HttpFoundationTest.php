@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
 use App\Core\Session;
+use App\Core\ViewRenderer;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -61,7 +62,9 @@ final class HttpFoundationTest extends TestCase
         $response = $this->application()->handle(Request::create('GET', '/'));
 
         self::assertSame(200, $response->statusCode());
-        self::assertStringContainsString('application bootstrap is running', $response->body());
+        self::assertStringContainsString('Application foundation is running', $response->body());
+        self::assertStringContainsString('The PHP view renderer is operational.', $response->body());
+        self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringNotContainsString(PHP_VERSION, $response->body());
         self::assertStringNotContainsString(dirname(__DIR__, 2), $response->body());
     }
@@ -111,10 +114,11 @@ final class HttpFoundationTest extends TestCase
     private function application(): Application
     {
         $router = new Router();
+        $renderer = new ViewRenderer(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views');
 
         foreach (['web.php', 'admin.php', 'api.php'] as $routeFile) {
             $registrar = require dirname(__DIR__, 2) . '/routes/' . $routeFile;
-            $registrar($router);
+            $registrar($router, $renderer);
         }
 
         return new Application($router, new ErrorHandler(new NullLogger(), false), $this->session);
