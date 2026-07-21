@@ -47,4 +47,5 @@ jobs:
             php -l "$file"
           done < <(git ls-files '*.php')
 
-      # Application tests are intentionally not run until real reviewed tests exist.
+      - name: Run PHPUnit tests
+        run: composer test
