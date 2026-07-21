@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Middleware\Middleware;
 use InvalidArgumentException;
 use LogicException;
 
@@ -15,19 +16,38 @@ final class Router
     private const ALLOWED_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
     /**
-     * @var list<array{method: string, pattern: string, regex: string, parameters: list<string>, handler: callable}>
+     * @var list<array{
+     *     method: string,
+     *     pattern: string,
+     *     regex: string,
+     *     parameters: list<string>,
+     *     handler: callable,
+     *     middleware: list<Middleware>
+     * }>
      */
     private array $routes = [];
 
     /**
      * Registers a route for one approved HTTP method.
+     *
+     * @param list<Middleware> $middleware
      */
-    public function add(string $method, string $pattern, callable $handler): self
+    public function add(string $method, string $pattern, callable $handler, array $middleware = []): self
     {
         $normalizedMethod = strtoupper(trim($method));
 
         if (!in_array($normalizedMethod, self::ALLOWED_METHODS, true)) {
             throw new InvalidArgumentException('The route HTTP method is not supported.');
+        }
+
+        if (!array_is_list($middleware)) {
+            throw new InvalidArgumentException('Route middleware must be provided as a list.');
+        }
+
+        foreach ($middleware as $item) {
+            if (!$item instanceof Middleware) {
+                throw new InvalidArgumentException('Route middleware must implement the Middleware interface.');
+            }
         }
 
         [$normalizedPattern, $regex, $parameters] = $this->compilePattern($pattern);
@@ -44,6 +64,7 @@ final class Router
             'regex' => $regex,
             'parameters' => $parameters,
             'handler' => $handler,
+            'middleware' => $middleware,
         ];
 
         return $this;
@@ -51,10 +72,52 @@ final class Router
 
     /**
      * Registers a GET route, which also permits HEAD requests.
+     *
+     * @param list<Middleware> $middleware
      */
-    public function get(string $pattern, callable $handler): self
+    public function get(string $pattern, callable $handler, array $middleware = []): self
     {
-        return $this->add('GET', $pattern, $handler);
+        return $this->add('GET', $pattern, $handler, $middleware);
+    }
+
+    /**
+     * Registers a POST route.
+     *
+     * @param list<Middleware> $middleware
+     */
+    public function post(string $pattern, callable $handler, array $middleware = []): self
+    {
+        return $this->add('POST', $pattern, $handler, $middleware);
+    }
+
+    /**
+     * Registers a PUT route.
+     *
+     * @param list<Middleware> $middleware
+     */
+    public function put(string $pattern, callable $handler, array $middleware = []): self
+    {
+        return $this->add('PUT', $pattern, $handler, $middleware);
+    }
+
+    /**
+     * Registers a PATCH route.
+     *
+     * @param list<Middleware> $middleware
+     */
+    public function patch(string $pattern, callable $handler, array $middleware = []): self
+    {
+        return $this->add('PATCH', $pattern, $handler, $middleware);
+    }
+
+    /**
+     * Registers a DELETE route.
+     *
+     * @param list<Middleware> $middleware
+     */
+    public function delete(string $pattern, callable $handler, array $middleware = []): self
+    {
+        return $this->add('DELETE', $pattern, $handler, $middleware);
     }
 
     /**
@@ -103,11 +166,22 @@ final class Router
                 $parameters[$parameter] = $decodedValue;
             }
 
-            $response = ($route['handler'])($request, $parameters);
+            $next = static function (Request $request) use ($route, $parameters): Response {
+                $response = ($route['handler'])($request, $parameters);
 
-            if (!$response instanceof Response) {
-                throw new LogicException('Route handlers must return a Response instance.');
+                if (!$response instanceof Response) {
+                    throw new LogicException('Route handlers must return a Response instance.');
+                }
+
+                return $response;
+            };
+
+            foreach (array_reverse($route['middleware']) as $middleware) {
+                $downstream = $next;
+                $next = static fn (Request $request): Response => $middleware->process($request, $downstream);
             }
+
+            $response = $next($request);
 
             return $request->method() === 'HEAD' ? $response->withoutBody() : $response;
         }

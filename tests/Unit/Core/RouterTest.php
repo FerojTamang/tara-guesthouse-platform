@@ -7,6 +7,7 @@ namespace Tests\Unit\Core;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
+use App\Middleware\Middleware;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +23,74 @@ final class RouterTest extends TestCase
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('OK', $response->body());
+    }
+
+
+    public function testItRegistersStateChangingRouteHelpers(): void
+    {
+        $router = new Router();
+        $handler = static fn (Request $request, array $parameters): Response => Response::text($request->method());
+
+        $router
+            ->post('/post', $handler)
+            ->put('/put', $handler)
+            ->patch('/patch', $handler)
+            ->delete('/delete', $handler);
+
+        self::assertSame('POST', $router->dispatch(Request::create('POST', '/post'))->body());
+        self::assertSame('PUT', $router->dispatch(Request::create('PUT', '/put'))->body());
+        self::assertSame('PATCH', $router->dispatch(Request::create('PATCH', '/patch'))->body());
+        self::assertSame('DELETE', $router->dispatch(Request::create('DELETE', '/delete'))->body());
+    }
+
+    public function testRouteMiddlewareRunsInRegistrationOrderAroundTheHandler(): void
+    {
+        $events = [];
+        $first = new RecordingMiddleware('first', $events);
+        $second = new RecordingMiddleware('second', $events);
+        $router = new Router();
+        $router->get('/protected', static function (Request $request, array $parameters) use (&$events): Response {
+            $events[] = 'handler';
+
+            return Response::text('OK');
+        }, [$first, $second]);
+
+        $response = $router->dispatch(Request::create('GET', '/protected'));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame(
+            ['first:before', 'second:before', 'handler', 'second:after', 'first:after'],
+            $events,
+        );
+    }
+
+    public function testRouteMiddlewareCanShortCircuitTheHandler(): void
+    {
+        $handlerCalled = false;
+        $router = new Router();
+        $router->get('/protected', static function (Request $request, array $parameters) use (&$handlerCalled): Response {
+            $handlerCalled = true;
+
+            return Response::text('Should not run');
+        }, [new ShortCircuitMiddleware()]);
+
+        $response = $router->dispatch(Request::create('GET', '/protected'));
+
+        self::assertSame(403, $response->statusCode());
+        self::assertSame('Forbidden', $response->body());
+        self::assertFalse($handlerCalled);
+    }
+
+    public function testItRejectsMiddlewareThatDoesNotImplementTheInterface(): void
+    {
+        $router = new Router();
+
+        $this->expectException(InvalidArgumentException::class);
+        $router->get(
+            '/protected',
+            static fn (Request $request, array $parameters): Response => Response::text('No'),
+            [static fn (Request $request, callable $next): Response => $next($request)],
+        );
     }
 
     public function testItDispatchesOneSegmentParametersAfterDecoding(): void
@@ -80,5 +149,39 @@ final class RouterTest extends TestCase
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('', $response->body());
+    }
+}
+
+
+final class RecordingMiddleware implements Middleware
+{
+    /** @var list<string> */
+    private array $events;
+
+    /**
+     * @param list<string> $events
+     */
+    public function __construct(
+        private readonly string $name,
+        array &$events,
+    ) {
+        $this->events =& $events;
+    }
+
+    public function process(Request $request, callable $next): Response
+    {
+        $this->events[] = $this->name . ':before';
+        $response = $next($request);
+        $this->events[] = $this->name . ':after';
+
+        return $response;
+    }
+}
+
+final class ShortCircuitMiddleware implements Middleware
+{
+    public function process(Request $request, callable $next): Response
+    {
+        return Response::text('Forbidden', 403);
     }
 }
