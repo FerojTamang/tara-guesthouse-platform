@@ -55,8 +55,11 @@ final class Bootstrap
 
         $session = Session::start($sessionConfiguration);
 
+        $viewRenderer = new ViewRenderer(
+            $resolvedBasePath . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
+        );
         $router = new Router();
-        self::loadRoutes($router);
+        self::loadRoutes($router, $viewRenderer);
 
         return new Application($router, $errorHandler, $session);
     }
@@ -85,7 +88,7 @@ final class Bootstrap
         }
     }
 
-    private static function loadRoutes(Router $router): void
+    private static function loadRoutes(Router $router, ViewRenderer $viewRenderer): void
     {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -100,7 +103,7 @@ final class Bootstrap
                 throw new ConfigurationException(sprintf('Route file %s must return a callable registrar.', $routeFile));
             }
 
-            $registrar($router);
+            $registrar($router, $viewRenderer);
         }
     }
 }

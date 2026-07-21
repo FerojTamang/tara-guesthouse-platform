@@ -65,6 +65,29 @@ final class Response
     }
 
     /**
+     * Creates a UTF-8 HTML response.
+     *
+     * @param array<string, string> $headers
+     */
+    public static function html(string $body, int $statusCode = 200, array $headers = []): self
+    {
+        $hasContentType = false;
+
+        foreach (array_keys($headers) as $name) {
+            if (strcasecmp($name, 'Content-Type') === 0) {
+                $hasContentType = true;
+                break;
+            }
+        }
+
+        if (!$hasContentType) {
+            $headers['Content-Type'] = 'text/html; charset=UTF-8';
+        }
+
+        return new self($body, $statusCode, $headers);
+    }
+
+    /**
      * Returns the response status code.
      */
     public function statusCode(): int
