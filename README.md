@@ -79,7 +79,21 @@ Copy-Item .env.example .env
 
 Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
 
-Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, and `composer test:feature`. The test harness is intentionally empty until real reviewed tests are introduced with application tickets.
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, and `composer test:feature`. S0-002 includes genuine unit, integration, and feature coverage for the bootstrap and HTTP core.
+
+The core HTTP bootstrap is executable. After configuring the required local environment values, start PHP's development server from the repository root:
+
+```bash
+php -S 127.0.0.1:8080 -t public public/index.php
+```
+
+Open `http://127.0.0.1:8080/` to verify the temporary infrastructure welcome response. It confirms only that the bootstrap is running; it is not the production homepage. The production Apache/cPanel document root must point to `public/` so application source, configuration, logs, and private files remain outside direct web access.
+
+Run the genuine core test suite with:
+
+```bash
+composer test
+```
 
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 
