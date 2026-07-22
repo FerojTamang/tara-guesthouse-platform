@@ -15,7 +15,7 @@ use Throwable;
 /**
  * Provides persistence access to the room-type catalogue.
  */
-final class RoomTypeRepository
+final class RoomTypeRepository implements RoomTypeCatalogRepository
 {
     use MapsRepositoryRows;
 

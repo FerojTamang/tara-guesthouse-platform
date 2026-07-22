@@ -15,7 +15,7 @@ use Throwable;
 /**
  * Provides persistence access to the amenity catalogue.
  */
-final class AmenityRepository
+final class AmenityRepository implements AmenityCatalogRepository
 {
     use MapsRepositoryRows;
 
