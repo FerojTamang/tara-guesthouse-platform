@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Requests;
 
 use App\Exceptions\RoomCatalogException;
+use App\Models\Room;
 
 /**
  * Validates and normalizes scalar room-catalogue form values.
@@ -82,27 +83,27 @@ final class RoomCatalogInput
         return $normalized;
     }
 
-    public static function money(mixed $value): string
+    public static function money(mixed $value, string $label = 'Base price'): string
     {
         if (is_int($value)) {
             $value = (string) $value;
         }
 
         if (!is_string($value)) {
-            throw RoomCatalogException::invalidInput('Base price is invalid.');
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
         }
 
         $normalized = trim($value);
 
         if (preg_match('/^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$/D', $normalized) !== 1) {
-            throw RoomCatalogException::invalidInput('Base price is invalid.');
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
         }
 
         [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
         $money = $whole . '.' . str_pad($fraction, 2, '0');
 
         if ($money === '0.00') {
-            throw RoomCatalogException::invalidInput('Base price must be greater than zero.');
+            throw RoomCatalogException::invalidInput($label . ' must be greater than zero.');
         }
 
         return $money;
@@ -160,6 +161,85 @@ final class RoomCatalogInput
         }
 
         throw RoomCatalogException::invalidInput($label . ' is invalid.');
+    }
+
+    public static function identifier(mixed $value, string $label): int
+    {
+        if (is_int($value)) {
+            $normalized = (string) $value;
+        } elseif (is_string($value)) {
+            $normalized = trim($value);
+        } else {
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
+        }
+
+        if (preg_match('/^[0-9]+$/D', $normalized) !== 1) {
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
+        }
+
+        $normalized = ltrim($normalized, '0');
+
+        if ($normalized === '') {
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
+        }
+
+        $maximum = (string) PHP_INT_MAX;
+
+        if (
+            strlen($normalized) > strlen($maximum)
+            || (strlen($normalized) === strlen($maximum) && strcmp($normalized, $maximum) > 0)
+        ) {
+            throw RoomCatalogException::invalidInput($label . ' is invalid.');
+        }
+
+        return (int) $normalized;
+    }
+
+    /** @return list<int> */
+    public static function identifierList(mixed $value, string $label): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (!is_array($value)) {
+            throw RoomCatalogException::invalidInput($label . ' selections are invalid.');
+        }
+
+        $identifiers = [];
+
+        foreach ($value as $item) {
+            $identifier = self::identifier($item, $label);
+
+            if (isset($identifiers[$identifier])) {
+                throw RoomCatalogException::invalidInput($label . ' selections are invalid.');
+            }
+
+            $identifiers[$identifier] = $identifier;
+        }
+
+        ksort($identifiers, SORT_NUMERIC);
+
+        return array_values($identifiers);
+    }
+
+    public static function operationalStatus(mixed $value): string
+    {
+        if (!is_string($value)) {
+            throw RoomCatalogException::invalidInput('Operational status is invalid.');
+        }
+
+        $normalized = trim($value);
+
+        if (!in_array($normalized, [
+            Room::STATUS_ACTIVE,
+            Room::STATUS_MAINTENANCE,
+            Room::STATUS_INACTIVE,
+        ], true)) {
+            throw RoomCatalogException::invalidInput('Operational status is invalid.');
+        }
+
+        return $normalized;
     }
 
     public static function optionalIcon(mixed $value): ?string
