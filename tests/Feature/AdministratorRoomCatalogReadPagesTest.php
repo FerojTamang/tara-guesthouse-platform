@@ -26,6 +26,7 @@ use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
 use App\Services\AmenityCatalogService;
+use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomTypeCatalogService;
 use DateTimeImmutable;
@@ -86,6 +87,7 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
                 fn (): AmenityCatalogService => new AmenityCatalogService($this->amenityRepository),
             ),
             $this->csrfTokens,
+            new RoomCatalogFlashMessages($this->session),
         );
         $router = new Router();
         $registrar = require dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'admin.php';

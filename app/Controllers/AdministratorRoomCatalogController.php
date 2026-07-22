@@ -10,6 +10,7 @@ use App\Core\Response;
 use App\Core\ViewRenderer;
 use App\Models\Amenity;
 use App\Models\RoomType;
+use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogServiceProvider;
 
 /**
@@ -21,6 +22,7 @@ final readonly class AdministratorRoomCatalogController
         private ViewRenderer $views,
         private RoomCatalogServiceProvider $services,
         private CsrfTokenManager $csrfTokens,
+        private RoomCatalogFlashMessages $flashMessages,
     ) {
     }
 
@@ -37,6 +39,7 @@ final readonly class AdministratorRoomCatalogController
             'pageTitle' => 'Room types',
             'activeNavigation' => 'room-types',
             'roomTypes' => $roomTypes,
+            'notice' => $this->flashMessages->pullRoomTypeSuccess(),
         ]);
     }
 

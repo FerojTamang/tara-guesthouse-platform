@@ -8,6 +8,7 @@ use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
+use App\Controllers\AdministratorRoomTypeController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
@@ -19,6 +20,7 @@ use App\Services\AdministratorAuthenticationService;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
+use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomTypeCatalogService;
 
@@ -115,17 +117,26 @@ final class Bootstrap
 
             return $catalogConnection;
         };
+        $catalogServices = new RoomCatalogServiceProvider(
+            static fn (): RoomTypeCatalogService => new RoomTypeCatalogService(
+                new RoomTypeRepository($catalogConnectionProvider()),
+            ),
+            static fn (): AmenityCatalogService => new AmenityCatalogService(
+                new AmenityRepository($catalogConnectionProvider()),
+            ),
+        );
+        $catalogFlashMessages = new RoomCatalogFlashMessages($session);
         $catalogController = new AdministratorRoomCatalogController(
             $viewRenderer,
-            new RoomCatalogServiceProvider(
-                static fn (): RoomTypeCatalogService => new RoomTypeCatalogService(
-                    new RoomTypeRepository($catalogConnectionProvider()),
-                ),
-                static fn (): AmenityCatalogService => new AmenityCatalogService(
-                    new AmenityRepository($catalogConnectionProvider()),
-                ),
-            ),
+            $catalogServices,
             $csrfTokens,
+            $catalogFlashMessages,
+        );
+        $roomTypeController = new AdministratorRoomTypeController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
         );
         $router = new Router();
         self::loadRoutes(
@@ -136,6 +147,7 @@ final class Bootstrap
             new RequireAdministratorMiddleware($administratorSession),
             new CsrfMiddleware($csrfTokens),
             $catalogController,
+            $roomTypeController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -173,6 +185,7 @@ final class Bootstrap
         RequireAdministratorMiddleware $requireAdministrator,
         CsrfMiddleware $csrf,
         AdministratorRoomCatalogController $catalogController,
+        AdministratorRoomTypeController $roomTypeController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -195,6 +208,7 @@ final class Bootstrap
                 $requireAdministrator,
                 $csrf,
                 $catalogController,
+                $roomTypeController,
             );
         }
     }

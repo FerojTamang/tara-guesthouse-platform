@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
+use App\Controllers\AdministratorRoomTypeController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
@@ -18,13 +19,14 @@ return static function (
     ?RequireAdministratorMiddleware $requireAdministrator = null,
     ?CsrfMiddleware $csrf = null,
     ?AdministratorRoomCatalogController $catalogController = null,
+    ?AdministratorRoomTypeController $roomTypeController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
         static fn (object|null $dependency): bool => $dependency !== null,
     ));
 
-    if ($dependencyCount === 0 && $catalogController === null) {
+    if ($dependencyCount === 0 && $catalogController === null && $roomTypeController === null) {
         return;
     }
 
@@ -66,5 +68,40 @@ return static function (
         '/admin/amenities',
         [$catalogController, 'amenities'],
         [$requireAdministrator],
+    );
+
+    if ($roomTypeController === null) {
+        return;
+    }
+
+    $router->get(
+        '/admin/room-types/create',
+        [$roomTypeController, 'createForm'],
+        [$requireAdministrator],
+    );
+    $router->post(
+        '/admin/room-types',
+        [$roomTypeController, 'create'],
+        [$requireAdministrator, $csrf],
+    );
+    $router->get(
+        '/admin/room-types/{id}/edit',
+        [$roomTypeController, 'editForm'],
+        [$requireAdministrator],
+    );
+    $router->post(
+        '/admin/room-types/{id}',
+        [$roomTypeController, 'update'],
+        [$requireAdministrator, $csrf],
+    );
+    $router->post(
+        '/admin/room-types/{id}/activate',
+        [$roomTypeController, 'activate'],
+        [$requireAdministrator, $csrf],
+    );
+    $router->post(
+        '/admin/room-types/{id}/deactivate',
+        [$roomTypeController, 'deactivate'],
+        [$requireAdministrator, $csrf],
     );
 };
