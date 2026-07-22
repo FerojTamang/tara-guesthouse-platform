@@ -23,6 +23,7 @@ final class Request
         private readonly array $headers,
         private readonly array $input,
         private readonly string $body,
+        private readonly ?string $remoteAddress,
     ) {
     }
 
@@ -54,7 +55,17 @@ final class Request
             $body = '';
         }
 
-        return self::create($method, $uri, $_GET, $headers, $_POST, $body);
+        $remoteAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        return self::create(
+            $method,
+            $uri,
+            $_GET,
+            $headers,
+            $_POST,
+            $body,
+            is_string($remoteAddress) ? $remoteAddress : null,
+        );
     }
 
     /**
@@ -71,6 +82,7 @@ final class Request
         array $headers = [],
         array $input = [],
         string $body = '',
+        ?string $remoteAddress = null,
     ): self {
         $normalizedMethod = strtoupper(trim($method));
 
@@ -100,7 +112,19 @@ final class Request
             }
         }
 
-        return new self($normalizedMethod, $path, $query, $normalizedHeaders, $input, $body);
+        if ($remoteAddress !== null && filter_var($remoteAddress, FILTER_VALIDATE_IP) === false) {
+            throw new InvalidArgumentException('Remote address is invalid.');
+        }
+
+        return new self(
+            $normalizedMethod,
+            $path,
+            $query,
+            $normalizedHeaders,
+            $input,
+            $body,
+            $remoteAddress,
+        );
     }
 
     /**
@@ -149,6 +173,14 @@ final class Request
     public function body(): string
     {
         return $this->body;
+    }
+
+    /**
+     * Returns the direct peer IP supplied by REMOTE_ADDR, when available.
+     */
+    public function remoteAddress(): ?string
+    {
+        return $this->remoteAddress;
     }
 
     /**

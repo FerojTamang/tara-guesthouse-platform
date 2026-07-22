@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Authentication\AdministratorSession;
+use App\Authentication\LoginRateLimiter;
+use App\Controllers\AdministratorAuthenticationController;
 use App\Exceptions\ConfigurationException;
+use App\Middleware\CsrfMiddleware;
+use App\Middleware\GuestOnlyMiddleware;
+use App\Middleware\RequireAdministratorMiddleware;
+use App\Repositories\UserRepository;
+use App\Services\AdministratorAuthenticationService;
+use App\Services\AdministratorLogoutService;
+use App\Services\LazyAdministratorAuthenticator;
 
 /**
  * Builds the approved core application runtime.
@@ -58,8 +68,50 @@ final class Bootstrap
         $viewRenderer = new ViewRenderer(
             $resolvedBasePath . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
         );
+        $csrfTokens = new CsrfTokenManager($session);
+        $administratorSession = new AdministratorSession($session, $csrfTokens);
+        $databaseConfiguration = $config->require('database');
+        $loginPolicy = $config->require('security.administrator_login');
+
+        if (!is_array($databaseConfiguration) || !is_array($loginPolicy)) {
+            throw new ConfigurationException('Administrator authentication configuration is invalid.');
+        }
+
+        $connectionFactory = new ConnectionFactory($databaseConfiguration);
+        $authenticator = new LazyAdministratorAuthenticator(
+            static fn (): AdministratorAuthenticationService => new AdministratorAuthenticationService(
+                new UserRepository($connectionFactory->create()),
+                new LoginRateLimiter(
+                    STORAGE_PATH
+                        . DIRECTORY_SEPARATOR
+                        . 'cache'
+                        . DIRECTORY_SEPARATOR
+                        . 'login-rate-limits'
+                        . DIRECTORY_SEPARATOR
+                        . 'administrator',
+                    $loginPolicy,
+                ),
+                $logger,
+            ),
+        );
+        $controller = new AdministratorAuthenticationController(
+            $viewRenderer,
+            $authenticator,
+            new AdministratorLogoutService($administratorSession, $logger),
+            $administratorSession,
+            $csrfTokens,
+            $logger,
+            $loginPolicy,
+        );
         $router = new Router();
-        self::loadRoutes($router, $viewRenderer);
+        self::loadRoutes(
+            $router,
+            $viewRenderer,
+            $controller,
+            new GuestOnlyMiddleware($administratorSession),
+            new RequireAdministratorMiddleware($administratorSession),
+            new CsrfMiddleware($csrfTokens),
+        );
 
         return new Application($router, $errorHandler, $session);
     }
@@ -88,8 +140,14 @@ final class Bootstrap
         }
     }
 
-    private static function loadRoutes(Router $router, ViewRenderer $viewRenderer): void
-    {
+    private static function loadRoutes(
+        Router $router,
+        ViewRenderer $viewRenderer,
+        AdministratorAuthenticationController $controller,
+        GuestOnlyMiddleware $guestOnly,
+        RequireAdministratorMiddleware $requireAdministrator,
+        CsrfMiddleware $csrf,
+    ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
 
@@ -103,7 +161,14 @@ final class Bootstrap
                 throw new ConfigurationException(sprintf('Route file %s must return a callable registrar.', $routeFile));
             }
 
-            $registrar($router, $viewRenderer);
+            $registrar(
+                $router,
+                $viewRenderer,
+                $controller,
+                $guestOnly,
+                $requireAdministrator,
+                $csrf,
+            );
         }
     }
 }

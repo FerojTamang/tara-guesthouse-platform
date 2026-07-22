@@ -15,4 +15,13 @@ return [
         'password_min_characters' => 15,
         'password_max_bytes' => 72,
     ],
+    'administrator_login' => [
+        'username_min_characters' => 3,
+        'username_max_characters' => 50,
+        'identifier_max_bytes' => 150,
+        'password_max_bytes' => 72,
+        'max_failed_attempts' => 5,
+        'attempt_window_seconds' => 900,
+        'block_duration_seconds' => 900,
+    ],
 ];

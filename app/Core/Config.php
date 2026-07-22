@@ -149,11 +149,18 @@ final class Config
      */
     private static function validateSecurity(array $configuration): array
     {
-        if (array_keys($configuration) !== ['administrator_bootstrap']) {
+        if (array_keys($configuration) !== ['administrator_bootstrap', 'administrator_login']) {
             throw new ConfigurationException('Security configuration is invalid.');
         }
 
-        $policy = $configuration['administrator_bootstrap'];
+        self::validateAdministratorBootstrapPolicy($configuration['administrator_bootstrap']);
+        self::validateAdministratorLoginPolicy($configuration['administrator_login']);
+
+        return $configuration;
+    }
+
+    private static function validateAdministratorBootstrapPolicy(mixed $policy): void
+    {
         $requiredKeys = [
             'allowed_environments',
             'force_required_environments',
@@ -195,9 +202,7 @@ final class Config
             throw new ConfigurationException('Security configuration is invalid.');
         }
 
-        $numericKeys = array_slice($requiredKeys, 2);
-
-        foreach ($numericKeys as $key) {
+        foreach (array_slice($requiredKeys, 2) as $key) {
             if (!is_int($policy[$key]) || $policy[$key] <= 0) {
                 throw new ConfigurationException('Security configuration is invalid.');
             }
@@ -214,7 +219,41 @@ final class Config
         ) {
             throw new ConfigurationException('Security configuration is invalid.');
         }
-
-        return $configuration;
     }
+
+    private static function validateAdministratorLoginPolicy(mixed $policy): void
+    {
+        $requiredKeys = [
+            'username_min_characters',
+            'username_max_characters',
+            'identifier_max_bytes',
+            'password_max_bytes',
+            'max_failed_attempts',
+            'attempt_window_seconds',
+            'block_duration_seconds',
+        ];
+
+        if (!is_array($policy) || array_keys($policy) !== $requiredKeys) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        foreach ($requiredKeys as $key) {
+            if (!is_int($policy[$key]) || $policy[$key] <= 0) {
+                throw new ConfigurationException('Security configuration is invalid.');
+            }
+        }
+
+        if (
+            $policy['username_min_characters'] > $policy['username_max_characters']
+            || $policy['username_max_characters'] > 50
+            || $policy['identifier_max_bytes'] > 150
+            || $policy['password_max_bytes'] > 72
+            || $policy['max_failed_attempts'] > 20
+            || $policy['attempt_window_seconds'] > 86400
+            || $policy['block_duration_seconds'] > 86400
+        ) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+    }
+
 }

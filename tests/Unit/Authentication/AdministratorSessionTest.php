@@ -105,6 +105,20 @@ final class AdministratorSessionTest extends TestCase
         self::assertSame(20, $this->administratorSession->identity()?->userId());
     }
 
+
+    public function testTerminateDestroysTheAuthenticatedSession(): void
+    {
+        $this->administratorSession->establish(new AdministratorIdentity(31));
+        $authenticatedId = session_id();
+
+        $identity = $this->administratorSession->terminate();
+
+        self::assertSame(31, $identity?->userId());
+        self::assertSame(PHP_SESSION_NONE, session_status());
+        self::assertSame([], $_SESSION);
+        self::assertNotSame('', $authenticatedId);
+    }
+
     public function testMalformedIdentityIsRemovedAndTheAnonymousSessionIsHardened(): void
     {
         $originalId = session_id();
