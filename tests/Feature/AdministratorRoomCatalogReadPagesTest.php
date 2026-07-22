@@ -16,20 +16,25 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Core\ViewRenderer;
 use App\Models\Amenity;
+use App\Models\Room;
 use App\Models\RoomType;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityCatalogRepository;
+use App\Repositories\RoomCatalogRepository;
 use App\Repositories\RoomTypeCatalogRepository;
 use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
 use App\Services\AmenityCatalogService;
 use App\Services\RoomCatalogFlashMessages;
+use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
+use App\Services\RoomCatalogTransaction;
 use App\Services\RoomTypeCatalogService;
 use DateTimeImmutable;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -53,6 +58,8 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
 
     private AmenityCatalogRepository $amenityRepository;
 
+    private RoomCatalogRepository $roomRepository;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -67,6 +74,8 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
         $this->administratorSession = new AdministratorSession($this->session, $this->csrfTokens);
         $this->roomTypeRepository = $this->createStub(RoomTypeCatalogRepository::class);
         $this->amenityRepository = $this->createStub(AmenityCatalogRepository::class);
+        $this->roomRepository = $this->createStub(RoomCatalogRepository::class);
+        $roomTransaction = $this->createStub(RoomCatalogTransaction::class);
         $logger = new NullLogger();
         $renderer = new ViewRenderer(
             dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
@@ -85,6 +94,12 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
             new RoomCatalogServiceProvider(
                 fn (): RoomTypeCatalogService => new RoomTypeCatalogService($this->roomTypeRepository),
                 fn (): AmenityCatalogService => new AmenityCatalogService($this->amenityRepository),
+                fn (): RoomCatalogService => new RoomCatalogService(
+                    $this->roomRepository,
+                    $this->roomTypeRepository,
+                    $this->amenityRepository,
+                    $roomTransaction,
+                ),
             ),
             $this->csrfTokens,
             new RoomCatalogFlashMessages($this->session),
@@ -126,12 +141,107 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
         parent::tearDown();
     }
 
-    public function testGuestCannotOpenRoomCataloguePages(): void
+    #[DataProvider('guestCataloguePaths')]
+    public function testGuestCannotOpenRoomCataloguePages(string $path): void
     {
-        $response = $this->application->handle(Request::create('GET', '/admin/room-types'));
+        $response = $this->application->handle(Request::create('GET', $path));
 
         self::assertSame(302, $response->statusCode());
         self::assertSame('/admin/login', $response->headers()['Location']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function guestCataloguePaths(): iterable
+    {
+        yield 'rooms' => ['/admin/rooms'];
+        yield 'room types' => ['/admin/room-types'];
+        yield 'amenities' => ['/admin/amenities'];
+    }
+
+    public function testRoomsPageRendersEscapedOperationalAndPublicationData(): void
+    {
+        $timestamp = new DateTimeImmutable('2026-07-22 10:11:12 UTC');
+        $deluxe = new RoomType(
+            1,
+            '<b>Deluxe</b>',
+            'deluxe',
+            null,
+            '6500.00',
+            2,
+            1,
+            true,
+            $timestamp,
+            $timestamp,
+        );
+        $standard = new RoomType(
+            2,
+            'Standard',
+            'standard',
+            null,
+            '3500.00',
+            1,
+            0,
+            true,
+            $timestamp,
+            $timestamp,
+        );
+        $this->roomRepository->method('findAll')->willReturn([
+            new Room(
+                11,
+                $deluxe,
+                'A-101',
+                '<script>Himalayan Suite</script>',
+                'himalayan-suite',
+                null,
+                '7000.50',
+                2,
+                1,
+                Room::STATUS_MAINTENANCE,
+                true,
+                $timestamp,
+                $timestamp,
+                null,
+            ),
+            new Room(
+                12,
+                $standard,
+                'B-201',
+                'Standard Room',
+                'standard-room',
+                null,
+                '3800.00',
+                1,
+                0,
+                Room::STATUS_ACTIVE,
+                false,
+                $timestamp,
+                $timestamp,
+                null,
+            ),
+        ]);
+        $this->administratorSession->establish(new AdministratorIdentity(91));
+
+        $response = $this->application->handle(Request::create('GET', '/admin/rooms'));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertStringContainsString('<title>Rooms | Tara Guest House</title>', $response->body());
+        self::assertStringContainsString('href="/admin/rooms"', $response->body());
+        self::assertStringContainsString('aria-current="page"', $response->body());
+        self::assertSame(1, substr_count($response->body(), 'aria-current="page"'));
+        self::assertStringContainsString('&lt;script&gt;Himalayan Suite&lt;/script&gt;', $response->body());
+        self::assertStringNotContainsString('<script>Himalayan Suite</script>', $response->body());
+        self::assertStringContainsString('&lt;b&gt;Deluxe&lt;/b&gt;', $response->body());
+        self::assertStringNotContainsString('<b>Deluxe</b>', $response->body());
+        self::assertStringContainsString('NPR 7000.50', $response->body());
+        self::assertStringContainsString('2 adults,', $response->body());
+        self::assertStringContainsString('1 child', $response->body());
+        self::assertStringContainsString('Maintenance', $response->body());
+        self::assertStringContainsString('Published', $response->body());
+        self::assertStringContainsString('Unpublished', $response->body());
+        self::assertStringNotContainsString('href="/admin/rooms/create"', $response->body());
+        self::assertStringNotContainsString('/edit', $response->body());
+        self::assertStringNotContainsString('/delete', $response->body());
     }
 
     public function testRoomTypesPageRendersEscapedDeterministicCatalogueData(): void

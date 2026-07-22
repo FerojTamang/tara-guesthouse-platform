@@ -67,6 +67,11 @@ return static function (
     }
 
     $router->get(
+        '/admin/rooms',
+        [$catalogController, 'rooms'],
+        [$requireAdministrator],
+    );
+    $router->get(
         '/admin/room-types',
         [$catalogController, 'roomTypes'],
         [$requireAdministrator],

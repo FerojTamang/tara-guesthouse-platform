@@ -9,6 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\ViewRenderer;
 use App\Models\Amenity;
+use App\Models\Room;
 use App\Models\RoomType;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogServiceProvider;
@@ -24,6 +25,22 @@ final readonly class AdministratorRoomCatalogController
         private CsrfTokenManager $csrfTokens,
         private RoomCatalogFlashMessages $flashMessages,
     ) {
+    }
+
+    /** @param array<string, string> $parameters */
+    public function rooms(Request $request, array $parameters): Response
+    {
+        $rooms = array_map(
+            $this->roomData(...),
+            $this->services->rooms()->listAll(),
+        );
+
+        return $this->page('admin.rooms.index', [
+            'title' => 'Rooms | Tara Guest House',
+            'pageTitle' => 'Rooms',
+            'activeNavigation' => 'rooms',
+            'rooms' => $rooms,
+        ]);
     }
 
     /** @param array<string, string> $parameters */
@@ -72,6 +89,44 @@ final readonly class AdministratorRoomCatalogController
         );
 
         return Response::html($html, 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * @return array{
+     *     id: int,
+     *     roomNumber: string,
+     *     name: string,
+     *     slug: string,
+     *     roomTypeName: string,
+     *     pricePerNight: string,
+     *     capacityAdults: int,
+     *     capacityChildren: int,
+     *     operationalStatusLabel: string,
+     *     operationalStatusBadge: string,
+     *     published: bool
+     * }
+     */
+    private function roomData(Room $room): array
+    {
+        [$statusLabel, $statusBadge] = match ($room->operationalStatus()) {
+            Room::STATUS_ACTIVE => ['Active', 'text-bg-success'],
+            Room::STATUS_MAINTENANCE => ['Maintenance', 'text-bg-warning'],
+            Room::STATUS_INACTIVE => ['Inactive', 'text-bg-secondary'],
+        };
+
+        return [
+            'id' => $room->id(),
+            'roomNumber' => $room->roomNumber(),
+            'name' => $room->name(),
+            'slug' => $room->slug(),
+            'roomTypeName' => $room->roomType()->name(),
+            'pricePerNight' => $room->pricePerNight(),
+            'capacityAdults' => $room->capacityAdults(),
+            'capacityChildren' => $room->capacityChildren(),
+            'operationalStatusLabel' => $statusLabel,
+            'operationalStatusBadge' => $statusBadge,
+            'published' => $room->isPublished(),
+        ];
     }
 
     /**

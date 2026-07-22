@@ -19,18 +19,28 @@ final class RoomCatalogServiceProvider
     /** @var Closure(): mixed */
     private readonly Closure $amenityFactory;
 
+    /** @var null|Closure(): mixed */
+    private readonly ?Closure $roomFactory;
+
     private ?RoomTypeCatalogService $roomTypes = null;
 
     private ?AmenityCatalogService $amenities = null;
 
+    private ?RoomCatalogService $rooms = null;
+
     /**
      * @param callable(): mixed $roomTypeFactory
      * @param callable(): mixed $amenityFactory
+     * @param null|callable(): mixed $roomFactory
      */
-    public function __construct(callable $roomTypeFactory, callable $amenityFactory)
-    {
+    public function __construct(
+        callable $roomTypeFactory,
+        callable $amenityFactory,
+        ?callable $roomFactory = null,
+    ) {
         $this->roomTypeFactory = Closure::fromCallable($roomTypeFactory);
         $this->amenityFactory = Closure::fromCallable($amenityFactory);
+        $this->roomFactory = $roomFactory === null ? null : Closure::fromCallable($roomFactory);
     }
 
     public function roomTypes(): RoomTypeCatalogService
@@ -65,6 +75,27 @@ final class RoomCatalogServiceProvider
         $this->amenities = $service;
 
         return $this->amenities;
+    }
+
+    public function rooms(): RoomCatalogService
+    {
+        if ($this->rooms !== null) {
+            return $this->rooms;
+        }
+
+        if ($this->roomFactory === null) {
+            throw RoomCatalogException::failure();
+        }
+
+        $service = $this->build($this->roomFactory);
+
+        if (!$service instanceof RoomCatalogService) {
+            throw RoomCatalogException::failure();
+        }
+
+        $this->rooms = $service;
+
+        return $this->rooms;
     }
 
     /** @param Closure(): mixed $factory */

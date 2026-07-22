@@ -15,13 +15,16 @@ use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
+use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
+use App\Services\PdoRoomCatalogTransaction;
 use App\Services\RoomCatalogFlashMessages;
+use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomTypeCatalogService;
 
@@ -124,6 +127,12 @@ final class Bootstrap
             ),
             static fn (): AmenityCatalogService => new AmenityCatalogService(
                 new AmenityRepository($catalogConnectionProvider()),
+            ),
+            static fn (): RoomCatalogService => new RoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()),
+                new RoomTypeRepository($catalogConnectionProvider()),
+                new AmenityRepository($catalogConnectionProvider()),
+                new PdoRoomCatalogTransaction($catalogConnectionProvider()),
             ),
         );
         $catalogFlashMessages = new RoomCatalogFlashMessages($session);
