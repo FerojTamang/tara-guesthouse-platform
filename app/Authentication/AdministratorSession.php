@@ -55,6 +55,17 @@ final class AdministratorSession
         $this->session->set(self::IDENTITY_KEY, $identity->toSessionData());
     }
 
+    /**
+     * Destroys the complete authenticated session and returns its prior identity.
+     */
+    public function terminate(): ?AdministratorIdentity
+    {
+        $identity = $this->identity();
+        $this->session->destroy();
+
+        return $identity;
+    }
+
     private function discardMalformedIdentity(): void
     {
         $this->session->remove(self::IDENTITY_KEY);

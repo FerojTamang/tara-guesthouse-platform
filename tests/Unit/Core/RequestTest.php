@@ -43,6 +43,22 @@ final class RequestTest extends TestCase
         self::assertSame('{"guest_name":"Maya"}', $request->body());
     }
 
+
+    public function testItStoresOnlyAValidatedDirectRemoteAddress(): void
+    {
+        $request = Request::create('POST', '/admin/login', remoteAddress: '2001:db8::10');
+
+        self::assertSame('2001:db8::10', $request->remoteAddress());
+        self::assertNull(Request::create('GET', '/')->remoteAddress());
+    }
+
+    public function testItRejectsAnInvalidRemoteAddress(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Request::create('POST', '/admin/login', remoteAddress: 'not-an-ip');
+    }
+
     public function testItRejectsEncodedNullBytes(): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -19,6 +19,11 @@ final class RequireAdministratorMiddleware implements Middleware
     ) {
     }
 
+    public function forJson(): self
+    {
+        return new self($this->administratorSession, true);
+    }
+
     public function process(Request $request, callable $next): Response
     {
         if ($this->administratorSession->isAuthenticated()) {

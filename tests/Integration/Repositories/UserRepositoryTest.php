@@ -6,6 +6,7 @@ namespace Tests\Integration\Repositories;
 
 use App\Core\MigrationRunner;
 use App\Core\SeederRunner;
+use App\Exceptions\DatabaseException;
 use App\Models\Role;
 use App\Models\User;
 use App\Repositories\UserRepository;
@@ -170,6 +171,85 @@ final class UserRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repository->findAdministratorByEmail("x' UNION SELECT password FROM users --"));
 
         self::assertSame($before, $this->databaseSnapshot());
+    }
+
+    public function testItRecordsASuccessfulAdministratorLoginWithoutChangingTheHash(): void
+    {
+        $loggedInAt = new DateTimeImmutable('2026-07-28 10:11:12 UTC');
+
+        $this->repository->recordSuccessfulLogin(
+            $this->userIds['active'],
+            'test-only-password-hash-sentinel',
+            null,
+            $loggedInAt,
+        );
+
+        $row = $this->connection->query(
+            'SELECT password, last_login_at FROM users WHERE id = ' . $this->userIds['active'],
+        )->fetch();
+
+        self::assertIsArray($row);
+        self::assertSame('test-only-password-hash-sentinel', $row['password']);
+        self::assertSame('2026-07-28 10:11:12', $row['last_login_at']);
+        self::assertFalse($this->connection->inTransaction());
+    }
+
+    public function testItAtomicallyReplacesTheHashAndRecordsTheLoginTime(): void
+    {
+        $replacementHash = password_hash('runtime-test-replacement', PASSWORD_DEFAULT);
+        self::assertIsString($replacementHash);
+
+        $this->repository->recordSuccessfulLogin(
+            $this->userIds['active'],
+            'test-only-password-hash-sentinel',
+            $replacementHash,
+            new DateTimeImmutable('2026-07-28 11:12:13 UTC'),
+        );
+
+        $row = $this->connection->query(
+            'SELECT password, last_login_at FROM users WHERE id = ' . $this->userIds['active'],
+        )->fetch();
+
+        self::assertIsArray($row);
+        self::assertSame($replacementHash, $row['password']);
+        self::assertSame('2026-07-28 11:12:13', $row['last_login_at']);
+        self::assertFalse($this->connection->inTransaction());
+    }
+
+    public function testItRejectsStaleOrIneligibleLoginStateWithoutPartialMutation(): void
+    {
+        $cases = [
+            'stale hash' => [$this->userIds['active'], 'wrong-expected-hash'],
+            'inactive' => [$this->userIds['inactive'], 'test-only-password-hash-sentinel'],
+            'locked' => [$this->userIds['locked'], 'test-only-password-hash-sentinel'],
+            'deleted' => [$this->userIds['deleted'], 'test-only-password-hash-sentinel'],
+            'other role' => [$this->userIds['other_role'], 'test-only-password-hash-sentinel'],
+        ];
+
+        foreach ($cases as $case => [$userId, $expectedHash]) {
+            $before = $this->connection->query(
+                'SELECT password, last_login_at FROM users WHERE id = ' . $userId,
+            )->fetch();
+
+            try {
+                $this->repository->recordSuccessfulLogin(
+                    $userId,
+                    $expectedHash,
+                    password_hash('runtime-rejected-rehash-' . $case, PASSWORD_DEFAULT),
+                    new DateTimeImmutable('2026-07-28 12:13:14 UTC'),
+                );
+                self::fail('Expected login update rejection for ' . $case);
+            } catch (DatabaseException $exception) {
+                self::assertSame('The Administrator login update failed.', $exception->getMessage());
+                self::assertSame(
+                    $before,
+                    $this->connection->query(
+                        'SELECT password, last_login_at FROM users WHERE id = ' . $userId,
+                    )->fetch(),
+                );
+                self::assertFalse($this->connection->inTransaction());
+            }
+        }
     }
 
     private function insertRole(string $name): int

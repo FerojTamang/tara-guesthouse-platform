@@ -22,6 +22,11 @@ final class CsrfMiddleware implements Middleware
     ) {
     }
 
+    public function forJson(): self
+    {
+        return new self($this->tokens, true);
+    }
+
     public function process(Request $request, callable $next): Response
     {
         if (!in_array($request->method(), self::PROTECTED_METHODS, true)) {

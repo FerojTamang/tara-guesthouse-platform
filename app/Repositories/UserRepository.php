@@ -14,9 +14,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Provides read-only persistence access to Version 1 Administrator accounts.
+ * Provides narrowly scoped persistence access to Version 1 Administrator accounts.
  */
-final class UserRepository
+final class UserRepository implements AdministratorAuthenticationRepository
 {
     private const SELECT_COLUMNS = <<<'SQL'
         SELECT
@@ -92,6 +92,113 @@ final class UserRepository
             $email,
             PDO::PARAM_STR,
         );
+    }
+
+    /**
+     * Atomically records one successful active-Administrator login.
+     */
+    public function recordSuccessfulLogin(
+        int $userId,
+        #[\SensitiveParameter] string $expectedPasswordHash,
+        #[\SensitiveParameter] ?string $replacementPasswordHash,
+        DateTimeImmutable $loggedInAt,
+    ): void {
+        if (
+            $userId <= 0
+            || $expectedPasswordHash === ''
+            || (
+                $replacementPasswordHash !== null
+                && (
+                    $replacementPasswordHash === ''
+                    || (password_get_info($replacementPasswordHash)['algoName'] ?? 'unknown') === 'unknown'
+                )
+            )
+            || $loggedInAt->getOffset() !== 0
+            || $this->connection->inTransaction()
+        ) {
+            throw new DatabaseException('The Administrator login update failed.');
+        }
+
+        try {
+            if (!$this->connection->beginTransaction()) {
+                throw new RuntimeException('The Administrator login transaction could not start.');
+            }
+
+            $statement = $this->connection->prepare(
+                'SELECT u.password AS password_hash, u.account_status, u.deleted_at, r.role_name '
+                . 'FROM users u INNER JOIN roles r ON r.id = u.role_id '
+                . 'WHERE u.id = :user_id LIMIT 1 FOR UPDATE',
+            );
+            $statement->bindValue('user_id', $userId, PDO::PARAM_INT);
+            $statement->execute();
+            $row = $statement->fetch();
+
+            if (
+                !is_array($row)
+                || !array_key_exists('password_hash', $row)
+                || !array_key_exists('account_status', $row)
+                || !array_key_exists('deleted_at', $row)
+                || !array_key_exists('role_name', $row)
+                || !is_string($row['password_hash'])
+                || !is_string($row['account_status'])
+                || $row['deleted_at'] !== null
+                || !is_string($row['role_name'])
+                || $row['role_name'] !== Role::ADMINISTRATOR
+                || $row['account_status'] !== User::STATUS_ACTIVE
+                || !hash_equals($row['password_hash'], $expectedPasswordHash)
+            ) {
+                throw new RuntimeException('The Administrator login state changed.');
+            }
+
+            $sql = 'UPDATE users SET last_login_at = :last_login_at';
+
+            if ($replacementPasswordHash !== null) {
+                $sql .= ', password = :replacement_password_hash';
+            }
+
+            $sql .= ' WHERE id = :user_id';
+            $update = $this->connection->prepare($sql);
+            $update->bindValue('last_login_at', $loggedInAt->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+            $update->bindValue('user_id', $userId, PDO::PARAM_INT);
+
+            if ($replacementPasswordHash !== null) {
+                $update->bindValue('replacement_password_hash', $replacementPasswordHash, PDO::PARAM_STR);
+            }
+
+            $update->execute();
+
+            if ($update->rowCount() > 1) {
+                throw new RuntimeException('The Administrator login update affected an invalid row count.');
+            }
+
+            $verification = $this->connection->prepare(
+                'SELECT password, last_login_at FROM users WHERE id = :user_id LIMIT 1',
+            );
+            $verification->bindValue('user_id', $userId, PDO::PARAM_INT);
+            $verification->execute();
+            $verified = $verification->fetch();
+            $expectedStoredHash = $replacementPasswordHash ?? $expectedPasswordHash;
+
+            if (
+                !is_array($verified)
+                || !is_string($verified['password'] ?? null)
+                || !is_string($verified['last_login_at'] ?? null)
+                || !hash_equals($expectedStoredHash, $verified['password'])
+                || $verified['last_login_at'] !== $loggedInAt->format('Y-m-d H:i:s')
+            ) {
+                throw new RuntimeException('The Administrator login update could not be verified.');
+            }
+
+            if (!$this->connection->commit()) {
+                throw new RuntimeException('The Administrator login transaction could not commit.');
+            }
+        } catch (Throwable) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+
+            throw new DatabaseException('The Administrator login update failed.');
+        }
     }
 
     private function lookup(string $sql, int|string $value, int $type): ?User
