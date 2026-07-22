@@ -244,9 +244,20 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertStringContainsString('<title>Dashboard | Tara Guest House</title>', $response->body());
+        self::assertStringContainsString('class="admin-shell"', $response->body());
+        self::assertStringContainsString('aria-label="Administrator navigation"', $response->body());
+        self::assertStringContainsString('href="/admin/dashboard"', $response->body());
+        self::assertStringContainsString('aria-current="page"', $response->body());
         self::assertStringContainsString('Administrator dashboard', $response->body());
         self::assertStringContainsString('method="post" action="/admin/logout"', $response->body());
         self::assertStringContainsString('value="' . $token . '"', $response->body());
+        self::assertStringContainsString('/assets/css/admin.css', $response->body());
+        self::assertStringContainsString('bootstrap@5.3.8/dist/css/bootstrap.min.css', $response->body());
+        self::assertStringContainsString('bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js', $response->body());
+        self::assertStringContainsString('integrity="sha384-', $response->body());
+        self::assertStringNotContainsString('Room occupancy', $response->body());
+        self::assertSame(1, substr_count($response->body(), 'action="/admin/logout"'));
     }
 
     public function testLogoutRequiresPostAndValidCsrfThenDestroysTheSession(): void

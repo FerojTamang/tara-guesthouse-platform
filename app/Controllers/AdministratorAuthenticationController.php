@@ -219,10 +219,12 @@ final class AdministratorAuthenticationController
         $html = $this->views->render(
             'admin.dashboard',
             [
-                'title' => 'Administrator Dashboard',
+                'title' => 'Dashboard | Tara Guest House',
+                'pageTitle' => 'Dashboard',
+                'activeNavigation' => 'dashboard',
                 'csrfToken' => $this->csrfTokens->token(),
             ],
-            'layouts.base',
+            'layouts.admin',
         );
 
         return Response::html($html, 200, ['Cache-Control' => 'no-store']);
