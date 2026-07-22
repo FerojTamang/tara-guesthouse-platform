@@ -6,6 +6,7 @@ namespace App\Core;
 
 use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
+use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomTypeController;
@@ -138,6 +139,12 @@ final class Bootstrap
             $csrfTokens,
             $catalogFlashMessages,
         );
+        $amenityController = new AdministratorAmenityController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -148,6 +155,7 @@ final class Bootstrap
             new CsrfMiddleware($csrfTokens),
             $catalogController,
             $roomTypeController,
+            $amenityController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -186,6 +194,7 @@ final class Bootstrap
         CsrfMiddleware $csrf,
         AdministratorRoomCatalogController $catalogController,
         AdministratorRoomTypeController $roomTypeController,
+        AdministratorAmenityController $amenityController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -209,6 +218,7 @@ final class Bootstrap
                 $csrf,
                 $catalogController,
                 $roomTypeController,
+                $amenityController,
             );
         }
     }

@@ -13,6 +13,8 @@ final readonly class RoomCatalogFlashMessages
 {
     private const ROOM_TYPE_SUCCESS_KEY = 'administrator_room_type_success';
 
+    private const AMENITY_SUCCESS_KEY = 'administrator_amenity_success';
+
     public function __construct(private Session $session)
     {
     }
@@ -24,7 +26,22 @@ final readonly class RoomCatalogFlashMessages
 
     public function pullRoomTypeSuccess(): ?string
     {
-        $message = $this->session->pull(self::ROOM_TYPE_SUCCESS_KEY);
+        return $this->pull(self::ROOM_TYPE_SUCCESS_KEY);
+    }
+
+    public function amenitySuccess(string $message): void
+    {
+        $this->session->set(self::AMENITY_SUCCESS_KEY, $message);
+    }
+
+    public function pullAmenitySuccess(): ?string
+    {
+        return $this->pull(self::AMENITY_SUCCESS_KEY);
+    }
+
+    private function pull(string $key): ?string
+    {
+        $message = $this->session->pull($key);
 
         return is_string($message) ? $message : null;
     }

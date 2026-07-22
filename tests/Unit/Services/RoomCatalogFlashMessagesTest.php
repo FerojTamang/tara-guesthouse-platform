@@ -65,6 +65,19 @@ final class RoomCatalogFlashMessagesTest extends TestCase
         self::assertNull($messages->pullRoomTypeSuccess());
     }
 
+
+    public function testAmenitySuccessMessageCanBePulledOnlyOnce(): void
+    {
+        $messages = new RoomCatalogFlashMessages($this->session);
+
+        self::assertNull($messages->pullAmenitySuccess());
+
+        $messages->amenitySuccess('Amenity created successfully.');
+
+        self::assertSame('Amenity created successfully.', $messages->pullAmenitySuccess());
+        self::assertNull($messages->pullAmenitySuccess());
+    }
+
     public function testMalformedSessionValueIsDiscardedSafely(): void
     {
         $this->session->set('administrator_room_type_success', ['unexpected']);
@@ -72,6 +85,11 @@ final class RoomCatalogFlashMessagesTest extends TestCase
 
         self::assertNull($messages->pullRoomTypeSuccess());
         self::assertFalse($this->session->has('administrator_room_type_success'));
+
+        $this->session->set('administrator_amenity_success', ['unexpected']);
+
+        self::assertNull($messages->pullAmenitySuccess());
+        self::assertFalse($this->session->has('administrator_amenity_success'));
     }
 
     /** @return array<string, mixed> */

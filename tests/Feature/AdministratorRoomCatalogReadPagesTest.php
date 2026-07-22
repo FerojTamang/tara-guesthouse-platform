@@ -171,6 +171,7 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
             new Amenity(2, 'Breakfast', null, false, $timestamp, $timestamp),
         ]);
         $this->administratorSession->establish(new AdministratorIdentity(91));
+        $token = $this->csrfTokens->token();
 
         $response = $this->application->handle(Request::create('GET', '/admin/amenities'));
 
@@ -178,6 +179,10 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertStringContainsString('<title>Amenities | Tara Guest House</title>', $response->body());
         self::assertStringContainsString('href="/admin/amenities"', $response->body());
+        self::assertStringContainsString('href="/admin/amenities/create"', $response->body());
+        self::assertStringContainsString('href="/admin/amenities/1/edit"', $response->body());
+        self::assertStringContainsString('action="/admin/amenities/1/deactivate"', $response->body());
+        self::assertStringContainsString('value="' . $token . '"', $response->body());
         self::assertStringContainsString('&lt;b&gt;Airport transfer&lt;/b&gt;', $response->body());
         self::assertStringNotContainsString('<b>Airport transfer</b>', $response->body());
         self::assertStringContainsString('<code>car-front</code>', $response->body());

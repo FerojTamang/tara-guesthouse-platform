@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomTypeController;
@@ -20,13 +21,19 @@ return static function (
     ?CsrfMiddleware $csrf = null,
     ?AdministratorRoomCatalogController $catalogController = null,
     ?AdministratorRoomTypeController $roomTypeController = null,
+    ?AdministratorAmenityController $amenityController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
         static fn (object|null $dependency): bool => $dependency !== null,
     ));
 
-    if ($dependencyCount === 0 && $catalogController === null && $roomTypeController === null) {
+    if (
+        $dependencyCount === 0
+        && $catalogController === null
+        && $roomTypeController === null
+        && $amenityController === null
+    ) {
         return;
     }
 
@@ -70,38 +77,71 @@ return static function (
         [$requireAdministrator],
     );
 
-    if ($roomTypeController === null) {
+    if ($roomTypeController !== null) {
+        $router->get(
+            '/admin/room-types/create',
+            [$roomTypeController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/room-types',
+            [$roomTypeController, 'create'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->get(
+            '/admin/room-types/{id}/edit',
+            [$roomTypeController, 'editForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/room-types/{id}',
+            [$roomTypeController, 'update'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/room-types/{id}/activate',
+            [$roomTypeController, 'activate'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/room-types/{id}/deactivate',
+            [$roomTypeController, 'deactivate'],
+            [$requireAdministrator, $csrf],
+        );
+    }
+
+    if ($amenityController === null) {
         return;
     }
 
     $router->get(
-        '/admin/room-types/create',
-        [$roomTypeController, 'createForm'],
+        '/admin/amenities/create',
+        [$amenityController, 'createForm'],
         [$requireAdministrator],
     );
     $router->post(
-        '/admin/room-types',
-        [$roomTypeController, 'create'],
+        '/admin/amenities',
+        [$amenityController, 'create'],
         [$requireAdministrator, $csrf],
     );
     $router->get(
-        '/admin/room-types/{id}/edit',
-        [$roomTypeController, 'editForm'],
+        '/admin/amenities/{id}/edit',
+        [$amenityController, 'editForm'],
         [$requireAdministrator],
     );
     $router->post(
-        '/admin/room-types/{id}',
-        [$roomTypeController, 'update'],
+        '/admin/amenities/{id}',
+        [$amenityController, 'update'],
         [$requireAdministrator, $csrf],
     );
     $router->post(
-        '/admin/room-types/{id}/activate',
-        [$roomTypeController, 'activate'],
+        '/admin/amenities/{id}/activate',
+        [$amenityController, 'activate'],
         [$requireAdministrator, $csrf],
     );
     $router->post(
-        '/admin/room-types/{id}/deactivate',
-        [$roomTypeController, 'deactivate'],
+        '/admin/amenities/{id}/deactivate',
+        [$amenityController, 'deactivate'],
         [$requireAdministrator, $csrf],
     );
 };

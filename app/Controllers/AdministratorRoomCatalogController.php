@@ -56,6 +56,7 @@ final readonly class AdministratorRoomCatalogController
             'pageTitle' => 'Amenities',
             'activeNavigation' => 'amenities',
             'amenities' => $amenities,
+            'notice' => $this->flashMessages->pullAmenitySuccess(),
         ]);
     }
 
