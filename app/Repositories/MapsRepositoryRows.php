@@ -119,4 +119,16 @@ trait MapsRepositoryRows
 
         return $date;
     }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function nullableDateTime(array $row, string $key): ?DateTimeImmutable
+    {
+        if (($row[$key] ?? null) === null) {
+            return null;
+        }
+
+        return $this->dateTime($row, $key);
+    }
 }
