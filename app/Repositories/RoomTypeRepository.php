@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Exceptions\DatabaseException;
+use App\Exceptions\RoomCatalogException;
 use App\Models\RoomType;
 use PDO;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
 /**
- * Provides read-only persistence access to the room-type catalogue.
+ * Provides persistence access to the room-type catalogue.
  */
 final class RoomTypeRepository
 {
@@ -71,6 +73,121 @@ final class RoomTypeRepository
     public function findAllActive(): array
     {
         return $this->listing(self::SELECT_COLUMNS . ' WHERE is_active = 1 ORDER BY name ASC, id ASC');
+    }
+
+    public function create(
+        string $name,
+        string $slug,
+        ?string $description,
+        string $basePrice,
+        int $capacityAdults,
+        int $capacityChildren,
+        bool $active,
+    ): RoomType {
+        try {
+            $statement = $this->connection->prepare(
+                'INSERT INTO room_types ('
+                . 'name, slug, description, base_price, capacity_adults, capacity_children, is_active'
+                . ') VALUES ('
+                . ':name, :slug, :description, :base_price, :capacity_adults, :capacity_children, :is_active'
+                . ')',
+            );
+            $statement->execute([
+                'name' => $name,
+                'slug' => $slug,
+                'description' => $description,
+                'base_price' => $basePrice,
+                'capacity_adults' => $capacityAdults,
+                'capacity_children' => $capacityChildren,
+                'is_active' => $active ? 1 : 0,
+            ]);
+
+            $roomType = $this->findById($this->generatedIdentifier());
+
+            if (!$roomType instanceof RoomType) {
+                throw new RuntimeException('The created room type could not be loaded.');
+            }
+
+            return $roomType;
+        } catch (PDOException $exception) {
+            if ($this->isDuplicateKey($exception)) {
+                throw RoomCatalogException::duplicateRoomTypeSlug($exception);
+            }
+
+            throw new DatabaseException('The room type write failed.');
+        } catch (RoomCatalogException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DatabaseException('The room type write failed.');
+        }
+    }
+
+    public function update(
+        int $id,
+        string $name,
+        string $slug,
+        ?string $description,
+        string $basePrice,
+        int $capacityAdults,
+        int $capacityChildren,
+        bool $active,
+    ): ?RoomType {
+        if ($id <= 0) {
+            return null;
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'UPDATE room_types SET '
+                . 'name = :name, slug = :slug, description = :description, base_price = :base_price, '
+                . 'capacity_adults = :capacity_adults, capacity_children = :capacity_children, '
+                . 'is_active = :is_active '
+                . 'WHERE id = :id',
+            );
+            $statement->execute([
+                'id' => $id,
+                'name' => $name,
+                'slug' => $slug,
+                'description' => $description,
+                'base_price' => $basePrice,
+                'capacity_adults' => $capacityAdults,
+                'capacity_children' => $capacityChildren,
+                'is_active' => $active ? 1 : 0,
+            ]);
+
+            return $this->findById($id);
+        } catch (PDOException $exception) {
+            if ($this->isDuplicateKey($exception)) {
+                throw RoomCatalogException::duplicateRoomTypeSlug($exception);
+            }
+
+            throw new DatabaseException('The room type write failed.');
+        } catch (RoomCatalogException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DatabaseException('The room type write failed.');
+        }
+    }
+
+    public function setActive(int $id, bool $active): ?RoomType
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'UPDATE room_types SET is_active = :is_active WHERE id = :id',
+            );
+            $statement->execute([
+                'id' => $id,
+                'is_active' => $active ? 1 : 0,
+            ]);
+
+            return $this->findById($id);
+        } catch (Throwable) {
+            throw new DatabaseException('The room type state update failed.');
+        }
     }
 
     private function lookup(string $sql, int|string $value, int $type): ?RoomType
@@ -144,4 +261,26 @@ final class RoomTypeRepository
         );
     }
 
+    private function generatedIdentifier(): int
+    {
+        $identifier = $this->connection->lastInsertId();
+
+        if (preg_match('/^[1-9][0-9]*$/D', $identifier) !== 1) {
+            throw new RuntimeException('The generated room type identifier is invalid.');
+        }
+
+        $integer = filter_var($identifier, FILTER_VALIDATE_INT);
+
+        if (!is_int($integer) || $integer <= 0) {
+            throw new RuntimeException('The generated room type identifier is invalid.');
+        }
+
+        return $integer;
+    }
+
+    private function isDuplicateKey(PDOException $exception): bool
+    {
+        return (string) $exception->getCode() === '23000'
+            && (int) ($exception->errorInfo[1] ?? 0) === 1062;
+    }
 }

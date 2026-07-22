@@ -6,6 +6,7 @@ namespace Tests\Integration\Repositories;
 
 use App\Core\MigrationRunner;
 use App\Exceptions\DatabaseException;
+use App\Exceptions\RoomCatalogException;
 use App\Models\Amenity;
 use App\Repositories\AmenityRepository;
 use DateTimeImmutable;
@@ -108,6 +109,115 @@ final class AmenityRepositoryTest extends DatabaseTestCase
             self::fail('Expected a sanitized amenity lookup failure.');
         } catch (DatabaseException $exception) {
             self::assertSame('The amenity lookup failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
+    }
+
+    public function testItCreatesAndReturnsTheStoredAmenity(): void
+    {
+        $amenity = $this->repository->create('Breakfast included', 'cup-hot', true);
+
+        self::assertGreaterThan(0, $amenity->id());
+        self::assertSame('Breakfast included', $amenity->name());
+        self::assertSame('cup-hot', $amenity->icon());
+        self::assertTrue($amenity->isActive());
+        self::assertSame('UTC', $amenity->createdAt()->getTimezone()->getName());
+        self::assertSame('UTC', $amenity->updatedAt()->getTimezone()->getName());
+        self::assertEquals($amenity, $this->repository->findById($amenity->id()));
+    }
+
+    public function testItUpdatesAndReturnsAnExistingAmenityIncludingAnUnchangedWrite(): void
+    {
+        $amenity = $this->repository->update(
+            $this->amenityIds['airport_shuttle'],
+            'Airport transfer',
+            'car-front',
+            true,
+        );
+
+        self::assertInstanceOf(Amenity::class, $amenity);
+        self::assertSame($this->amenityIds['airport_shuttle'], $amenity->id());
+        self::assertSame('Airport transfer', $amenity->name());
+        self::assertSame('car-front', $amenity->icon());
+        self::assertTrue($amenity->isActive());
+
+        $unchanged = $this->repository->update(
+            $amenity->id(),
+            $amenity->name(),
+            $amenity->icon(),
+            $amenity->isActive(),
+        );
+
+        self::assertEquals($amenity, $unchanged);
+    }
+
+    public function testMissingWriteTargetsReturnNullWithoutMutation(): void
+    {
+        $before = $this->amenitySnapshot();
+
+        self::assertNull($this->repository->update(0, 'Missing', null, true));
+        self::assertNull($this->repository->update(999999, 'Missing', null, true));
+        self::assertNull($this->repository->setActive(-1, false));
+        self::assertNull($this->repository->setActive(999999, false));
+
+        self::assertSame($before, $this->amenitySnapshot());
+    }
+
+    public function testItChangesOnlyTheAmenityActiveState(): void
+    {
+        $before = $this->repository->findById($this->amenityIds['wifi']);
+        self::assertInstanceOf(Amenity::class, $before);
+
+        $inactive = $this->repository->setActive($before->id(), false);
+
+        self::assertInstanceOf(Amenity::class, $inactive);
+        self::assertFalse($inactive->isActive());
+        self::assertSame($before->name(), $inactive->name());
+        self::assertSame($before->icon(), $inactive->icon());
+
+        $active = $this->repository->setActive($before->id(), true);
+        self::assertInstanceOf(Amenity::class, $active);
+        self::assertTrue($active->isActive());
+    }
+
+    public function testDuplicateNamesAreReportedAsSafeConflictsWithoutPartialWrites(): void
+    {
+        $before = $this->amenitySnapshot();
+
+        try {
+            $this->repository->create('wi-fi', 'broadcast', true);
+            self::fail('Expected a duplicate amenity-name conflict.');
+        } catch (RoomCatalogException $exception) {
+            self::assertTrue($exception->isConflict());
+            self::assertSame('An amenity with this name already exists.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
+
+        try {
+            $this->repository->update(
+                $this->amenityIds['airport_shuttle'],
+                'Air conditioning',
+                'car-front',
+                true,
+            );
+            self::fail('Expected an update name conflict.');
+        } catch (RoomCatalogException $exception) {
+            self::assertTrue($exception->isConflict());
+            self::assertSame('An amenity with this name already exists.', $exception->getMessage());
+        }
+
+        self::assertSame($before, $this->amenitySnapshot());
+    }
+
+    public function testWriteDatabaseFailuresAreSanitized(): void
+    {
+        $this->dropTables(['room_amenities', 'amenities']);
+
+        try {
+            $this->repository->create('Breakfast included', 'cup-hot', true);
+            self::fail('Expected a sanitized amenity write failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The amenity write failed.', $exception->getMessage());
             self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
         }
     }
