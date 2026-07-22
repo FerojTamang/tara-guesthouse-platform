@@ -409,7 +409,16 @@ final class AdministratorBootstrapCommandTest extends TestCase
         $this->connection->exec('SET FOREIGN_KEY_CHECKS = 0');
 
         try {
-            foreach (['users', 'roles', 'schema_migrations'] as $table) {
+            foreach ([
+                'room_amenities',
+                'room_images',
+                'rooms',
+                'amenities',
+                'room_types',
+                'users',
+                'roles',
+                'schema_migrations',
+            ] as $table) {
                 $this->connection->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
             }
         } finally {

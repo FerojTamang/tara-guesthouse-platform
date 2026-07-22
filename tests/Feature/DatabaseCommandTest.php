@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Core\Config;
 use App\Core\ConnectionFactory;
 use App\Core\Environment;
+use App\Core\MigrationRunner;
 use PDO;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -75,14 +76,21 @@ final class DatabaseCommandTest extends TestCase
     public function testStatusMigrateRollbackAndRepeatedMigrateSucceed(): void
     {
         $this->writeMigrationFixture();
+        $migrationCount = $this->migrationCount();
 
         $status = $this->command(['status']);
         self::assertSame(0, $status['exit']);
-        self::assertStringContainsString('Pending migrations: 3', $status['stdout']);
+        self::assertStringContainsString(
+            sprintf('Pending migrations: %d', $migrationCount),
+            $status['stdout'],
+        );
 
         $migrate = $this->command(['migrate']);
         self::assertSame(0, $migrate['exit']);
-        self::assertStringContainsString('Applied migrations: 3', $migrate['stdout']);
+        self::assertStringContainsString(
+            sprintf('Applied migrations: %d', $migrationCount),
+            $migrate['stdout'],
+        );
 
         $repeat = $this->command(['migrate']);
         self::assertSame(0, $repeat['exit']);
@@ -90,11 +98,17 @@ final class DatabaseCommandTest extends TestCase
 
         $rollback = $this->command(['rollback']);
         self::assertSame(0, $rollback['exit']);
-        self::assertStringContainsString('Rolled back migrations: 3', $rollback['stdout']);
+        self::assertStringContainsString(
+            sprintf('Rolled back migrations: %d', $migrationCount),
+            $rollback['stdout'],
+        );
 
         $finalMigrate = $this->command(['migrate']);
         self::assertSame(0, $finalMigrate['exit']);
-        self::assertStringContainsString('Applied migrations: 3', $finalMigrate['stdout']);
+        self::assertStringContainsString(
+            sprintf('Applied migrations: %d', $migrationCount),
+            $finalMigrate['stdout'],
+        );
     }
 
     public function testApprovedTestingSeederGroupSucceeds(): void
@@ -150,11 +164,15 @@ final class DatabaseCommandTest extends TestCase
     public function testProductionMigrateWithForceUsesOnlyTheIsolatedTestDatabase(): void
     {
         $this->writeMigrationFixture();
+        $migrationCount = $this->migrationCount();
 
         $result = $this->command(['migrate', '--force'], $this->productionEnvironment());
 
         self::assertSame(0, $result['exit']);
-        self::assertStringContainsString('Applied migrations: 3', $result['stdout']);
+        self::assertStringContainsString(
+            sprintf('Applied migrations: %d', $migrationCount),
+            $result['stdout'],
+        );
         self::assertSame(1, (int) $this->connection->query(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 's0004_command_fixture'",
         )->fetchColumn());
@@ -300,12 +318,31 @@ PHP);
         $this->fixtureFiles[] = $path;
     }
 
+    private function migrationCount(): int
+    {
+        return count((new MigrationRunner(
+            $this->connection,
+            $this->basePath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations',
+        ))->discover());
+    }
+
     private function cleanupDatabase(): void
     {
         $this->connection->exec('SET FOREIGN_KEY_CHECKS = 0');
 
         try {
-            foreach (['users', 'roles', 's0004_command_seed', 's0004_command_fixture', 'schema_migrations'] as $table) {
+            foreach ([
+                'room_amenities',
+                'room_images',
+                'rooms',
+                'amenities',
+                'room_types',
+                'users',
+                'roles',
+                's0004_command_seed',
+                's0004_command_fixture',
+                'schema_migrations',
+            ] as $table) {
                 $this->connection->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
             }
         } finally {

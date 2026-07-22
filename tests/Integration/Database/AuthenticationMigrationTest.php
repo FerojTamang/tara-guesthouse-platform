@@ -13,6 +13,16 @@ use Tests\Support\DatabaseTestCase;
 #[Group('database')]
 final class AuthenticationMigrationTest extends DatabaseTestCase
 {
+    private const APPLICATION_MIGRATIONS = [
+        '20260721000100_create_roles_table',
+        '20260721000200_create_users_table',
+        '20260722000100_create_room_types_table',
+        '20260722000200_create_rooms_table',
+        '20260722000300_create_room_images_table',
+        '20260722000400_create_amenities_table',
+        '20260722000500_create_room_amenities_table',
+    ];
+
     private MigrationRunner $runner;
 
     protected function setUp(): void
@@ -36,12 +46,12 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
 
     public function testMigrationsApplyInOrderAndExposeTheApprovedSchema(): void
     {
-        self::assertSame([
-            '20260721000100_create_roles_table',
-            '20260721000200_create_users_table',
-        ], $this->runner->migrate());
+        self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
         self::assertSame([], $this->runner->migrate());
-        self::assertSame(['applied', 'applied'], array_column($this->runner->status(), 'status'));
+        self::assertSame(
+            array_fill(0, count(self::APPLICATION_MIGRATIONS), 'applied'),
+            array_column($this->runner->status(), 'status'),
+        );
 
         $roles = $this->columns('roles');
         self::assertSame(['id', 'role_name', 'description', 'created_at', 'updated_at'], array_keys($roles));
@@ -122,7 +132,10 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
             self::assertStringContainsString($requiredValue, $checkClause);
         }
 
-        self::assertSame(2, (int) $this->connection->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(
+            count(self::APPLICATION_MIGRATIONS),
+            (int) $this->connection->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn(),
+        );
     }
 
     public function testDatabaseConstraintsDefaultsAndTimestampBehaviorAreEnforced(): void
@@ -207,23 +220,14 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
     {
         $this->runner->migrate();
 
-        self::assertSame([
-            '20260721000200_create_users_table',
-            '20260721000100_create_roles_table',
-        ], $this->runner->rollbackLastBatch());
-        self::assertSame(0, $this->authenticationTableCount());
+        self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
+        self::assertSame(0, $this->applicationTableCount());
         self::assertSame(0, (int) $this->connection->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
 
-        self::assertSame([
-            '20260721000100_create_roles_table',
-            '20260721000200_create_users_table',
-        ], $this->runner->migrate());
-        self::assertSame(2, $this->authenticationTableCount());
-        self::assertSame([
-            '20260721000200_create_users_table',
-            '20260721000100_create_roles_table',
-        ], $this->runner->rollbackLastBatch());
-        self::assertSame(0, $this->authenticationTableCount());
+        self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
+        self::assertSame(count(self::APPLICATION_MIGRATIONS), $this->applicationTableCount());
+        self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
+        self::assertSame(0, $this->applicationTableCount());
     }
 
     /**
@@ -365,16 +369,16 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         }
     }
 
-    private function authenticationTableCount(): int
+    private function applicationTableCount(): int
     {
         return (int) $this->connection->query(
-            "SELECT COUNT(*) FROM information_schema.TABLES "
-            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('roles', 'users')",
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
+            . "AND TABLE_NAME IN ('roles', 'users', 'room_types', 'rooms', 'room_images', 'amenities', 'room_amenities')",
         )->fetchColumn();
     }
 
     private function cleanupAuthenticationTables(): void
     {
-        $this->dropTables(['users', 'roles', 'schema_migrations']);
+        $this->cleanupApplicationTables();
     }
 }
