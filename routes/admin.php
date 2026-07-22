@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorRoomCatalogController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
@@ -16,13 +17,14 @@ return static function (
     ?GuestOnlyMiddleware $guestOnly = null,
     ?RequireAdministratorMiddleware $requireAdministrator = null,
     ?CsrfMiddleware $csrf = null,
+    ?AdministratorRoomCatalogController $catalogController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
         static fn (object|null $dependency): bool => $dependency !== null,
     ));
 
-    if ($dependencyCount === 0) {
+    if ($dependencyCount === 0 && $catalogController === null) {
         return;
     }
 
@@ -49,5 +51,20 @@ return static function (
         '/admin/logout',
         [$controller, 'logout'],
         [$requireAdministrator, $csrf],
+    );
+
+    if ($catalogController === null) {
+        return;
+    }
+
+    $router->get(
+        '/admin/room-types',
+        [$catalogController, 'roomTypes'],
+        [$requireAdministrator],
+    );
+    $router->get(
+        '/admin/amenities',
+        [$catalogController, 'amenities'],
+        [$requireAdministrator],
     );
 };

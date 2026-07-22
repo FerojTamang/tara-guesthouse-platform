@@ -1,0 +1,109 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use App\Core\CsrfTokenManager;
+use App\Core\Request;
+use App\Core\Response;
+use App\Core\ViewRenderer;
+use App\Models\Amenity;
+use App\Models\RoomType;
+use App\Services\RoomCatalogServiceProvider;
+
+/**
+ * Formats authenticated Administrator room catalogue pages.
+ */
+final readonly class AdministratorRoomCatalogController
+{
+    public function __construct(
+        private ViewRenderer $views,
+        private RoomCatalogServiceProvider $services,
+        private CsrfTokenManager $csrfTokens,
+    ) {
+    }
+
+    /** @param array<string, string> $parameters */
+    public function roomTypes(Request $request, array $parameters): Response
+    {
+        $roomTypes = array_map(
+            $this->roomTypeData(...),
+            $this->services->roomTypes()->listAll(),
+        );
+
+        return $this->page('admin.room-types.index', [
+            'title' => 'Room types | Tara Guest House',
+            'pageTitle' => 'Room types',
+            'activeNavigation' => 'room-types',
+            'roomTypes' => $roomTypes,
+        ]);
+    }
+
+    /** @param array<string, string> $parameters */
+    public function amenities(Request $request, array $parameters): Response
+    {
+        $amenities = array_map(
+            $this->amenityData(...),
+            $this->services->amenities()->listAll(),
+        );
+
+        return $this->page('admin.amenities.index', [
+            'title' => 'Amenities | Tara Guest House',
+            'pageTitle' => 'Amenities',
+            'activeNavigation' => 'amenities',
+            'amenities' => $amenities,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function page(string $view, array $data): Response
+    {
+        $html = $this->views->render(
+            $view,
+            [...$data, 'csrfToken' => $this->csrfTokens->token()],
+            'layouts.admin',
+        );
+
+        return Response::html($html, 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * @return array{
+     *     id: int,
+     *     name: string,
+     *     slug: string,
+     *     basePrice: string,
+     *     capacityAdults: int,
+     *     capacityChildren: int,
+     *     active: bool
+     * }
+     */
+    private function roomTypeData(RoomType $roomType): array
+    {
+        return [
+            'id' => $roomType->id(),
+            'name' => $roomType->name(),
+            'slug' => $roomType->slug(),
+            'basePrice' => $roomType->basePrice(),
+            'capacityAdults' => $roomType->capacityAdults(),
+            'capacityChildren' => $roomType->capacityChildren(),
+            'active' => $roomType->isActive(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, icon: ?string, active: bool}
+     */
+    private function amenityData(Amenity $amenity): array
+    {
+        return [
+            'id' => $amenity->id(),
+            'name' => $amenity->name(),
+            'icon' => $amenity->icon(),
+            'active' => $amenity->isActive(),
+        ];
+    }
+}

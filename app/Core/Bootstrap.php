@@ -7,14 +7,20 @@ namespace App\Core;
 use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorRoomCatalogController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
+use App\Repositories\AmenityRepository;
+use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
+use App\Services\AmenityCatalogService;
+use App\Services\RoomCatalogServiceProvider;
+use App\Services\RoomTypeCatalogService;
 
 /**
  * Builds the approved core application runtime.
@@ -103,6 +109,24 @@ final class Bootstrap
             $logger,
             $loginPolicy,
         );
+        $catalogConnection = null;
+        $catalogConnectionProvider = static function () use ($connectionFactory, &$catalogConnection): \PDO {
+            $catalogConnection ??= $connectionFactory->create();
+
+            return $catalogConnection;
+        };
+        $catalogController = new AdministratorRoomCatalogController(
+            $viewRenderer,
+            new RoomCatalogServiceProvider(
+                static fn (): RoomTypeCatalogService => new RoomTypeCatalogService(
+                    new RoomTypeRepository($catalogConnectionProvider()),
+                ),
+                static fn (): AmenityCatalogService => new AmenityCatalogService(
+                    new AmenityRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $csrfTokens,
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -111,6 +135,7 @@ final class Bootstrap
             new GuestOnlyMiddleware($administratorSession),
             new RequireAdministratorMiddleware($administratorSession),
             new CsrfMiddleware($csrfTokens),
+            $catalogController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -147,6 +172,7 @@ final class Bootstrap
         GuestOnlyMiddleware $guestOnly,
         RequireAdministratorMiddleware $requireAdministrator,
         CsrfMiddleware $csrf,
+        AdministratorRoomCatalogController $catalogController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -168,6 +194,7 @@ final class Bootstrap
                 $guestOnly,
                 $requireAdministrator,
                 $csrf,
+                $catalogController,
             );
         }
     }
