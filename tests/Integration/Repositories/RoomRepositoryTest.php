@@ -6,6 +6,7 @@ namespace Tests\Integration\Repositories;
 
 use App\Core\MigrationRunner;
 use App\Exceptions\DatabaseException;
+use App\Exceptions\RoomCatalogException;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Repositories\RoomRepository;
@@ -23,6 +24,9 @@ final class RoomRepositoryTest extends DatabaseTestCase
 
     /** @var array<string, int> */
     private array $roomIds = [];
+
+    /** @var array<string, int> */
+    private array $amenityIds = [];
 
     protected function setUp(): void
     {
@@ -55,6 +59,9 @@ final class RoomRepositoryTest extends DatabaseTestCase
             '2026-07-22 03:04:05',
             '2026-07-22 04:05:06',
         );
+
+        $this->amenityIds['wifi'] = $this->insertAmenity('Wi-Fi', 'wifi', true);
+        $this->amenityIds['parking'] = $this->insertAmenity('Parking', 'parking', false);
 
         $this->roomIds['public'] = $this->insertRoom(
             $this->roomTypeIds['deluxe'],
@@ -116,6 +123,9 @@ final class RoomRepositoryTest extends DatabaseTestCase
             '2026-07-22 12:13:14',
             '2026-07-22 13:14:15',
         );
+
+        $this->assignAmenity($this->roomIds['public'], $this->amenityIds['wifi']);
+        $this->assignAmenity($this->roomIds['public'], $this->amenityIds['parking']);
 
         $this->repository = new RoomRepository($this->connection);
     }
@@ -215,6 +225,159 @@ final class RoomRepositoryTest extends DatabaseTestCase
         self::assertSame($before, $this->roomSnapshot());
     }
 
+    public function testItCreatesUpdatesAndSynchronizesAmenityAssignments(): void
+    {
+        $created = $this->repository->create(
+            $this->roomTypeIds['deluxe'],
+            '201',
+            'Courtyard Suite',
+            'courtyard-suite',
+            "First line\nSecond line",
+            '7200.50',
+            3,
+            2,
+            Room::STATUS_ACTIVE,
+            false,
+        );
+        $this->repository->replaceAmenities(
+            $created->id(),
+            [$this->amenityIds['parking'], $this->amenityIds['wifi']],
+        );
+
+        self::assertSame('201', $created->roomNumber());
+        self::assertSame('7200.50', $created->pricePerNight());
+        self::assertFalse($created->isPublished());
+        self::assertSame(
+            [$this->amenityIds['wifi'], $this->amenityIds['parking']],
+            $this->repository->findAmenityIds($created->id()),
+        );
+
+        $updated = $this->repository->update(
+            $created->id(),
+            $this->roomTypeIds['retired'],
+            '202',
+            'Courtyard Suite Updated',
+            'courtyard-suite-updated',
+            null,
+            '7300.00',
+            2,
+            0,
+            Room::STATUS_MAINTENANCE,
+            true,
+        );
+        $this->repository->replaceAmenities($created->id(), [$this->amenityIds['parking']]);
+
+        self::assertInstanceOf(Room::class, $updated);
+        self::assertSame('202', $updated->roomNumber());
+        self::assertSame('courtyard-suite-updated', $updated->slug());
+        self::assertSame(Room::STATUS_MAINTENANCE, $updated->operationalStatus());
+        self::assertTrue($updated->isPublished());
+        self::assertFalse($updated->roomType()->isActive());
+        self::assertSame(
+            [$this->amenityIds['parking']],
+            $this->repository->findAmenityIds($created->id()),
+        );
+
+        $this->repository->replaceAmenities($created->id(), []);
+        self::assertSame([], $this->repository->findAmenityIds($created->id()));
+    }
+
+    public function testMissingAndDeletedWriteTargetsReturnNullWithoutMutation(): void
+    {
+        $before = $this->roomSnapshot();
+
+        self::assertNull($this->repository->update(
+            999999,
+            $this->roomTypeIds['deluxe'],
+            '999',
+            'Missing Room',
+            'missing-room',
+            null,
+            '5000.00',
+            1,
+            0,
+            Room::STATUS_ACTIVE,
+            false,
+        ));
+        self::assertNull($this->repository->update(
+            $this->roomIds['deleted'],
+            $this->roomTypeIds['deluxe'],
+            '998',
+            'Deleted Room Update',
+            'deleted-room-update',
+            null,
+            '5000.00',
+            1,
+            0,
+            Room::STATUS_ACTIVE,
+            false,
+        ));
+        self::assertNull($this->repository->softDelete(999999));
+        self::assertNull($this->repository->softDelete($this->roomIds['deleted']));
+
+        self::assertSame($before, $this->roomSnapshot());
+    }
+
+    public function testSoftDeleteRetainsHistoricalAmenityAssignments(): void
+    {
+        $deleted = $this->repository->softDelete($this->roomIds['public']);
+
+        self::assertInstanceOf(Room::class, $deleted);
+        self::assertTrue($deleted->isDeleted());
+        self::assertNull($this->repository->findById($this->roomIds['public']));
+        self::assertSame(
+            [$this->amenityIds['wifi'], $this->amenityIds['parking']],
+            $this->repository->findAmenityIds($this->roomIds['public']),
+        );
+    }
+
+    public function testDuplicateRoomNumberAndSlugBecomeSafeConflicts(): void
+    {
+        $cases = [
+            ['101', 'unique-room-slug', 'A room with this room number already exists.'],
+            ['999', 'garden-deluxe', 'A room with this slug already exists.'],
+        ];
+
+        foreach ($cases as [$roomNumber, $slug, $message]) {
+            try {
+                $this->repository->create(
+                    $this->roomTypeIds['deluxe'],
+                    $roomNumber,
+                    'Duplicate Room',
+                    $slug,
+                    null,
+                    '5000.00',
+                    1,
+                    0,
+                    Room::STATUS_ACTIVE,
+                    false,
+                );
+                self::fail('Expected a safe room uniqueness conflict.');
+            } catch (RoomCatalogException $exception) {
+                self::assertTrue($exception->isConflict());
+                self::assertSame($message, $exception->getMessage());
+                self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testInvalidAmenityReplacementIsRejectedWithoutMutation(): void
+    {
+        $before = $this->roomSnapshot();
+
+        foreach ([[0], [1, 1], ['1']] as $amenityIds) {
+            try {
+                /** @var list<int> $amenityIds */
+                $this->repository->replaceAmenities($this->roomIds['public'], $amenityIds);
+                self::fail('Expected an invalid room amenity update failure.');
+            } catch (DatabaseException $exception) {
+                self::assertSame('The room amenity update failed.', $exception->getMessage());
+            }
+        }
+
+        self::assertSame($before, $this->roomSnapshot());
+    }
+
     public function testDatabaseFailuresAreSanitized(): void
     {
         $this->dropTables(['room_amenities', 'room_images', 'rooms']);
@@ -257,6 +420,28 @@ final class RoomRepositoryTest extends DatabaseTestCase
         ]);
 
         return (int) $this->connection->lastInsertId();
+    }
+
+    private function insertAmenity(string $name, ?string $icon, bool $active): int
+    {
+        $statement = $this->connection->prepare(
+            'INSERT INTO amenities (name, icon, is_active) VALUES (:name, :icon, :is_active)',
+        );
+        $statement->execute([
+            'name' => $name,
+            'icon' => $icon,
+            'is_active' => $active ? 1 : 0,
+        ]);
+
+        return (int) $this->connection->lastInsertId();
+    }
+
+    private function assignAmenity(int $roomId, int $amenityId): void
+    {
+        $statement = $this->connection->prepare(
+            'INSERT INTO room_amenities (room_id, amenity_id) VALUES (:room_id, :amenity_id)',
+        );
+        $statement->execute(['room_id' => $roomId, 'amenity_id' => $amenityId]);
     }
 
     private function insertRoom(
@@ -304,7 +489,16 @@ final class RoomRepositoryTest extends DatabaseTestCase
     {
         $roomTypes = $this->connection->query('SELECT * FROM room_types ORDER BY id')->fetchAll();
         $rooms = $this->connection->query('SELECT * FROM rooms ORDER BY id')->fetchAll();
+        $amenities = $this->connection->query('SELECT * FROM amenities ORDER BY id')->fetchAll();
+        $assignments = $this->connection->query(
+            'SELECT * FROM room_amenities ORDER BY room_id, amenity_id',
+        )->fetchAll();
 
-        return json_encode(['room_types' => $roomTypes, 'rooms' => $rooms], JSON_THROW_ON_ERROR);
+        return json_encode([
+            'room_types' => $roomTypes,
+            'rooms' => $rooms,
+            'amenities' => $amenities,
+            'room_amenities' => $assignments,
+        ], JSON_THROW_ON_ERROR);
     }
 }

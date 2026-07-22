@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Exceptions\DatabaseException;
+use App\Exceptions\RoomCatalogException;
 use App\Models\Room;
 use App\Models\RoomType;
 use PDO;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
 /**
- * Provides read-only persistence access to physical rooms.
+ * Provides persistence access to physical rooms.
  */
-final class RoomRepository
+final class RoomRepository implements RoomCatalogRepository
 {
     use MapsRepositoryRows;
 
@@ -121,6 +123,207 @@ final class RoomRepository
         );
     }
 
+    /** @return list<int> */
+    public function findAmenityIds(int $roomId): array
+    {
+        if ($roomId <= 0) {
+            return [];
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT amenity_id FROM room_amenities WHERE room_id = :room_id ORDER BY amenity_id ASC',
+            );
+            $statement->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The room amenity assignments could not be mapped.');
+            }
+
+            $amenityIds = [];
+
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The room amenity assignments could not be mapped.');
+                }
+
+                $amenityIds[] = $this->positiveInteger($row, 'amenity_id');
+            }
+
+            return $amenityIds;
+        } catch (Throwable) {
+            throw new DatabaseException('The room amenity lookup failed.');
+        }
+    }
+
+    public function create(
+        int $roomTypeId,
+        string $roomNumber,
+        string $name,
+        string $slug,
+        ?string $description,
+        string $pricePerNight,
+        int $capacityAdults,
+        int $capacityChildren,
+        string $operationalStatus,
+        bool $published,
+    ): Room {
+        try {
+            $statement = $this->connection->prepare(
+                'INSERT INTO rooms ('
+                . 'room_type_id, room_number, name, slug, description, price_per_night, capacity_adults, '
+                . 'capacity_children, operational_status, is_published'
+                . ') VALUES ('
+                . ':room_type_id, :room_number, :name, :slug, :description, :price_per_night, '
+                . ':capacity_adults, :capacity_children, :operational_status, :is_published'
+                . ')',
+            );
+            $statement->execute([
+                'room_type_id' => $roomTypeId,
+                'room_number' => $roomNumber,
+                'name' => $name,
+                'slug' => $slug,
+                'description' => $description,
+                'price_per_night' => $pricePerNight,
+                'capacity_adults' => $capacityAdults,
+                'capacity_children' => $capacityChildren,
+                'operational_status' => $operationalStatus,
+                'is_published' => $published ? 1 : 0,
+            ]);
+
+            $room = $this->findById($this->generatedIdentifier());
+
+            if (!$room instanceof Room) {
+                throw new RuntimeException('The created room could not be loaded.');
+            }
+
+            return $room;
+        } catch (PDOException $exception) {
+            $this->throwWriteFailure($exception);
+        } catch (RoomCatalogException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DatabaseException('The room write failed.');
+        }
+    }
+
+    public function update(
+        int $id,
+        int $roomTypeId,
+        string $roomNumber,
+        string $name,
+        string $slug,
+        ?string $description,
+        string $pricePerNight,
+        int $capacityAdults,
+        int $capacityChildren,
+        string $operationalStatus,
+        bool $published,
+    ): ?Room {
+        if ($id <= 0) {
+            return null;
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'UPDATE rooms SET '
+                . 'room_type_id = :room_type_id, room_number = :room_number, name = :name, slug = :slug, '
+                . 'description = :description, price_per_night = :price_per_night, '
+                . 'capacity_adults = :capacity_adults, capacity_children = :capacity_children, '
+                . 'operational_status = :operational_status, is_published = :is_published '
+                . 'WHERE id = :id AND deleted_at IS NULL',
+            );
+            $statement->execute([
+                'id' => $id,
+                'room_type_id' => $roomTypeId,
+                'room_number' => $roomNumber,
+                'name' => $name,
+                'slug' => $slug,
+                'description' => $description,
+                'price_per_night' => $pricePerNight,
+                'capacity_adults' => $capacityAdults,
+                'capacity_children' => $capacityChildren,
+                'operational_status' => $operationalStatus,
+                'is_published' => $published ? 1 : 0,
+            ]);
+
+            return $this->findById($id);
+        } catch (PDOException $exception) {
+            $this->throwWriteFailure($exception);
+        } catch (RoomCatalogException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DatabaseException('The room write failed.');
+        }
+    }
+
+    /** @param list<int> $amenityIds */
+    public function replaceAmenities(int $roomId, array $amenityIds): void
+    {
+        if ($roomId <= 0 || $amenityIds !== array_values(array_unique($amenityIds))) {
+            throw new DatabaseException('The room amenity update failed.');
+        }
+
+        foreach ($amenityIds as $amenityId) {
+            if (!is_int($amenityId) || $amenityId <= 0) {
+                throw new DatabaseException('The room amenity update failed.');
+            }
+        }
+
+        try {
+            $delete = $this->connection->prepare('DELETE FROM room_amenities WHERE room_id = :room_id');
+            $delete->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            $delete->execute();
+
+            if ($amenityIds === []) {
+                return;
+            }
+
+            $insert = $this->connection->prepare(
+                'INSERT INTO room_amenities (room_id, amenity_id) VALUES (:room_id, :amenity_id)',
+            );
+
+            foreach ($amenityIds as $amenityId) {
+                $insert->bindValue('room_id', $roomId, PDO::PARAM_INT);
+                $insert->bindValue('amenity_id', $amenityId, PDO::PARAM_INT);
+                $insert->execute();
+            }
+        } catch (Throwable) {
+            throw new DatabaseException('The room amenity update failed.');
+        }
+    }
+
+    public function softDelete(int $id): ?Room
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'UPDATE rooms SET deleted_at = UTC_TIMESTAMP() WHERE id = :id AND deleted_at IS NULL',
+            );
+            $statement->bindValue('id', $id, PDO::PARAM_INT);
+            $statement->execute();
+
+            if ($statement->rowCount() === 0) {
+                return null;
+            }
+
+            $room = $this->findByIdIncludingDeleted($id);
+
+            if (!$room instanceof Room || !$room->isDeleted()) {
+                throw new RuntimeException('The deleted room could not be loaded.');
+            }
+
+            return $room;
+        } catch (Throwable) {
+            throw new DatabaseException('The room deletion failed.');
+        }
+    }
+
     private function lookup(string $sql, int|string $value, int $type): ?Room
     {
         try {
@@ -207,5 +410,39 @@ final class RoomRepository
             $this->dateTime($row, 'room_updated_at'),
             $this->nullableDateTime($row, 'deleted_at'),
         );
+    }
+
+    private function generatedIdentifier(): int
+    {
+        $identifier = $this->connection->lastInsertId();
+
+        if (preg_match('/^[1-9][0-9]*$/D', $identifier) !== 1) {
+            throw new RuntimeException('The generated room identifier is invalid.');
+        }
+
+        $integer = filter_var($identifier, FILTER_VALIDATE_INT);
+
+        if (!is_int($integer) || $integer <= 0) {
+            throw new RuntimeException('The generated room identifier is invalid.');
+        }
+
+        return $integer;
+    }
+
+    private function throwWriteFailure(PDOException $exception): never
+    {
+        if ((string) $exception->getCode() === '23000' && (int) ($exception->errorInfo[1] ?? 0) === 1062) {
+            $details = (string) ($exception->errorInfo[2] ?? '');
+
+            if (str_contains($details, 'uq_rooms_room_number')) {
+                throw RoomCatalogException::duplicateRoomNumber($exception);
+            }
+
+            if (str_contains($details, 'uq_rooms_slug')) {
+                throw RoomCatalogException::duplicateRoomSlug($exception);
+            }
+        }
+
+        throw new DatabaseException('The room write failed.');
     }
 }

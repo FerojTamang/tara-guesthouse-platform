@@ -35,6 +35,16 @@ final class RoomCatalogException extends RuntimeException
         return new self('An amenity with this name already exists.', 'conflict', $previous);
     }
 
+    public static function duplicateRoomNumber(?Throwable $previous = null): self
+    {
+        return new self('A room with this room number already exists.', 'conflict', $previous);
+    }
+
+    public static function duplicateRoomSlug(?Throwable $previous = null): self
+    {
+        return new self('A room with this slug already exists.', 'conflict', $previous);
+    }
+
     public static function roomTypeNotFound(): self
     {
         return new self('The requested room type was not found.', 'not_found');
@@ -43,6 +53,11 @@ final class RoomCatalogException extends RuntimeException
     public static function amenityNotFound(): self
     {
         return new self('The requested amenity was not found.', 'not_found');
+    }
+
+    public static function roomNotFound(): self
+    {
+        return new self('The requested room was not found.', 'not_found');
     }
 
     public static function failure(?Throwable $previous = null): self
