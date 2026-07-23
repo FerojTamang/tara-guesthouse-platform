@@ -206,3 +206,14 @@
         </div>
     </div>
 </section>
+
+<?php if ($roomId !== null): ?>
+    <?= $partial('components.admin-room-images', [
+        'roomId' => $roomId,
+        'csrfToken' => $csrfToken,
+        'images' => $images,
+        'success' => $imageSuccess,
+        'error' => $imageError,
+        'oldInput' => $imageOldInput,
+    ]) ?>
+<?php endif; ?>

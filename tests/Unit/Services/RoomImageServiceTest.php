@@ -36,6 +36,39 @@ final class RoomImageServiceTest extends TestCase
         @unlink($this->uploadPath);
     }
 
+    public function testOrderedReadUsesRepositoryOrderAndSanitizesFailures(): void
+    {
+        $second = $this->image(2, 7, 2, true);
+        $first = $this->image(1, 7, 9, false);
+        [$service, , $images, , $transaction] = $this->fixture(existing: [$second, $first]);
+
+        self::assertSame([$second, $first], $service->listForRoom(7));
+        self::assertSame(['list'], $transaction->events);
+
+        $images->failure = 'list';
+
+        try {
+            $service->listForRoom(7);
+            self::fail('Expected a sanitized image exception.');
+        } catch (RoomImageException $exception) {
+            self::assertSame('Room image operation failed.', $exception->getMessage());
+            self::assertStringNotContainsString('sensitive', $exception->getMessage());
+        }
+    }
+
+    public function testOrderedReadRejectsMissingRoomBeforeRepository(): void
+    {
+        [$service, , , , $transaction] = $this->fixture(roomExists: false);
+
+        try {
+            $service->listForRoom(7);
+            self::fail('Expected a missing-room exception.');
+        } catch (RoomImageException $exception) {
+            self::assertTrue($exception->isNotFound());
+            self::assertSame([], $transaction->events);
+        }
+    }
+
     public function testFirstUploadIsForcedPrimaryAndUsesZeroDefaultOrder(): void
     {
         [$service, $rooms, $images, $storage, $transaction] = $this->fixture();
@@ -563,7 +596,12 @@ final class ServiceImageRepository implements RoomImageCatalogRepository
     public ?RoomImage $deleteResult = null;
     public function __construct(private array &$events, private int $count, private array $existing, private ?RoomImage $primary) {}
     public function countByRoomId(int $roomId): int { $this->events[] = 'count'; return $this->count; }
-    public function findAllByRoomId(int $roomId): array { $this->events[] = 'list'; return $this->existing; }
+    public function findAllByRoomId(int $roomId): array
+    {
+        $this->events[] = 'list';
+        if ($this->failure === 'list') { throw new RuntimeException('sensitive database path'); }
+        return $this->existing;
+    }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { $this->events[] = 'primary'; return $this->primary; }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage
     {

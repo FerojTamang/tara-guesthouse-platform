@@ -17,6 +17,10 @@ final readonly class RoomCatalogFlashMessages
 
     private const AMENITY_SUCCESS_KEY = 'administrator_amenity_success';
 
+    private const ROOM_IMAGE_ERROR_KEY = 'administrator_room_image_error';
+
+    private const ROOM_IMAGE_OLD_INPUT_KEY = 'administrator_room_image_old_input';
+
     public function __construct(private Session $session)
     {
     }
@@ -49,6 +53,44 @@ final readonly class RoomCatalogFlashMessages
     public function pullAmenitySuccess(): ?string
     {
         return $this->pull(self::AMENITY_SUCCESS_KEY);
+    }
+
+    public function roomImageError(string $message): void
+    {
+        $this->session->set(self::ROOM_IMAGE_ERROR_KEY, $message);
+    }
+
+    public function pullRoomImageError(): ?string
+    {
+        return $this->pull(self::ROOM_IMAGE_ERROR_KEY);
+    }
+
+    /** @param array{alt_text: string, sort_order: string, is_primary: string} $input */
+    public function roomImageOldInput(array $input): void
+    {
+        $this->session->set(self::ROOM_IMAGE_OLD_INPUT_KEY, $input);
+    }
+
+    /** @return array{alt_text: string, sort_order: string, is_primary: string}|null */
+    public function pullRoomImageOldInput(): ?array
+    {
+        $input = $this->session->pull(self::ROOM_IMAGE_OLD_INPUT_KEY);
+
+        if (
+            !is_array($input)
+            || !isset($input['alt_text'], $input['sort_order'], $input['is_primary'])
+            || !is_string($input['alt_text'])
+            || !is_string($input['sort_order'])
+            || !is_string($input['is_primary'])
+        ) {
+            return null;
+        }
+
+        return [
+            'alt_text' => $input['alt_text'],
+            'sort_order' => $input['sort_order'],
+            'is_primary' => $input['is_primary'],
+        ];
     }
 
     private function pull(string $key): ?string

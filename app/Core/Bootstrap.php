@@ -29,6 +29,7 @@ use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
+use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
 
 /**
@@ -139,17 +140,22 @@ final class Bootstrap
             ),
         );
         $catalogFlashMessages = new RoomCatalogFlashMessages($session);
+        $roomImageServices = new RoomImageServiceProvider($catalogConnectionProvider, $resolvedBasePath);
         $catalogController = new AdministratorRoomCatalogController(
             $viewRenderer,
             $catalogServices,
             $csrfTokens,
             $catalogFlashMessages,
+            $roomImageServices->service(...),
+            new RoomImageUrl(),
         );
         $roomController = new AdministratorRoomController(
             $viewRenderer,
             $catalogServices,
             $csrfTokens,
             $catalogFlashMessages,
+            $roomImageServices->service(...),
+            new RoomImageUrl(),
         );
         $roomTypeController = new AdministratorRoomTypeController(
             $viewRenderer,
@@ -164,7 +170,7 @@ final class Bootstrap
             $catalogFlashMessages,
         );
         $roomImageController = new AdministratorRoomImageController(
-            ($roomImageServices = new RoomImageServiceProvider($catalogConnectionProvider, $resolvedBasePath))->service(...),
+            $roomImageServices->service(...),
             $roomImageServices->uploadConfiguration(...),
             $catalogFlashMessages,
         );

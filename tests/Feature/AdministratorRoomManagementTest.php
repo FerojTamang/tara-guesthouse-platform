@@ -19,12 +19,15 @@ use App\Core\ViewRenderer;
 use App\Exceptions\RoomCatalogException;
 use App\Models\Amenity;
 use App\Models\Room;
+use App\Models\RoomImage;
 use App\Models\RoomType;
+use App\Presentation\RoomImageUrl;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityCatalogRepository;
 use App\Repositories\RoomCatalogRepository;
+use App\Repositories\RoomImageCatalogRepository;
 use App\Repositories\RoomTypeCatalogRepository;
 use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
@@ -35,6 +38,10 @@ use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomCatalogTransaction;
 use App\Services\RoomTypeCatalogService;
+use App\Services\RoomImageService;
+use App\Storage\RoomImageStorage;
+use App\Storage\StoredRoomImage;
+use App\Core\UploadedFile;
 use DateTimeImmutable;
 use LogicException;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
@@ -65,6 +72,8 @@ final class AdministratorRoomManagementTest extends TestCase
 
     private RoomManagementAmenityRepositoryFake $amenities;
 
+    private RoomManagementImageRepositoryFake $images;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -81,6 +90,7 @@ final class AdministratorRoomManagementTest extends TestCase
         $this->roomTypes = new RoomManagementRoomTypeRepositoryFake();
         $this->amenities = new RoomManagementAmenityRepositoryFake();
         $this->rooms = new RoomManagementRoomRepositoryFake($this->roomTypes);
+        $this->images = new RoomManagementImageRepositoryFake();
         $transaction = new RoomManagementTransactionFake();
         $logger = new NullLogger();
         $renderer = new ViewRenderer(
@@ -111,12 +121,28 @@ final class AdministratorRoomManagementTest extends TestCase
             $services,
             $this->csrfTokens,
             $flashMessages,
+            fn (): RoomImageService => new RoomImageService(
+                $this->rooms,
+                $this->images,
+                new RoomManagementImageStorageFake(),
+                $transaction,
+                10,
+            ),
+            new RoomImageUrl(),
         );
         $roomController = new AdministratorRoomController(
             $renderer,
             $services,
             $this->csrfTokens,
             $flashMessages,
+            fn (): RoomImageService => new RoomImageService(
+                $this->rooms,
+                $this->images,
+                new RoomManagementImageStorageFake(),
+                $transaction,
+                10,
+            ),
+            new RoomImageUrl(),
         );
         $router = new Router();
         $registrar = require dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'admin.php';
@@ -199,6 +225,7 @@ final class AdministratorRoomManagementTest extends TestCase
         self::assertStringContainsString('value="active" selected', $response->body());
         self::assertStringContainsString('name="published" value="0"', $response->body());
         self::assertStringContainsString('name="amenity_ids[]"', $response->body());
+        self::assertStringNotContainsString('id="room-images"', $response->body());
     }
 
     public function testInvalidCreateReturns422AndPreservesEscapedInputWithoutWriting(): void
@@ -278,6 +305,10 @@ final class AdministratorRoomManagementTest extends TestCase
             false,
         );
         $this->rooms->amenityAssignments[7] = [2];
+        $this->images->items = [
+            new RoomImage(2, 7, 'uploads/rooms/' . str_repeat('b', 64) . '.webp', '<script>Lake</script>', 1, true, new DateTimeImmutable('2026-01-01 UTC')),
+            new RoomImage(1, 7, 'uploads/rooms/%2e%2e/' . str_repeat('a', 64) . '.png', null, 4, false, new DateTimeImmutable('2026-01-01 UTC')),
+        ];
         $this->authenticate();
 
         $formResponse = $this->application->handle(Request::create('GET', '/admin/rooms/7/edit'));
@@ -288,6 +319,18 @@ final class AdministratorRoomManagementTest extends TestCase
         self::assertStringContainsString('&lt;script&gt;Line two&lt;/script&gt;', $formResponse->body());
         self::assertStringNotContainsString('<script>Line two</script>', $formResponse->body());
         self::assertMatchesRegularExpression('/value="2"\s+checked/', $formResponse->body());
+        self::assertStringContainsString('id="room-images"', $formResponse->body());
+        self::assertStringContainsString('enctype="multipart/form-data"', $formResponse->body());
+        self::assertStringContainsString('name="image"', $formResponse->body());
+        self::assertStringContainsString('accept="image/jpeg,image/png,image/webp"', $formResponse->body());
+        self::assertStringNotContainsString('/admin/rooms/7/images/2/primary', $formResponse->body());
+        self::assertStringContainsString('/admin/rooms/7/images/1/primary', $formResponse->body());
+        self::assertStringContainsString('Primary image', $formResponse->body());
+        self::assertStringContainsString('&lt;script&gt;Lake&lt;/script&gt;', $formResponse->body());
+        self::assertStringNotContainsString('<script>Lake</script>', $formResponse->body());
+        self::assertStringContainsString('/assets/images/room-placeholder.svg', $formResponse->body());
+        self::assertStringNotContainsString('%2e%2e', $formResponse->body());
+        self::assertStringNotContainsString('C:\\', $formResponse->body());
 
         $this->reopenSession();
         $input = $this->validInput();
@@ -738,6 +781,28 @@ final class RoomManagementRoomRepositoryFake implements RoomCatalogRepository
 
         return $deleted;
     }
+}
+
+final class RoomManagementImageRepositoryFake implements RoomImageCatalogRepository
+{
+    /** @var list<RoomImage> */
+    public array $items = [];
+
+    public function countByRoomId(int $roomId): int { return count($this->items); }
+    public function findAllByRoomId(int $roomId): array { return $this->items; }
+    public function findPrimaryByRoomId(int $roomId): ?RoomImage { return null; }
+    public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage { return null; }
+    public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage { throw new LogicException(); }
+    public function clearPrimaryByRoomId(int $roomId): void { throw new LogicException(); }
+    public function updateMetadata(int $imageId, int $roomId, ?string $altText, int $sortOrder): ?RoomImage { throw new LogicException(); }
+    public function setPrimary(int $imageId, int $roomId): ?RoomImage { throw new LogicException(); }
+    public function delete(int $imageId, int $roomId): ?RoomImage { throw new LogicException(); }
+}
+
+final class RoomManagementImageStorageFake implements RoomImageStorage
+{
+    public function store(UploadedFile $file, string $detectedMediaType): StoredRoomImage { throw new LogicException(); }
+    public function remove(string $relativePath): void { throw new LogicException(); }
 }
 
 final class RoomManagementTransactionFake implements RoomCatalogTransaction

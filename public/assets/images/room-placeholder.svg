@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title description">
+  <title id="title">Room image unavailable</title>
+  <desc id="description">A neutral placeholder for an unavailable room image.</desc>
+  <rect width="640" height="480" fill="#e9ecef"/>
+  <path d="M120 360 250 220l80 85 55-60 135 115H120Z" fill="#adb5bd"/>
+  <circle cx="430" cy="145" r="42" fill="#adb5bd"/>
+</svg>

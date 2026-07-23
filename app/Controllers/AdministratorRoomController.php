@@ -12,21 +12,31 @@ use App\Exceptions\RoomCatalogException;
 use App\Models\Amenity;
 use App\Models\Room;
 use App\Models\RoomType;
+use App\Presentation\RoomImageUrl;
 use App\Requests\RoomUpsertRequest;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogServiceProvider;
+use App\Services\RoomImageService;
+use Closure;
+use Throwable;
 
 /**
  * Handles authenticated Administrator physical-room forms and soft deletion.
  */
-final readonly class AdministratorRoomController
+final class AdministratorRoomController
 {
+    /** @var Closure(): mixed */
+    private readonly Closure $imageServiceProvider;
+
     public function __construct(
         private ViewRenderer $views,
         private RoomCatalogServiceProvider $services,
         private CsrfTokenManager $csrfTokens,
         private RoomCatalogFlashMessages $flashMessages,
+        callable $imageServiceProvider,
+        private readonly RoomImageUrl $imageUrls,
     ) {
+        $this->imageServiceProvider = Closure::fromCallable($imageServiceProvider);
     }
 
     /** @param array<string, string> $parameters */
@@ -107,6 +117,7 @@ final readonly class AdministratorRoomController
         try {
             $room = $this->services->rooms()->get($id);
             $amenityIds = $this->services->rooms()->amenityIds($id);
+            $images = $this->imageService()->listForRoom($id);
         } catch (RoomCatalogException $exception) {
             if ($exception->isNotFound()) {
                 return $this->notFound();
@@ -120,6 +131,11 @@ final readonly class AdministratorRoomController
             '/admin/rooms/' . $room->id(),
             'Save room',
             $this->storedValues($room, $amenityIds),
+            roomId: $room->id(),
+            images: array_map($this->imageView(...), $images),
+            imageSuccess: $this->flashMessages->pullRoomSuccess(),
+            imageError: $this->flashMessages->pullRoomImageError(),
+            imageOldInput: $this->flashMessages->pullRoomImageOldInput(),
         );
     }
 
@@ -423,6 +439,11 @@ final readonly class AdministratorRoomController
         array $values,
         ?string $error = null,
         int $statusCode = 200,
+        ?int $roomId = null,
+        array $images = [],
+        ?string $imageSuccess = null,
+        ?string $imageError = null,
+        ?array $imageOldInput = null,
     ): Response {
         $html = $this->views->render(
             'admin.rooms.form',
@@ -438,11 +459,53 @@ final readonly class AdministratorRoomController
                 'roomTypes' => array_map($this->roomTypeOption(...), $this->services->roomTypes()->listAll()),
                 'amenities' => array_map($this->amenityOption(...), $this->services->amenities()->listAll()),
                 'error' => $error,
+                'roomId' => $roomId,
+                'images' => $images,
+                'imageSuccess' => $imageSuccess,
+                'imageError' => $imageError,
+                'imageOldInput' => $imageOldInput ?? [
+                    'alt_text' => '',
+                    'sort_order' => '',
+                    'is_primary' => '0',
+                ],
             ],
             'layouts.admin',
         );
 
         return Response::html($html, $statusCode, ['Cache-Control' => 'no-store']);
+    }
+
+    private function imageService(): RoomImageService
+    {
+        $service = ($this->imageServiceProvider)();
+
+        if (!$service instanceof RoomImageService) {
+            throw RoomCatalogException::failure();
+        }
+
+        return $service;
+    }
+
+    /**
+     * @return array{
+     *   id: string, url: string, altText: string, sortOrder: string, primary: bool
+     * }
+     */
+    private function imageView(\App\Models\RoomImage $image): array
+    {
+        try {
+            $url = $this->imageUrls->fromStoredPath($image->filePath());
+        } catch (Throwable) {
+            $url = '/assets/images/room-placeholder.svg';
+        }
+
+        return [
+            'id' => (string) $image->id(),
+            'url' => $url,
+            'altText' => $image->altText() ?? '',
+            'sortOrder' => (string) $image->sortOrder(),
+            'primary' => $image->isPrimary(),
+        ];
     }
 
     /** @return array{id: string, name: string, active: bool} */

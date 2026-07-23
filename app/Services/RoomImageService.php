@@ -28,6 +28,22 @@ final readonly class RoomImageService
         }
     }
 
+    /** @return list<RoomImage> */
+    public function listForRoom(int $roomId): array
+    {
+        try {
+            if ($roomId <= 0 || !$this->rooms->findById($roomId) instanceof Room) {
+                throw RoomImageException::roomNotFound();
+            }
+
+            return $this->images->findAllByRoomId($roomId);
+        } catch (RoomImageException $exception) {
+            throw $exception;
+        } catch (Throwable $failure) {
+            throw RoomImageException::system($failure);
+        }
+    }
+
     public function upload(RoomImageUploadRequest $request): RoomImage
     {
         $this->rejectExistingTransaction();

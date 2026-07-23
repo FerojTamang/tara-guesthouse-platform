@@ -167,7 +167,7 @@ final class AdministratorRoomImageManagementTest extends TestCase
         $this->authenticate();
         $upload = $this->application->handle($this->uploadRequest());
         self::assertSame(303, $upload->statusCode());
-        self::assertSame('/admin/rooms', $upload->headers()['Location']);
+        self::assertSame('/admin/rooms/7/edit#room-images', $upload->headers()['Location']);
         self::assertTrue($this->images->items[1]->isPrimary());
         self::assertSame(1, $this->storage->stores);
         $this->assertFlashOnce('Room image uploaded successfully.');
@@ -211,8 +211,8 @@ final class AdministratorRoomImageManagementTest extends TestCase
             '/admin/rooms/7/images',
             input: ['_csrf' => $this->csrfTokens->token(), 'is_primary' => '0'],
         ));
-        self::assertSame(422, $missingUpload->statusCode());
-        self::assertSame('Room image is required.', $missingUpload->body());
+        self::assertSame(303, $missingUpload->statusCode());
+        self::assertSame('/admin/rooms/7/edit#room-images', $missingUpload->headers()['Location']);
 
         foreach (['0', '-1', '+1', ' 1', '1.0', '1e2', 'x1', str_repeat('9', 40)] as $invalid) {
             $this->reopenSession();
@@ -227,8 +227,8 @@ final class AdministratorRoomImageManagementTest extends TestCase
         $this->images->count = 10;
         $this->reopenSession();
         $limit = $this->application->handle($this->uploadRequest());
-        self::assertSame(409, $limit->statusCode());
-        self::assertSame('This room already has the maximum of 10 images.', $limit->body());
+        self::assertSame(303, $limit->statusCode());
+        self::assertSame('/admin/rooms/7/edit#room-images', $limit->headers()['Location']);
 
         $this->images->count = 0;
         $this->images->items[1] = self::image(1, false);
@@ -328,7 +328,7 @@ final class AdministratorRoomImageManagementTest extends TestCase
                     input: [...$input, 'room_id' => '999', 'image_id' => '999', 'file_path' => 'secret'],
                     files: ['image' => ['name' => $name, 'type' => 'attacker/value', 'tmp_name' => $path, 'error' => $error, 'size' => $size]],
                 ));
-                self::assertSame(422, $response->statusCode(), $label);
+                self::assertSame(303, $response->statusCode(), $label); self::assertSame('/admin/rooms/7/edit#room-images', $response->headers()['Location'], $label);
                 self::assertSame($before, $this->transaction->begins, $label);
                 self::assertStringNotContainsString($path, $response->body());
                 self::assertStringNotContainsString('secret', $response->body());
@@ -356,7 +356,7 @@ final class AdministratorRoomImageManagementTest extends TestCase
                 '/admin/rooms/7/images/1',
                 input: [...$input, '_csrf' => $this->csrfTokens->token()],
             ));
-            self::assertSame(422, $response->statusCode());
+            self::assertSame(303, $response->statusCode()); self::assertSame('/admin/rooms/7/edit#room-images', $response->headers()['Location']);
             self::assertSame($before, $this->transaction->begins);
             self::assertSame(0, $this->images->updates);
             $this->reopenSession();

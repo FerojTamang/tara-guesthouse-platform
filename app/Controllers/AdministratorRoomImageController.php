@@ -53,11 +53,11 @@ final class AdministratorRoomImageController
             $this->service()->upload($validated);
             $this->flashMessages->roomSuccess('Room image uploaded successfully.');
 
-            return $this->success();
+            return $this->success($roomId);
         } catch (RoomCatalogException $exception) {
-            return $this->validation($exception);
+            return $this->validation($request, $roomId, $exception);
         } catch (RoomImageException $exception) {
-            return $this->imageFailure($exception);
+            return $this->imageFailure($request, $roomId, $exception);
         } catch (Throwable) {
             return $this->systemFailure();
         }
@@ -81,7 +81,7 @@ final class AdministratorRoomImageController
                 $request->input('sort_order'),
             );
         } catch (RoomCatalogException $exception) {
-            return $this->validation($exception);
+            return $this->validation($request, $roomId, $exception);
         }
 
         try {
@@ -93,9 +93,9 @@ final class AdministratorRoomImageController
             );
             $this->flashMessages->roomSuccess('Room image metadata updated successfully.');
 
-            return $this->success();
+            return $this->success($roomId);
         } catch (RoomImageException $exception) {
-            return $this->imageFailure($exception);
+            return $this->imageFailure($request, $roomId, $exception);
         } catch (Throwable) {
             return $this->systemFailure();
         }
@@ -135,9 +135,9 @@ final class AdministratorRoomImageController
             $action($roomId, $imageId);
             $this->flashMessages->roomSuccess($message);
 
-            return $this->success();
+            return $this->success($roomId);
         } catch (RoomImageException $exception) {
-            return $this->imageFailure($exception);
+            return $this->imageFailure(null, $roomId, $exception);
         } catch (Throwable) {
             return $this->systemFailure();
         }
@@ -170,15 +170,17 @@ final class AdministratorRoomImageController
         return (int) $normalized;
     }
 
-    private function imageFailure(RoomImageException $exception): Response
+    private function imageFailure(?Request $request, int $roomId, RoomImageException $exception): Response
     {
         if ($exception->isNotFound()) {
             return $this->notFound();
         }
 
-        $status = $exception->isLimit() ? 409 : 500;
+        if ($exception->isLimit()) {
+            return $this->recoverableFailure($request, $roomId, $exception->getMessage());
+        }
 
-        return Response::text($exception->getMessage(), $status, ['Cache-Control' => 'no-store']);
+        return Response::text($exception->getMessage(), 500, ['Cache-Control' => 'no-store']);
     }
 
     private function service(): RoomImageService
@@ -204,9 +206,9 @@ final class AdministratorRoomImageController
         return $configuration;
     }
 
-    private function validation(RoomCatalogException $exception): Response
+    private function validation(Request $request, int $roomId, RoomCatalogException $exception): Response
     {
-        return Response::text($exception->getMessage(), 422, ['Cache-Control' => 'no-store']);
+        return $this->recoverableFailure($request, $roomId, $exception->getMessage());
     }
 
     private function systemFailure(): Response
@@ -214,9 +216,36 @@ final class AdministratorRoomImageController
         return Response::text('Room image operation failed.', 500, ['Cache-Control' => 'no-store']);
     }
 
-    private function success(): Response
+    private function success(int $roomId): Response
     {
-        return Response::redirect('/admin/rooms', 303, ['Cache-Control' => 'no-store']);
+        return Response::redirect($this->editLocation($roomId), 303, ['Cache-Control' => 'no-store']);
+    }
+
+    private function recoverableFailure(?Request $request, int $roomId, string $message): Response
+    {
+        $this->flashMessages->roomImageError($message);
+
+        if ($request !== null) {
+            $this->flashMessages->roomImageOldInput([
+                'alt_text' => $this->safeScalar($request->input('alt_text'), 255),
+                'sort_order' => $this->safeScalar($request->input('sort_order'), 5),
+                'is_primary' => $request->input('is_primary') === '1' ? '1' : '0',
+            ]);
+        }
+
+        return Response::redirect($this->editLocation($roomId), 303, ['Cache-Control' => 'no-store']);
+    }
+
+    private function safeScalar(mixed $value, int $maximumBytes): string
+    {
+        return is_string($value) && strlen($value) <= $maximumBytes && preg_match('//u', $value) === 1
+            ? $value
+            : '';
+    }
+
+    private function editLocation(int $roomId): string
+    {
+        return '/admin/rooms/' . $roomId . '/edit#room-images';
     }
 
     private function notFound(): Response
