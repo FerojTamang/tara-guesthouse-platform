@@ -21,6 +21,7 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         '20260722000300_create_room_images_table',
         '20260722000400_create_amenities_table',
         '20260722000500_create_room_amenities_table',
+        '20260723000100_add_room_image_persistence_constraints',
     ];
 
     private MigrationRunner $runner;
@@ -225,7 +226,7 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         self::assertSame(0, (int) $this->connection->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
 
         self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
-        self::assertSame(count(self::APPLICATION_MIGRATIONS), $this->applicationTableCount());
+        self::assertSame(7, $this->applicationTableCount());
         self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
         self::assertSame(0, $this->applicationTableCount());
     }

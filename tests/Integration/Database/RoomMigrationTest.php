@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Database;
 
+use App\Core\Migration;
 use App\Core\MigrationRunner;
 use PDOException;
 use PHPUnit\Framework\Attributes\Group;
@@ -20,6 +21,7 @@ final class RoomMigrationTest extends DatabaseTestCase
         '20260722000300_create_room_images_table',
         '20260722000400_create_amenities_table',
         '20260722000500_create_room_amenities_table',
+        '20260723000100_add_room_image_persistence_constraints',
     ];
 
     private MigrationRunner $runner;
@@ -102,6 +104,7 @@ final class RoomMigrationTest extends DatabaseTestCase
             'sort_order',
             'is_primary',
             'created_at',
+            'primary_room_id',
         ], array_keys($roomImages));
         $this->assertBigIntUnsigned($roomImages['id'], false, true);
         $this->assertBigIntUnsigned($roomImages['room_id'], false, false);
@@ -110,6 +113,7 @@ final class RoomMigrationTest extends DatabaseTestCase
         $this->assertInteger($roomImages['sort_order'], false);
         $this->assertBoolean($roomImages['is_primary'], false);
         $this->assertTimestampColumn($roomImages['created_at'], false);
+        $this->assertGeneratedPrimaryRoomId($roomImages['primary_room_id']);
 
         $amenities = $this->columns('amenities');
         self::assertSame([
@@ -162,7 +166,13 @@ final class RoomMigrationTest extends DatabaseTestCase
             'chk_room_images_is_primary' => 'CHECK',
             'chk_room_images_sort_order' => 'CHECK',
             'fk_room_images_room' => 'FOREIGN KEY',
+            'uq_room_images_file_path' => 'UNIQUE',
+            'uq_room_images_primary_room' => 'UNIQUE',
         ], $this->constraints('room_images'));
+        self::assertSame(
+            ['room_id', 'sort_order', 'id'],
+            $this->indexColumns('room_images', 'idx_room_images_room_order'),
+        );
         self::assertSame([
             'PRIMARY' => 'PRIMARY KEY',
             'chk_amenities_is_active' => 'CHECK',
@@ -252,6 +262,26 @@ final class RoomMigrationTest extends DatabaseTestCase
         $this->assertPdoFailure(fn () => $this->insertRoomImage($roomId, 'rooms/negative.webp', -1, 0));
         $this->assertPdoFailure(fn () => $this->insertRoomImage($roomId, 'rooms/bad-primary.webp', 1, 2));
         $this->assertPdoFailure(fn () => $this->insertRoomImage($roomId + 999, 'rooms/missing.webp', 1, 0));
+        $this->assertPdoFailure(fn () => $this->insertRoomImage($roomId, 'rooms/101/primary.webp', 2, 0));
+        $this->assertPdoFailure(fn () => $this->insertRoomImage($roomId, 'rooms/101/second-primary.webp', 2, 1));
+
+        $this->insertRoomImage($roomId, 'rooms/101/detail-a.webp', 2, 0);
+        $this->insertRoomImage($roomId, 'rooms/101/detail-b.webp', 2, 0);
+        $secondRoomId = $this->insertRoom(
+            $roomTypeId,
+            '109',
+            'Garden Room 109',
+            'garden-room-109',
+            '7000.00',
+            2,
+            1,
+            'active',
+            1,
+        );
+        $this->insertRoomImage($secondRoomId, 'rooms/109/primary.webp', 0, 1);
+        $this->assertPdoFailure(
+            fn () => $this->insertRoomImage($secondRoomId, 'rooms/101/detail-a.webp', 1, 0),
+        );
 
         $this->assertPdoFailure(fn () => $this->insertAmenity('WI-FI', null, 1));
         $this->assertPdoFailure(fn () => $this->insertAmenity('Bad Active Amenity', null, 2));
@@ -282,6 +312,136 @@ final class RoomMigrationTest extends DatabaseTestCase
         );
     }
 
+    public function testPersistenceConstraintMigrationAcceptsValidExistingRows(): void
+    {
+        $this->migrateBeforePersistenceConstraints();
+        $roomTypeId = $this->insertRoomType('Existing Type', 'existing-type', '5000.00', 2, 0, 1);
+        $firstRoomId = $this->insertRoom(
+            $roomTypeId,
+            '201',
+            'Existing Room 201',
+            'existing-room-201',
+            '5000.00',
+            2,
+            0,
+            'active',
+            1,
+        );
+        $secondRoomId = $this->insertRoom(
+            $roomTypeId,
+            '202',
+            'Existing Room 202',
+            'existing-room-202',
+            '5000.00',
+            2,
+            0,
+            'active',
+            1,
+        );
+        $this->insertRoomImage($firstRoomId, 'rooms/201/primary.webp', 0, 1);
+        $this->insertRoomImage($firstRoomId, 'rooms/201/detail.webp', 1, 0);
+        $this->insertRoomImage($secondRoomId, 'rooms/202/primary.webp', 0, 1);
+
+        $this->persistenceConstraintMigration()->up($this->connection);
+
+        $rows = $this->connection->query(
+            'SELECT room_id, is_primary, primary_room_id FROM room_images ORDER BY id',
+        )->fetchAll();
+        self::assertCount(3, $rows);
+        self::assertSame($firstRoomId, (int) $rows[0]['primary_room_id']);
+        self::assertNull($rows[1]['primary_room_id']);
+        self::assertSame($secondRoomId, (int) $rows[2]['primary_room_id']);
+    }
+
+    public function testPersistenceConstraintMigrationRejectsDuplicateExistingPathsWithoutRepair(): void
+    {
+        $this->migrateBeforePersistenceConstraints();
+        $roomTypeId = $this->insertRoomType('Duplicate Type', 'duplicate-type', '5000.00', 2, 0, 1);
+        $roomId = $this->insertRoom(
+            $roomTypeId,
+            '301',
+            'Duplicate Room 301',
+            'duplicate-room-301',
+            '5000.00',
+            2,
+            0,
+            'active',
+            1,
+        );
+        $this->insertRoomImage($roomId, 'rooms/301/duplicate.webp', 0, 0);
+        $this->insertRoomImage($roomId, 'rooms/301/duplicate.webp', 1, 0);
+
+        $this->assertPdoFailure(fn () => $this->persistenceConstraintMigration()->up($this->connection));
+
+        self::assertSame(2, (int) $this->connection->query('SELECT COUNT(*) FROM room_images')->fetchColumn());
+        self::assertArrayNotHasKey('primary_room_id', $this->columns('room_images'));
+    }
+
+    public function testPersistenceConstraintMigrationRejectsExistingMultiplePrimariesWithoutRepair(): void
+    {
+        $this->migrateBeforePersistenceConstraints();
+        $roomTypeId = $this->insertRoomType('Primary Type', 'primary-type', '5000.00', 2, 0, 1);
+        $roomId = $this->insertRoom(
+            $roomTypeId,
+            '401',
+            'Primary Room 401',
+            'primary-room-401',
+            '5000.00',
+            2,
+            0,
+            'active',
+            1,
+        );
+        $this->insertRoomImage($roomId, 'rooms/401/first.webp', 0, 1);
+        $this->insertRoomImage($roomId, 'rooms/401/second.webp', 1, 1);
+
+        $this->assertPdoFailure(fn () => $this->persistenceConstraintMigration()->up($this->connection));
+
+        self::assertSame(2, (int) $this->connection->query(
+            'SELECT COUNT(*) FROM room_images WHERE is_primary = 1',
+        )->fetchColumn());
+        self::assertArrayNotHasKey('primary_room_id', $this->columns('room_images'));
+    }
+
+    public function testPersistenceConstraintRollbackPreservesOriginalTableRowsAndForeignKey(): void
+    {
+        $this->runner->migrate();
+        $roomTypeId = $this->insertRoomType('Rollback Type', 'rollback-type', '5000.00', 2, 0, 1);
+        $roomId = $this->insertRoom(
+            $roomTypeId,
+            '501',
+            'Rollback Room 501',
+            'rollback-room-501',
+            '5000.00',
+            2,
+            0,
+            'active',
+            1,
+        );
+        $imageId = $this->insertRoomImage($roomId, 'rooms/501/primary.webp', 0, 1);
+        $migration = $this->persistenceConstraintMigration();
+
+        $migration->down($this->connection);
+
+        self::assertSame(
+            ['id', 'room_id', 'file_path', 'alt_text', 'sort_order', 'is_primary', 'created_at'],
+            array_keys($this->columns('room_images')),
+        );
+        self::assertSame($imageId, (int) $this->connection->query('SELECT id FROM room_images')->fetchColumn());
+        self::assertSame(['RESTRICT', 'CASCADE'], $this->referentialRules('fk_room_images_room'));
+        self::assertSame([], $this->indexColumns('room_images', 'idx_room_images_room_order'));
+        $rolledBackConstraints = $this->constraints('room_images');
+        self::assertArrayNotHasKey('uq_room_images_file_path', $rolledBackConstraints);
+        self::assertArrayNotHasKey('uq_room_images_primary_room', $rolledBackConstraints);
+
+        $migration->up($this->connection);
+        self::assertArrayHasKey('primary_room_id', $this->columns('room_images'));
+        self::assertSame(
+            ['room_id', 'sort_order', 'id'],
+            $this->indexColumns('room_images', 'idx_room_images_room_order'),
+        );
+    }
+
     public function testRoomMigrationsRollbackInDependencyOrderAndRemigrateCleanly(): void
     {
         self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
@@ -302,7 +462,8 @@ final class RoomMigrationTest extends DatabaseTestCase
     {
         $statement = $this->connection->prepare(
             'SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA, '
-            . 'CHARACTER_MAXIMUM_LENGTH, COLLATION_NAME, NUMERIC_PRECISION, NUMERIC_SCALE '
+            . 'CHARACTER_MAXIMUM_LENGTH, COLLATION_NAME, NUMERIC_PRECISION, NUMERIC_SCALE, '
+            . 'GENERATION_EXPRESSION '
             . 'FROM information_schema.COLUMNS '
             . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name ORDER BY ORDINAL_POSITION',
         );
@@ -390,6 +551,19 @@ final class RoomMigrationTest extends DatabaseTestCase
         self::assertSame('NULL', $column['COLUMN_DEFAULT']);
     }
 
+    /** @param array<string, mixed> $column */
+    private function assertGeneratedPrimaryRoomId(array $column): void
+    {
+        self::assertSame('bigint', $column['DATA_TYPE']);
+        self::assertStringContainsString('unsigned', strtolower((string) $column['COLUMN_TYPE']));
+        self::assertSame('YES', $column['IS_NULLABLE']);
+        self::assertStringContainsString('virtual generated', strtolower((string) $column['EXTRA']));
+        $expression = strtolower((string) $column['GENERATION_EXPRESSION']);
+        self::assertStringContainsString('case', $expression);
+        self::assertStringContainsString('is_primary', $expression);
+        self::assertStringContainsString('room_id', $expression);
+    }
+
     private function tableOption(string $table, string $column): string
     {
         if (!in_array($column, ['ENGINE', 'TABLE_COLLATION'], true)) {
@@ -426,6 +600,22 @@ final class RoomMigrationTest extends DatabaseTestCase
         ksort($constraints, SORT_STRING);
 
         return $constraints;
+    }
+
+    /** @return list<string> */
+    private function indexColumns(string $table, string $index): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT COLUMN_NAME FROM information_schema.STATISTICS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND INDEX_NAME = :index_name '
+            . 'ORDER BY SEQ_IN_INDEX',
+        );
+        $statement->execute(['table_name' => $table, 'index_name' => $index]);
+
+        return array_map(
+            static fn (array $row): string => (string) $row['COLUMN_NAME'],
+            $statement->fetchAll(),
+        );
     }
 
     /** @return array{0: string, 1: string} */
@@ -586,5 +776,37 @@ final class RoomMigrationTest extends DatabaseTestCase
             "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
             . "AND TABLE_NAME IN ('room_types', 'rooms', 'room_images', 'amenities', 'room_amenities')",
         )->fetchColumn();
+    }
+
+    private function migrateBeforePersistenceConstraints(): void
+    {
+        foreach (array_slice(self::APPLICATION_MIGRATIONS, 0, -1) as $migrationName) {
+            $path = dirname(__DIR__, 3)
+                . DIRECTORY_SEPARATOR
+                . 'database'
+                . DIRECTORY_SEPARATOR
+                . 'migrations'
+                . DIRECTORY_SEPARATOR
+                . $migrationName
+                . '.php';
+            $migration = require $path;
+            self::assertInstanceOf(Migration::class, $migration);
+            $migration->up($this->connection);
+        }
+    }
+
+    private function persistenceConstraintMigration(): Migration
+    {
+        $path = dirname(__DIR__, 3)
+            . DIRECTORY_SEPARATOR
+            . 'database'
+            . DIRECTORY_SEPARATOR
+            . 'migrations'
+            . DIRECTORY_SEPARATOR
+            . '20260723000100_add_room_image_persistence_constraints.php';
+        $migration = require $path;
+        self::assertInstanceOf(Migration::class, $migration);
+
+        return $migration;
     }
 }
