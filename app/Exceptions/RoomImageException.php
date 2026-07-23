@@ -23,6 +23,11 @@ final class RoomImageException extends RuntimeException
         return new self('The requested room was not found.', 'not_found');
     }
 
+    public static function imageNotFound(): self
+    {
+        return new self('The requested room image was not found.', 'not_found');
+    }
+
     public static function limitReached(int $maximum): self
     {
         return new self(

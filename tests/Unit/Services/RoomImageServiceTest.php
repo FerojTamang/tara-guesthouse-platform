@@ -223,6 +223,263 @@ final class RoomImageServiceTest extends TestCase
         }
     }
 
+    public function testMetadataUpdateUsesOwnedImageAndCommitsWithoutStorage(): void
+    {
+        [$service, , $images, $storage, $transaction] = $this->fixture();
+        $images->owned = $this->image(4, 7, 3, false);
+        $images->updateResult = $this->image(4, 7, 12, false, 'Courtyard');
+
+        $updated = $service->updateMetadata(7, 4, 'Courtyard', 12);
+
+        self::assertSame('Courtyard', $updated->altText());
+        self::assertSame(12, $updated->sortOrder());
+        self::assertSame(['begin', 'lock', 'owned', 'update', 'commit'], $transaction->events);
+        self::assertSame(0, $storage->stores);
+        self::assertSame(0, $storage->removes);
+    }
+
+    public function testMetadataUpdateAllowsNullAndRejectsInvalidOrMissingTargets(): void
+    {
+        [$service, , $images] = $this->fixture();
+        $images->owned = $this->image(4, 7, 3, false, 'Old');
+        $images->updateResult = $this->image(4, 7, 5, false);
+        self::assertNull($service->updateMetadata(7, 4, null, 5)->altText());
+
+        foreach (['room', 'image', 'negative'] as $case) {
+            [$failing, , $repository, $storage, $transaction] = $this->fixture(roomExists: $case !== 'room');
+            $repository->owned = $case === 'image' ? null : $this->image(4, 7, 3, false);
+
+            try {
+                $failing->updateMetadata(7, 4, null, $case === 'negative' ? -1 : 0);
+                self::fail('Expected metadata rejection.');
+            } catch (RoomImageException $exception) {
+                self::assertSame($case === 'room'
+                    ? 'The requested room was not found.'
+                    : ($case === 'image' ? 'The requested room image was not found.' : 'Room image operation failed.'), $exception->getMessage());
+                self::assertSame(0, $storage->stores);
+                self::assertSame('rollback', $transaction->events[array_key_last($transaction->events)]);
+            }
+        }
+    }
+
+    public function testMetadataRepositoryNullAndFailuresUseSafePrecedence(): void
+    {
+        foreach (['null', 'failure', 'commit', 'rollback'] as $case) {
+            [$service, , $images, , $transaction] = $this->fixture();
+            $images->owned = $this->image(4, 7, 0, false);
+            $images->updateResult = $case === 'null' ? null : $this->image(4, 7, 1, false);
+            $images->failure = in_array($case, ['failure', 'rollback'], true) ? 'update' : null;
+            $transaction->failCommitActive = $case === 'commit';
+            $transaction->failRollback = $case === 'rollback';
+
+            try {
+                $service->updateMetadata(7, 4, null, 1);
+                self::fail('Expected metadata workflow failure.');
+            } catch (RoomImageException $exception) {
+                self::assertSame(
+                    $case === 'rollback' ? 'Room image cleanup failed.' : 'Room image operation failed.',
+                    $exception->getMessage(),
+                );
+            }
+        }
+    }
+
+    public function testPrimaryReplacementAndAlreadyPrimaryFollowExactOrder(): void
+    {
+        [$service, , $images, $storage, $transaction] = $this->fixture();
+        $images->owned = $this->image(4, 7, 2, false);
+        $images->setResult = $this->image(4, 7, 2, true);
+        self::assertTrue($service->setPrimary(7, 4)->isPrimary());
+        self::assertSame(['begin', 'lock', 'owned', 'clear', 'set', 'commit'], $transaction->events);
+        self::assertSame(0, $storage->removes);
+
+        [$stable, , $stableImages, , $stableTransaction] = $this->fixture();
+        $stableImages->owned = $this->image(4, 7, 2, true);
+        self::assertTrue($stable->setPrimary(7, 4)->isPrimary());
+        self::assertSame(['begin', 'lock', 'owned', 'commit'], $stableTransaction->events);
+        self::assertSame(0, $stableImages->clears);
+        self::assertSame(0, $stableImages->sets);
+    }
+
+    public function testPrimaryFailuresRollBackAndRemainSanitized(): void
+    {
+        foreach (['clear', 'set', 'null'] as $case) {
+            [$service, , $images, $storage, $transaction] = $this->fixture();
+            $images->owned = $this->image(4, 7, 2, false);
+            $images->setResult = $case === 'null' ? null : $this->image(4, 7, 2, true);
+            $images->failure = $case === 'null' ? null : $case;
+
+            try {
+                $service->setPrimary(7, 4);
+                self::fail('Expected primary workflow failure.');
+            } catch (RoomImageException $exception) {
+                self::assertTrue($exception->isSystemFailure());
+                self::assertSame('rollback', $transaction->events[array_key_last($transaction->events)]);
+                self::assertSame(0, $storage->removes);
+            }
+        }
+    }
+
+    public function testPrimaryActiveCommitFailureRollsBackWithoutStorage(): void
+    {
+        [$service, $rooms, $images, $storage, $transaction] = $this->fixture();
+        $images->owned = $this->image(4, 7, 2, false);
+        $images->setResult = $this->image(4, 7, 2, true);
+        $transaction->failCommitActive = true;
+
+        try {
+            $service->setPrimary(7, 4);
+            self::fail('Expected active commit failure.');
+        } catch (RoomImageException $exception) {
+            self::assertTrue($exception->isSystemFailure());
+            self::assertSame('Room image operation failed.', $exception->getMessage());
+            self::assertSame(1, $rooms->locks);
+            self::assertSame(1, $images->clears);
+            self::assertSame(1, $images->sets);
+            self::assertSame(
+                ['begin', 'lock', 'owned', 'clear', 'set', 'commit', 'rollback'],
+                $transaction->events,
+            );
+            self::assertFalse($transaction->active);
+            self::assertSame(0, $storage->stores);
+            self::assertSame(0, $storage->removes);
+        }
+    }
+
+    public function testDeleteNonPrimaryCommitsBeforeRemovingAndReturnsDeletedModel(): void
+    {
+        [$service, , $images, $storage, $transaction] = $this->fixture();
+        $owned = $this->image(4, 7, 2, false);
+        $images->owned = $owned;
+        $images->deleteResult = $owned;
+
+        self::assertSame($owned, $service->delete(7, 4));
+        self::assertSame(['begin', 'lock', 'owned', 'delete', 'commit', 'remove'], $transaction->events);
+        self::assertSame([$owned->filePath()], $storage->removedPaths);
+        self::assertSame(0, $images->sets);
+    }
+
+    public function testDeletePrimarySelectsFirstFallbackOrLeavesNone(): void
+    {
+        $owned = $this->image(4, 7, 0, true);
+        $first = $this->image(5, 7, 1, false);
+        $second = $this->image(6, 7, 1, false);
+        [$service, , $images, , $transaction] = $this->fixture(existing: [$first, $second]);
+        $images->owned = $owned;
+        $images->deleteResult = $owned;
+        $images->setResult = $this->image(5, 7, 1, true);
+
+        $service->delete(7, 4);
+        self::assertSame(['begin', 'lock', 'owned', 'delete', 'list', 'set', 'commit', 'remove'], $transaction->events);
+        self::assertSame(1, $images->sets);
+        self::assertSame(0, $images->clears);
+
+        [$onlyService, , $onlyImages, , $onlyTransaction] = $this->fixture();
+        $onlyImages->owned = $owned;
+        $onlyImages->deleteResult = $owned;
+        $onlyService->delete(7, 4);
+        self::assertSame(['begin', 'lock', 'owned', 'delete', 'list', 'commit', 'remove'], $onlyTransaction->events);
+    }
+
+    public function testDeletePreCommitFailuresNeverRemoveFile(): void
+    {
+        foreach (['delete', 'delete-null', 'fallback'] as $case) {
+            $fallback = $this->image(5, 7, 1, false);
+            [$service, , $images, $storage, $transaction] = $this->fixture(existing: [$fallback]);
+            $images->owned = $this->image(4, 7, 0, true);
+            $images->deleteResult = $case === 'delete-null' ? null : $images->owned;
+            $images->setResult = $this->image(5, 7, 1, true);
+            $images->failure = $case === 'delete' ? 'delete' : ($case === 'fallback' ? 'set' : null);
+
+            try {
+                $service->delete(7, 4);
+                self::fail('Expected delete workflow failure.');
+            } catch (RoomImageException $exception) {
+                self::assertTrue($exception->isSystemFailure());
+                self::assertSame(0, $storage->removes);
+                self::assertSame('rollback', $transaction->events[array_key_last($transaction->events)]);
+            }
+        }
+    }
+
+    public function testDeleteCommitRollbackAndPostCommitCleanupPrecedence(): void
+    {
+        foreach (['commit', 'rollback', 'remove'] as $case) {
+            [$service, , $images, $storage, $transaction] = $this->fixture();
+            $images->owned = $this->image(4, 7, 0, false);
+            $images->deleteResult = $images->owned;
+            $transaction->failCommitActive = $case === 'commit' || $case === 'rollback';
+            $transaction->failRollback = $case === 'rollback';
+            $storage->failRemove = $case === 'remove';
+
+            try {
+                $service->delete(7, 4);
+                self::fail('Expected deletion failure.');
+            } catch (RoomImageException $exception) {
+                self::assertSame(
+                    in_array($case, ['rollback', 'remove'], true)
+                        ? 'Room image cleanup failed.'
+                        : 'Room image operation failed.',
+                    $exception->getMessage(),
+                );
+                self::assertSame($case === 'remove' ? 1 : 0, $storage->removes);
+                if ($case === 'remove') {
+                    self::assertNotContains('rollback', $transaction->events);
+                    self::assertNotNull($exception->cleanupCause());
+                }
+            }
+        }
+    }
+
+    public function testNewWorkflowsRejectNestedTransactionsWithoutMutation(): void
+    {
+        foreach (['metadata', 'primary', 'delete'] as $workflow) {
+            [$service, , $images, $storage, $transaction] = $this->fixture();
+            $transaction->active = true;
+
+            try {
+                match ($workflow) {
+                    'metadata' => $service->updateMetadata(7, 4, null, 0),
+                    'primary' => $service->setPrimary(7, 4),
+                    'delete' => $service->delete(7, 4),
+                };
+                self::fail('Expected nested transaction rejection.');
+            } catch (RoomImageException $exception) {
+                self::assertTrue($exception->isSystemFailure());
+                self::assertSame([], $transaction->events);
+                self::assertSame(0, $images->updates + $images->sets + $images->deletes);
+                self::assertSame(0, $storage->removes);
+            }
+        }
+    }
+
+    public function testPrimaryAndDeleteKeepMissingRoomsAndImagesIndistinguishable(): void
+    {
+        foreach (['primary', 'delete'] as $workflow) {
+            foreach (['room', 'image'] as $missing) {
+                [$service, , $images, $storage, $transaction] = $this->fixture(roomExists: $missing !== 'room');
+                $images->owned = null;
+
+                try {
+                    $workflow === 'primary'
+                        ? $service->setPrimary(7, 99)
+                        : $service->delete(7, 99);
+                    self::fail('Expected missing target rejection.');
+                } catch (RoomImageException $exception) {
+                    self::assertTrue($exception->isNotFound());
+                    self::assertSame(
+                        $missing === 'room'
+                            ? 'The requested room was not found.'
+                            : 'The requested room image was not found.',
+                        $exception->getMessage(),
+                    );
+                    self::assertSame('rollback', $transaction->events[array_key_last($transaction->events)]);
+                    self::assertSame(0, $storage->removes);
+                }
+            }
+        }
+    }
+
     /** @return array{RoomImageService, ServiceRoomRepository, ServiceImageRepository, ServiceStorage, ServiceTransaction} */
     private function fixture(
         int $count = 0,
@@ -262,9 +519,9 @@ final class RoomImageServiceTest extends TestCase
         return new Room(7, $type, '7', 'Room', 'room', null, '100.00', 2, 0, Room::STATUS_ACTIVE, true, $time, $time, null);
     }
 
-    private function image(int $id, int $roomId, int $sortOrder, bool $primary): RoomImage
+    private function image(int $id, int $roomId, int $sortOrder, bool $primary, ?string $altText = null): RoomImage
     {
-        return new RoomImage($id, $roomId, 'uploads/rooms/' . str_repeat(dechex($id % 16), 64) . '.png', null, $sortOrder, $primary, new DateTimeImmutable('2026-01-01 UTC'));
+        return new RoomImage($id, $roomId, 'uploads/rooms/' . str_repeat(dechex($id % 16), 64) . '.png', $altText, $sortOrder, $primary, new DateTimeImmutable('2026-01-01 UTC'));
     }
 
     private static function png(): string
@@ -296,11 +553,23 @@ final class ServiceImageRepository implements RoomImageCatalogRepository
 {
     public int $creates = 0;
     public int $clears = 0;
+    public int $updates = 0;
+    public int $sets = 0;
+    public int $deletes = 0;
     public ?string $failure = null;
+    public ?RoomImage $owned = null;
+    public ?RoomImage $updateResult = null;
+    public ?RoomImage $setResult = null;
+    public ?RoomImage $deleteResult = null;
     public function __construct(private array &$events, private int $count, private array $existing, private ?RoomImage $primary) {}
     public function countByRoomId(int $roomId): int { $this->events[] = 'count'; return $this->count; }
     public function findAllByRoomId(int $roomId): array { $this->events[] = 'list'; return $this->existing; }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { $this->events[] = 'primary'; return $this->primary; }
+    public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage
+    {
+        $this->events[] = 'owned';
+        return $this->owned;
+    }
     public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage
     {
         $this->events[] = 'create'; $this->creates++;
@@ -312,6 +581,24 @@ final class ServiceImageRepository implements RoomImageCatalogRepository
         $this->events[] = 'clear'; $this->clears++;
         if ($this->failure === 'clear') { throw new RuntimeException('sensitive primary failure'); }
     }
+    public function updateMetadata(int $imageId, int $roomId, ?string $altText, int $sortOrder): ?RoomImage
+    {
+        $this->events[] = 'update'; $this->updates++;
+        if ($this->failure === 'update') { throw new RuntimeException('sensitive metadata failure'); }
+        return $this->updateResult;
+    }
+    public function setPrimary(int $imageId, int $roomId): ?RoomImage
+    {
+        $this->events[] = 'set'; $this->sets++;
+        if ($this->failure === 'set') { throw new RuntimeException('sensitive primary failure'); }
+        return $this->setResult;
+    }
+    public function delete(int $imageId, int $roomId): ?RoomImage
+    {
+        $this->events[] = 'delete'; $this->deletes++;
+        if ($this->failure === 'delete') { throw new RuntimeException('sensitive delete failure'); }
+        return $this->deleteResult;
+    }
 }
 
 final class ServiceStorage implements RoomImageStorage
@@ -320,6 +607,7 @@ final class ServiceStorage implements RoomImageStorage
     public int $removes = 0;
     public bool $failStore = false;
     public bool $failRemove = false;
+    public array $removedPaths = [];
     public function __construct(private array &$events) {}
     public function store(UploadedFile $file, string $detectedMediaType): StoredRoomImage
     {
@@ -330,6 +618,7 @@ final class ServiceStorage implements RoomImageStorage
     public function remove(string $relativePath): void
     {
         $this->events[] = 'remove'; $this->removes++;
+        $this->removedPaths[] = $relativePath;
         if ($this->failRemove) { throw new RuntimeException('sensitive cleanup path'); }
     }
 }

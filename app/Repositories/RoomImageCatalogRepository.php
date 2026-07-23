@@ -15,6 +15,8 @@ interface RoomImageCatalogRepository
 
     public function findPrimaryByRoomId(int $roomId): ?RoomImage;
 
+    public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage;
+
     public function create(
         int $roomId,
         string $filePath,
@@ -24,4 +26,15 @@ interface RoomImageCatalogRepository
     ): RoomImage;
 
     public function clearPrimaryByRoomId(int $roomId): void;
+
+    public function updateMetadata(
+        int $imageId,
+        int $roomId,
+        ?string $altText,
+        int $sortOrder,
+    ): ?RoomImage;
+
+    public function setPrimary(int $imageId, int $roomId): ?RoomImage;
+
+    public function delete(int $imageId, int $roomId): ?RoomImage;
 }
