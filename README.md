@@ -222,7 +222,19 @@ The required baseline includes unit, integration, feature, security, responsive/
 
 ## Current Status
 
-Sprint 0 repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented, formally approved, and merged. The [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md) records the executed evidence and remaining non-blocking warnings. Sprint 1 Administrator authentication data and secure initial-account bootstrap foundations are now under technical review; login/logout, authorization, domain modules, final interfaces, UAT, and deployment remain unimplemented.
+**Sprint 0** — Repository, HTTP, session/CSRF, database-runner, and view-renderer foundations are implemented, formally approved, and merged. See [Sprint 0 QA Closure Report](docs/39_Sprint_0_QA_Closure_Report.md).
+
+**Sprint 1 Phase 2** — Administrator authentication and Rooms Phase 2 is implemented and tested:
+- Administrator bootstrap, login/logout, protected administration routes
+- Room types, amenities, room CRUD, soft deletion
+- Operational status (active, maintenance, inactive) and publication controls
+- Room image upload, metadata management, deletion
+- Public room listing and detail pages with safe Not Found responses
+- Calculated eligibility filtering (active, published, capacity, unexpired bookings)
+
+Automated baseline: **970 tests, 6088 assertions, 10 skipped, 0 failures**. See [Sprint 1 QA Closure Report](docs/40_Sprint_1_QA_Closure_Report.md).
+
+**Later phases** — Availability, booking, payments, invoices, operations/content, hardening, UAT, and production deployment remain unimplemented.
 
 ## Ownership
 

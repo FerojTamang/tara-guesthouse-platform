@@ -50,6 +50,34 @@ abstract class DatabaseTestCase extends TestCase
         self::assertNotSame($environment->literalString('DB_DATABASE'), $this->databaseConfiguration['database']);
         $this->connection = (new ConnectionFactory($this->databaseConfiguration))->create();
         self::assertSame($this->databaseConfiguration['database'], $this->connection->query('SELECT DATABASE()')->fetchColumn());
+        $this->cleanupApplicationTables();
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($this->connection)) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+
+            $this->cleanupApplicationTables();
+        }
+
+        parent::tearDown();
+    }
+
+    protected function cleanupApplicationTables(): void
+    {
+        $this->dropTables([
+            'room_amenities',
+            'room_images',
+            'rooms',
+            'amenities',
+            'room_types',
+            'users',
+            'roles',
+            'schema_migrations',
+        ]);
     }
 
     /** @param list<string> $tables */

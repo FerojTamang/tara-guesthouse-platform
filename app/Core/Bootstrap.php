@@ -6,15 +6,35 @@ namespace App\Core;
 
 use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
+use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorRoomCatalogController;
+use App\Controllers\AdministratorRoomController;
+use App\Controllers\AdministratorRoomImageController;
+use App\Controllers\AdministratorRoomTypeController;
+use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
+use App\Repositories\AmenityRepository;
+use App\Repositories\RoomRepository;
+use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
+use App\Services\AmenityCatalogService;
+use App\Services\PdoRoomCatalogTransaction;
+use App\Services\RoomCatalogFlashMessages;
+use App\Services\RoomCatalogService;
+use App\Services\RoomCatalogServiceProvider;
+use App\Services\RoomImageServiceProvider;
+use App\Presentation\RoomImageUrl;
+use App\Services\RoomTypeCatalogService;
+use App\Services\PublicRoomCatalogService;
+use App\Services\PublicRoomCatalogServiceProvider;
+use App\Repositories\RoomImageRepository;
 
 /**
  * Builds the approved core application runtime.
@@ -103,6 +123,68 @@ final class Bootstrap
             $logger,
             $loginPolicy,
         );
+        $catalogConnection = null;
+        $catalogConnectionProvider = static function () use ($connectionFactory, &$catalogConnection): \PDO {
+            $catalogConnection ??= $connectionFactory->create();
+
+            return $catalogConnection;
+        };
+        $catalogServices = new RoomCatalogServiceProvider(
+            static fn (): RoomTypeCatalogService => new RoomTypeCatalogService(
+                new RoomTypeRepository($catalogConnectionProvider()),
+            ),
+            static fn (): AmenityCatalogService => new AmenityCatalogService(
+                new AmenityRepository($catalogConnectionProvider()),
+            ),
+            static fn (): RoomCatalogService => new RoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()),
+                new RoomTypeRepository($catalogConnectionProvider()),
+                new AmenityRepository($catalogConnectionProvider()),
+                new PdoRoomCatalogTransaction($catalogConnectionProvider()),
+            ),
+        );
+        $catalogFlashMessages = new RoomCatalogFlashMessages($session);
+        $roomImageServices = new RoomImageServiceProvider($catalogConnectionProvider, $resolvedBasePath);
+        $catalogController = new AdministratorRoomCatalogController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
+            $roomImageServices->service(...),
+            new RoomImageUrl(),
+        );
+        $roomController = new AdministratorRoomController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
+            $roomImageServices->service(...),
+            new RoomImageUrl(),
+        );
+        $roomTypeController = new AdministratorRoomTypeController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
+        );
+        $amenityController = new AdministratorAmenityController(
+            $viewRenderer,
+            $catalogServices,
+            $csrfTokens,
+            $catalogFlashMessages,
+        );
+        $roomImageController = new AdministratorRoomImageController(
+            $roomImageServices->service(...),
+            $roomImageServices->uploadConfiguration(...),
+            $catalogFlashMessages,
+        );
+        $publicRoomController = new PublicRoomController(
+            $viewRenderer,
+            new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()), new RoomImageRepository($catalogConnectionProvider()), new RoomImageUrl(),
+            ),
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -111,6 +193,12 @@ final class Bootstrap
             new GuestOnlyMiddleware($administratorSession),
             new RequireAdministratorMiddleware($administratorSession),
             new CsrfMiddleware($csrfTokens),
+            $catalogController,
+            $roomTypeController,
+            $amenityController,
+            $roomController,
+            $roomImageController,
+            $publicRoomController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -147,6 +235,12 @@ final class Bootstrap
         GuestOnlyMiddleware $guestOnly,
         RequireAdministratorMiddleware $requireAdministrator,
         CsrfMiddleware $csrf,
+        AdministratorRoomCatalogController $catalogController,
+        AdministratorRoomTypeController $roomTypeController,
+        AdministratorAmenityController $amenityController,
+        AdministratorRoomController $roomController,
+        AdministratorRoomImageController $roomImageController,
+        PublicRoomController $publicRoomController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -168,6 +262,12 @@ final class Bootstrap
                 $guestOnly,
                 $requireAdministrator,
                 $csrf,
+                $catalogController,
+                $roomTypeController,
+                $amenityController,
+                $roomController,
+                $roomImageController,
+                $publicRoomController,
             );
         }
     }

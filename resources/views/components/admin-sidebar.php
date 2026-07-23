@@ -34,9 +34,33 @@
             </ul>
 
             <p class="admin-navigation-heading mt-4">Management</p>
-            <ul class="nav nav-pills flex-column gap-1" aria-label="Upcoming management modules">
+            <ul class="nav nav-pills flex-column gap-1" aria-label="Management modules">
                 <li class="nav-item">
-                    <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Rooms</span>
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'rooms' ? ' active' : '' ?>"
+                        href="/admin/rooms"
+                        <?= $activeNavigation === 'rooms' ? 'aria-current="page"' : '' ?>
+                    >
+                        Rooms
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'room-types' ? ' active' : '' ?>"
+                        href="/admin/room-types"
+                        <?= $activeNavigation === 'room-types' ? 'aria-current="page"' : '' ?>
+                    >
+                        Room types
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'amenities' ? ' active' : '' ?>"
+                        href="/admin/amenities"
+                        <?= $activeNavigation === 'amenities' ? 'aria-current="page"' : '' ?>
+                    >
+                        Amenities
+                    </a>
                 </li>
                 <li class="nav-item">
                     <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Bookings</span>

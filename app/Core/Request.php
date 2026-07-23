@@ -15,6 +15,7 @@ final class Request
      * @param array<string, mixed> $query
      * @param array<string, string> $headers
      * @param array<string, mixed> $input
+     * @param array<string, UploadedFile|array<array-key, mixed>> $files
      */
     private function __construct(
         private readonly string $method,
@@ -24,6 +25,7 @@ final class Request
         private readonly array $input,
         private readonly string $body,
         private readonly ?string $remoteAddress,
+        private readonly array $files,
     ) {
     }
 
@@ -65,6 +67,7 @@ final class Request
             $_POST,
             $body,
             is_string($remoteAddress) ? $remoteAddress : null,
+            $_FILES,
         );
     }
 
@@ -74,6 +77,7 @@ final class Request
      * @param array<string, mixed>|null $query
      * @param array<string, string> $headers
      * @param array<string, mixed> $input
+     * @param array<string, mixed> $files
      */
     public static function create(
         string $method,
@@ -83,6 +87,7 @@ final class Request
         array $input = [],
         string $body = '',
         ?string $remoteAddress = null,
+        array $files = [],
     ): self {
         $normalizedMethod = strtoupper(trim($method));
 
@@ -116,6 +121,8 @@ final class Request
             throw new InvalidArgumentException('Remote address is invalid.');
         }
 
+        $normalizedFiles = self::normalizeFiles($files);
+
         return new self(
             $normalizedMethod,
             $path,
@@ -124,6 +131,7 @@ final class Request
             $input,
             $body,
             $remoteAddress,
+            $normalizedFiles,
         );
     }
 
@@ -173,6 +181,18 @@ final class Request
     public function body(): string
     {
         return $this->body;
+    }
+
+    /**
+     * Returns all normalized uploads or one named upload tree.
+     */
+    public function file(?string $key = null): UploadedFile|array|null
+    {
+        if ($key === null) {
+            return $this->files;
+        }
+
+        return $this->files[$key] ?? null;
     }
 
     /**
@@ -235,5 +255,87 @@ final class Request
         if (preg_match('/[\x00-\x08\x0A-\x1F\x7F]/', $value) === 1) {
             throw new InvalidArgumentException('HTTP header value contains prohibited control characters.');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $files
+     * @return array<string, UploadedFile|array<array-key, mixed>>
+     */
+    private static function normalizeFiles(array $files): array
+    {
+        $normalized = [];
+
+        foreach ($files as $field => $file) {
+            if (!is_string($field) || !is_array($file)) {
+                throw new InvalidArgumentException('Uploaded file structure is invalid.');
+            }
+
+            $normalized[$field] = self::normalizeFileNode($file);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     * @return UploadedFile|array<array-key, mixed>
+     */
+    private static function normalizeFileNode(array $file): UploadedFile|array
+    {
+        $keys = ['name', 'type', 'tmp_name', 'error', 'size'];
+
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $file)) {
+                throw new InvalidArgumentException('Uploaded file structure is invalid.');
+            }
+        }
+
+        $arrayFields = array_map(static fn (string $key): bool => is_array($file[$key]), $keys);
+
+        if (in_array(true, $arrayFields, true)) {
+            if (in_array(false, $arrayFields, true)) {
+                throw new InvalidArgumentException('Uploaded file structure is invalid.');
+            }
+
+            $nodeKeys = array_keys($file['name']);
+
+            foreach ($keys as $key) {
+                if (array_keys($file[$key]) !== $nodeKeys) {
+                    throw new InvalidArgumentException('Uploaded file structure is invalid.');
+                }
+            }
+
+            $normalized = [];
+
+            foreach ($nodeKeys as $nodeKey) {
+                $child = [];
+
+                foreach ($keys as $key) {
+                    $child[$key] = $file[$key][$nodeKey];
+                }
+
+                $normalized[$nodeKey] = self::normalizeFileNode($child);
+            }
+
+            return $normalized;
+        }
+
+        if (
+            !is_string($file['name'])
+            || !is_string($file['type'])
+            || !is_string($file['tmp_name'])
+            || !is_int($file['error'])
+            || !is_int($file['size'])
+        ) {
+            throw new InvalidArgumentException('Uploaded file structure is invalid.');
+        }
+
+        return new UploadedFile(
+            $file['name'],
+            $file['type'],
+            $file['tmp_name'],
+            $file['error'],
+            $file['size'],
+        );
     }
 }

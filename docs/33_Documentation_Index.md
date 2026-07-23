@@ -57,9 +57,9 @@ When documents conflict, follow the authority order in `00_V1_ARCHITECT_DECISION
 | 32 | `32_Project_Implementation_Plan.md` | Project Implementation Plan | Synchronized to approved phase order |
 | 33 | `33_Documentation_Index.md` | Documentation Index | Synchronized |
 | 34 | `34_UI_UX_Screen_Specification.md` | UI/UX Screen Specification | Synchronized; deferred portal retained as future |
-| 35 | `35_Requirements_Traceability_Matrix.md` | Requirements Traceability Matrix | Synchronized baseline; implementation/test IDs pending |
+| 35 | `35_Requirements_Traceability_Matrix.md` | Requirements Traceability Matrix | Synchronized; Sprint 1 Phase 2 implementation and test traceability verified |
 | 36 | `36_Architecture_Review_Report.md` | Architecture Review Report | Superseded readiness claims corrected |
-| 37 | `37_Sprint_1_Readiness_Report.md` | Sprint 1 Readiness Report | Reassessment required after review |
+| 37 | `37_Sprint_1_Readiness_Report.md` | Sprint 1 Readiness Report | Reassessed after Sprint 1 Phase 2 implementation and QA; ready for pull-request review |
 | 38 | `38_Development_Handbook.md` | Development Handbook | Renamed and synchronized; review required |
 
 # 4. Governance and Audit Documents
@@ -72,7 +72,8 @@ These files support, but do not alter, the preserved 38-document numbering:
 | `DOCUMENTATION_CONSISTENCY_AUDIT.md` | Pre-synchronization findings | Historical baseline; superseded by final audit |
 | `DOCUMENTATION_SYNCHRONIZATION_REPORT.md` | Synchronization change record | Created after synchronization |
 | `FINAL_DOCUMENTATION_CONSISTENCY_AUDIT.md` | Post-synchronization verification | Created after synchronization |
-| `39_Sprint_0_QA_Closure_Report.md` | Executed Sprint 0 foundation QA evidence and closure verdict | Awaiting Technical Architect approval |
+| `39_Sprint_0_QA_Closure_Report.md` | Executed Sprint 0 foundation QA evidence and closure verdict | Approved and merged |
+| `40_Sprint_1_QA_Closure_Report.md` | Executed Sprint 1 Phase 2 QA evidence and closure verdict | Ready for Technical Architect approval |
 | `archive/22_PreDecision_State_Machine_Proposals.md` | Historical pre-decision state proposals | Archived; not an implementation source |
 
 # 5. Recommended Reading Order
@@ -89,7 +90,7 @@ These files support, but do not alter, the preserved 38-document numbering:
 
 # 6. Documentation Status
 
-The suite has been synchronized to the approved Version 1 decisions. Project Manager and Technical Architect review is still required before marking every document Approved. Sprint 0 now provides the repository, HTTP, session/CSRF, migration/seeder-runner, view-renderer, and automated foundation-test infrastructure recorded in `39_Sprint_0_QA_Closure_Report.md`. Domain migrations, application routes and modules, UAT, and deployment verification remain future project work and must not be implied by foundation approval.
+The suite has been synchronized to the approved Version 1 decisions. Sprint 0 foundation is approved and merged, recorded in `39_Sprint_0_QA_Closure_Report.md`. Sprint 1 Phase 2 Administrator authentication and Rooms is implemented, tested, and recorded in `40_Sprint_1_QA_Closure_Report.md`, ready for Technical Architect approval and pull-request review into `develop`. Availability, booking, payments, operations, content, hardening, and deployment remain future project phases and must not be implemented before their approved decisions and scheduled sprints.
 
 # 7. Future Documentation
 
