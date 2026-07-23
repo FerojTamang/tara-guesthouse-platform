@@ -54,6 +54,46 @@ final class RoomRepository implements RoomCatalogRepository
     }
 
     /**
+     * Locks one current room inside an already active transaction.
+     */
+    public function lockCurrentById(int $roomId): ?Room
+    {
+        try {
+            if (!$this->connection->inTransaction()) {
+                throw new DatabaseException('The room lock failed.');
+            }
+
+            if ($roomId <= 0) {
+                return null;
+            }
+
+            $statement = $this->connection->prepare(
+                'SELECT id FROM rooms '
+                . 'WHERE id = :room_id AND deleted_at IS NULL '
+                . 'LIMIT 1 FOR UPDATE',
+            );
+            $statement->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            $statement->execute();
+
+            if ($statement->fetch() === false) {
+                return null;
+            }
+
+            $room = $this->findById($roomId);
+
+            if (!$room instanceof Room) {
+                throw new RuntimeException('The locked room could not be loaded.');
+            }
+
+            return $room;
+        } catch (DatabaseException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DatabaseException('The room lock failed.');
+        }
+    }
+
+    /**
      * Finds one current, non-deleted room by its numeric identifier.
      */
     public function findById(int $id): ?Room

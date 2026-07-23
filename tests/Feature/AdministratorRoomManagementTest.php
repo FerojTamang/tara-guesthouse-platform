@@ -606,6 +606,11 @@ final class RoomManagementRoomRepositoryFake implements RoomCatalogRepository
         return $room instanceof Room && !$room->isDeleted() ? $room : null;
     }
 
+    public function lockCurrentById(int $roomId): ?Room
+    {
+        return $this->findById($roomId);
+    }
+
     public function findAll(): array
     {
         $items = array_filter($this->items, static fn (Room $room): bool => !$room->isDeleted());

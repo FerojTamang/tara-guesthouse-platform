@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Repositories;
 
+use App\Core\ConnectionFactory;
 use App\Core\MigrationRunner;
 use App\Exceptions\DatabaseException;
 use App\Exceptions\RoomCatalogException;
@@ -164,6 +165,128 @@ final class RoomRepositoryTest extends DatabaseTestCase
         self::assertTrue($roomType->isActive());
         self::assertEquals(new DateTimeImmutable('2026-07-22 01:02:03 UTC'), $roomType->createdAt());
         self::assertEquals(new DateTimeImmutable('2026-07-22 02:03:04 UTC'), $roomType->updatedAt());
+    }
+
+    public function testItLocksAndReloadsTheCompleteCurrentRoomInsideATransaction(): void
+    {
+        $this->connection->beginTransaction();
+
+        try {
+            $room = $this->repository->lockCurrentById($this->roomIds['public']);
+
+            self::assertInstanceOf(Room::class, $room);
+            self::assertSame($this->roomIds['public'], $room->id());
+            self::assertSame('101', $room->roomNumber());
+            self::assertSame('Garden Deluxe', $room->name());
+            self::assertSame($this->roomTypeIds['deluxe'], $room->roomType()->id());
+            self::assertSame('Deluxe Room', $room->roomType()->name());
+            self::assertTrue($this->connection->inTransaction());
+        } finally {
+            $this->connection->rollBack();
+        }
+    }
+
+    public function testRoomLockRequiresAnActiveTransaction(): void
+    {
+        try {
+            $this->repository->lockCurrentById($this->roomIds['public']);
+            self::fail('Expected a transaction-precondition failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The room lock failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+            self::assertStringNotContainsString('rooms', $exception->getMessage());
+        }
+    }
+
+    public function testRoomLockReturnsNullForInvalidMissingAndSoftDeletedRooms(): void
+    {
+        $this->connection->beginTransaction();
+
+        try {
+            self::assertNull($this->repository->lockCurrentById(0));
+            self::assertNull($this->repository->lockCurrentById(-1));
+            self::assertNull($this->repository->lockCurrentById(999999));
+            self::assertNull($this->repository->lockCurrentById($this->roomIds['deleted']));
+            self::assertTrue($this->connection->inTransaction());
+        } finally {
+            $this->connection->rollBack();
+        }
+    }
+
+    public function testCompetingConnectionCannotLockTheSameRoomButCanLockADifferentRoom(): void
+    {
+        $secondConnection = (new ConnectionFactory($this->databaseConfiguration))->create();
+        $secondConnection->exec('SET SESSION innodb_lock_wait_timeout = 1');
+        $secondRepository = new RoomRepository($secondConnection);
+        $this->connection->beginTransaction();
+
+        try {
+            self::assertInstanceOf(
+                Room::class,
+                $this->repository->lockCurrentById($this->roomIds['public']),
+            );
+
+            $secondConnection->beginTransaction();
+
+            try {
+                $secondRepository->lockCurrentById($this->roomIds['public']);
+                self::fail('Expected the competing room lock to time out.');
+            } catch (DatabaseException $exception) {
+                self::assertSame('The room lock failed.', $exception->getMessage());
+                self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+                self::assertTrue($secondConnection->inTransaction());
+            } finally {
+                if ($secondConnection->inTransaction()) {
+                    $secondConnection->rollBack();
+                }
+            }
+
+            $secondConnection->beginTransaction();
+
+            try {
+                $otherRoom = $secondRepository->lockCurrentById($this->roomIds['maintenance']);
+                self::assertInstanceOf(Room::class, $otherRoom);
+                self::assertSame($this->roomIds['maintenance'], $otherRoom->id());
+            } finally {
+                $secondConnection->rollBack();
+            }
+        } finally {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
+            }
+
+            if ($secondConnection->inTransaction()) {
+                $secondConnection->rollBack();
+            }
+        }
+    }
+
+    public function testRollbackAndCommitReleaseTheRoomLock(): void
+    {
+        $secondConnection = (new ConnectionFactory($this->databaseConfiguration))->create();
+        $secondRepository = new RoomRepository($secondConnection);
+
+        foreach (['rollBack', 'commit'] as $release) {
+            $this->connection->beginTransaction();
+            self::assertInstanceOf(
+                Room::class,
+                $this->repository->lockCurrentById($this->roomIds['public']),
+            );
+            $this->connection->{$release}();
+
+            $secondConnection->beginTransaction();
+
+            try {
+                $room = $secondRepository->lockCurrentById($this->roomIds['public']);
+                self::assertInstanceOf(Room::class, $room);
+                self::assertSame($this->roomIds['public'], $room->id());
+            } finally {
+                $secondConnection->rollBack();
+            }
+        }
+
+        self::assertFalse($this->connection->inTransaction());
+        self::assertFalse($secondConnection->inTransaction());
     }
 
     public function testSlugLookupUsesTheApprovedDatabaseCollationWithoutNormalization(): void

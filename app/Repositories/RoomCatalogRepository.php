@@ -11,6 +11,13 @@ use App\Models\Room;
  */
 interface RoomCatalogRepository
 {
+    /**
+     * Locks one current room inside an already active transaction.
+     *
+     * Returns null when the identifier is invalid or the room is missing or soft deleted.
+     */
+    public function lockCurrentById(int $roomId): ?Room;
+
     public function findById(int $id): ?Room;
 
     /** @return list<Room> */
