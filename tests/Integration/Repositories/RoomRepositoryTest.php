@@ -335,6 +335,29 @@ final class RoomRepositoryTest extends DatabaseTestCase
         ));
     }
 
+    public function testPublicSlugLookupsApplyEveryEligibilityFilterAndReturnNullWhenMissing(): void
+    {
+        $eligible = $this->repository->findPublicBySlug('Garden-Deluxe');
+        self::assertInstanceOf(Room::class, $eligible);
+        self::assertSame($this->roomIds['public'], $eligible->id());
+        foreach (['maintenance-room', 'draft-room', 'deleted-room', 'missing-room'] as $slug) {
+            self::assertNull($this->repository->findPublicBySlug($slug));
+        }
+        $inactiveId = $this->insertRoom($this->roomTypeIds['deluxe'], '105', 'Inactive', 'inactive-room', null, '5000.00', 2, 0, Room::STATUS_INACTIVE, true, '2026-07-22 01:00:00', '2026-07-22 01:00:00', null);
+        self::assertGreaterThan(0, $inactiveId);
+        self::assertNull($this->repository->findPublicBySlug('inactive-room'));
+    }
+
+    public function testPublicAmenitiesIncludeOnlyActiveAssignmentsInDeterministicOrder(): void
+    {
+        $extra = $this->insertAmenity('Airport transfer', null, true);
+        $this->assignAmenity($this->roomIds['public'], $extra);
+        self::assertSame(['Airport transfer', 'Wi-Fi'], array_map(
+            static fn (\App\Models\Amenity $amenity): string => $amenity->name(),
+            $this->repository->findActiveAmenitiesByRoomId($this->roomIds['public']),
+        ));
+    }
+
     public function testMissingAndInjectionShapedLookupsReturnNullWithoutMutation(): void
     {
         $before = $this->roomSnapshot();

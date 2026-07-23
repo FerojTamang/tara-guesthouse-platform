@@ -7,6 +7,7 @@ namespace App\Repositories;
 use App\Exceptions\DatabaseException;
 use App\Exceptions\RoomCatalogException;
 use App\Models\Room;
+use App\Models\Amenity;
 use App\Models\RoomType;
 use PDO;
 use PDOException;
@@ -161,6 +162,56 @@ final class RoomRepository implements RoomCatalogRepository
                 . " WHERE r.deleted_at IS NULL AND BINARY r.operational_status = BINARY 'active'"
                 . ' AND r.is_published = 1 ORDER BY r.room_number ASC, r.id ASC',
         );
+    }
+
+    public function findPublicBySlug(string $slug): ?Room
+    {
+        if ($slug === '') {
+            return null;
+        }
+
+        return $this->lookup(
+            self::SELECT_COLUMNS . " WHERE r.slug = :lookup AND r.deleted_at IS NULL"
+                . " AND BINARY r.operational_status = BINARY 'active' AND r.is_published = 1 LIMIT 1",
+            $slug,
+            PDO::PARAM_STR,
+        );
+    }
+
+    /** @return list<Amenity> */
+    public function findActiveAmenitiesByRoomId(int $roomId): array
+    {
+        if ($roomId <= 0) {
+            return [];
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT a.id, a.name, a.icon, a.is_active, a.created_at, a.updated_at '
+                . 'FROM room_amenities ra INNER JOIN amenities a ON a.id = ra.amenity_id '
+                . 'WHERE ra.room_id = :room_id AND a.is_active = 1 ORDER BY a.name ASC, a.id ASC',
+            );
+            $statement->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            $statement->execute();
+            $rows = $statement->fetchAll();
+            if (!is_array($rows)) {
+                throw new RuntimeException('The room amenities could not be mapped.');
+            }
+            $amenities = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The room amenities could not be mapped.');
+                }
+                $amenities[] = new Amenity(
+                    $this->positiveInteger($row, 'id'), $this->string($row, 'name'),
+                    $this->nullableString($row, 'icon'), $this->boolean($row, 'is_active'),
+                    $this->dateTime($row, 'created_at'), $this->dateTime($row, 'updated_at'),
+                );
+            }
+            return $amenities;
+        } catch (Throwable) {
+            throw new DatabaseException('The room amenity lookup failed.');
+        }
     }
 
     /** @return list<int> */

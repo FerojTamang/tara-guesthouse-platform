@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Models\Room;
+use App\Models\Amenity;
 
 /**
  * Defines the persistence operations required by physical-room administration.
@@ -22,6 +23,14 @@ interface RoomCatalogRepository
 
     /** @return list<Room> */
     public function findAll(): array;
+
+    /** @return list<Room> */
+    public function findAllPublic(): array;
+
+    public function findPublicBySlug(string $slug): ?Room;
+
+    /** @return list<Amenity> */
+    public function findActiveAmenitiesByRoomId(int $roomId): array;
 
     /** @return list<int> */
     public function findAmenityIds(int $roomId): array;

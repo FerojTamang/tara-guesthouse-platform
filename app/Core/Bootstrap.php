@@ -12,6 +12,7 @@ use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
+use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
@@ -31,6 +32,9 @@ use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
 use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
+use App\Services\PublicRoomCatalogService;
+use App\Services\PublicRoomCatalogServiceProvider;
+use App\Repositories\RoomImageRepository;
 
 /**
  * Builds the approved core application runtime.
@@ -174,6 +178,13 @@ final class Bootstrap
             $roomImageServices->uploadConfiguration(...),
             $catalogFlashMessages,
         );
+        $publicRoomController = new PublicRoomController(
+            $viewRenderer,
+            new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()), new RoomImageRepository($catalogConnectionProvider()), new RoomImageUrl(),
+            ),
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -187,6 +198,7 @@ final class Bootstrap
             $amenityController,
             $roomController,
             $roomImageController,
+            $publicRoomController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -228,6 +240,7 @@ final class Bootstrap
         AdministratorAmenityController $amenityController,
         AdministratorRoomController $roomController,
         AdministratorRoomImageController $roomImageController,
+        PublicRoomController $publicRoomController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -254,6 +267,7 @@ final class Bootstrap
                 $amenityController,
                 $roomController,
                 $roomImageController,
+                $publicRoomController,
             );
         }
     }
