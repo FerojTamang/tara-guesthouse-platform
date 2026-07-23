@@ -49,8 +49,8 @@ final readonly class RoomImageUploadRequest
 
         self::validateUploadError($file->error());
         $policy = self::policy($configuration);
-        $normalizedAlternativeText = self::normalizeAlternativeText($alternativeText);
-        $normalizedSortOrder = self::normalizeSortOrder($sortOrder);
+        $normalizedAlternativeText = RoomImageInput::alternativeText($alternativeText);
+        $normalizedSortOrder = RoomImageInput::sortOrder($sortOrder, false);
         $normalizedPrimary = RoomCatalogInput::explicitBoolean($primary, 'Primary state');
 
         if (
@@ -219,48 +219,6 @@ final readonly class RoomImageUploadRequest
         }
 
         imagedestroy($image);
-    }
-
-    private static function normalizeAlternativeText(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        if (!is_string($value) || preg_match('//u', $value) !== 1) {
-            throw RoomCatalogException::invalidInput('Alternative text is invalid.');
-        }
-
-        $normalized = preg_replace('/^\s+|\s+$/u', '', $value);
-
-        if (!is_string($normalized) || $normalized === '') {
-            return null;
-        }
-
-        if (
-            mb_strlen($normalized, 'UTF-8') > 255
-            || preg_match('/[\p{Cc}\p{Cf}]/u', $normalized) === 1
-            || strip_tags($normalized) !== $normalized
-        ) {
-            throw RoomCatalogException::invalidInput('Alternative text is invalid.');
-        }
-
-        return $normalized;
-    }
-
-    private static function normalizeSortOrder(mixed $value): ?int
-    {
-        if ($value === null || (is_string($value) && trim($value) === '')) {
-            return null;
-        }
-
-        $order = RoomCatalogInput::integer($value, 'Sort order', 0);
-
-        if ($order > 65535) {
-            throw RoomCatalogException::invalidInput('Sort order is invalid.');
-        }
-
-        return $order;
     }
 
     /**

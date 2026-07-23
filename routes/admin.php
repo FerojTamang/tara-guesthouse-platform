@@ -6,6 +6,7 @@ use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
+use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
@@ -24,6 +25,7 @@ return static function (
     ?AdministratorRoomTypeController $roomTypeController = null,
     ?AdministratorAmenityController $amenityController = null,
     ?AdministratorRoomController $roomController = null,
+    ?AdministratorRoomImageController $roomImageController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -36,6 +38,7 @@ return static function (
         && $roomController === null
         && $roomTypeController === null
         && $amenityController === null
+        && $roomImageController === null
     ) {
         return;
     }
@@ -64,6 +67,29 @@ return static function (
         [$controller, 'logout'],
         [$requireAdministrator, $csrf],
     );
+
+    if ($roomImageController !== null) {
+        $router->post(
+            '/admin/rooms/{roomId}/images',
+            [$roomImageController, 'upload'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/rooms/{roomId}/images/{imageId}',
+            [$roomImageController, 'updateMetadata'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/rooms/{roomId}/images/{imageId}/primary',
+            [$roomImageController, 'setPrimary'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/rooms/{roomId}/images/{imageId}/delete',
+            [$roomImageController, 'delete'],
+            [$requireAdministrator, $csrf],
+        );
+    }
 
     if ($catalogController === null) {
         return;

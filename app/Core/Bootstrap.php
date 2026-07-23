@@ -10,6 +10,7 @@ use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
+use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
@@ -27,6 +28,7 @@ use App\Services\PdoRoomCatalogTransaction;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
+use App\Services\RoomImageServiceProvider;
 use App\Services\RoomTypeCatalogService;
 
 /**
@@ -161,6 +163,11 @@ final class Bootstrap
             $csrfTokens,
             $catalogFlashMessages,
         );
+        $roomImageController = new AdministratorRoomImageController(
+            ($roomImageServices = new RoomImageServiceProvider($catalogConnectionProvider, $resolvedBasePath))->service(...),
+            $roomImageServices->uploadConfiguration(...),
+            $catalogFlashMessages,
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -173,6 +180,7 @@ final class Bootstrap
             $roomTypeController,
             $amenityController,
             $roomController,
+            $roomImageController,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -213,6 +221,7 @@ final class Bootstrap
         AdministratorRoomTypeController $roomTypeController,
         AdministratorAmenityController $amenityController,
         AdministratorRoomController $roomController,
+        AdministratorRoomImageController $roomImageController,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -238,6 +247,7 @@ final class Bootstrap
                 $roomTypeController,
                 $amenityController,
                 $roomController,
+                $roomImageController,
             );
         }
     }
