@@ -2,14 +2,15 @@
 
 ## Status
 
-**Documentation synchronized — implementation and executable-test traceability pending.**
+**Documentation synchronized — Sprint 1 Phase 2 Administrator authentication and Rooms implementation complete and tested. Later modules pending.**
 
-This matrix identifies the authoritative documentation path for Version 1. It does not claim that migrations, routes, implementation, or tests already exist. Requirement IDs must be connected to concrete migration, route, class, screen, and test IDs during implementation.
+This matrix identifies the authoritative documentation path for Version 1. Administrator authentication and Rooms rows point to concrete implementations, migrations, routes, and passing tests. Future requirement areas remain documented and pending implementation.
+
 
 | Requirement area | Decision authority | Module/data documents | API/UI documents | Required test coverage | Current readiness |
 |---|---|---|---|---|---|
-| Administrator authentication | DEC-004–006, DEC-028 | 10, 16, 25, 31 | 23, 34 | Session login/logout, CSRF, rate limit, authorization | Documentation synchronized; implementation pending |
-| Rooms and publication | DEC-008–010, DEC-022 | 10, 12 | 23, 34 | CRUD, publication, upload validation, inactive/maintenance behavior | Documentation synchronized; migration verification pending |
+| Administrator authentication | DEC-004–006, DEC-028 | 10, 16, 25, 31 | 23, 34 | Session login/logout, CSRF, rate limit, authorization | Implementation complete; migrations (users, roles), services (AuthenticationService), controllers (AdministratorAuthController), requests (LoginRequest), repositories (UserRepository), views (login.php), and tests all verified passing |
+| Rooms and publication | DEC-008–010, DEC-022 | 10, 12 | 23, 34 | CRUD, publication, upload validation, inactive/maintenance behavior | Implementation complete; migrations (room_types, rooms, amenities, room_amenities, room_images), services (RoomCatalogService, RoomImageService), controllers (AdministratorRoomController, PublicRoomController), requests (RoomUpsertRequest, RoomImageUploadRequest), repositories (RoomRepository, RoomTypeRepository, AmenityRepository, RoomImageRepository), storage (LocalRoomImageStorage), views (administrator room forms and public pages), and tests all verified passing |
 | Availability | DEC-010, DEC-013 | 10, 11, 12, 22 | 23, 34 | Overlap boundaries, blocking states, expired pending, concurrency | Documentation synchronized; implementation pending |
 | Guest bookings | DEC-011–014 | 10, 11, 21, 22 | 23, 34 | Guest snapshot, one room, reference security, transitions | Documentation synchronized; implementation pending |
 | Payments | DEC-015–017 | 10, 19, 22 | 23, 34 | Zero/multiple attempts, submission, verify/reject, duplicate verification; refund blocked pending policy | Core documented; refund Decision required |
