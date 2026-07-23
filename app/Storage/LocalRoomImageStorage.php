@@ -162,6 +162,45 @@ final class LocalRoomImageStorage implements RoomImageStorage
         throw new RuntimeException('Room image storage failed.');
     }
 
+    public function remove(string $relativePath): void
+    {
+        if (
+            preg_match(
+                '/^uploads\/rooms\/([a-f0-9]{64}\.(?:jpg|png|webp))$/D',
+                $relativePath,
+                $matches,
+            ) !== 1
+        ) {
+            throw new RuntimeException('Room image removal failed.');
+        }
+
+        try {
+            $this->revalidateRoot();
+            $destinationPath = $this->destinationPath($matches[1]);
+            clearstatcache(true, $destinationPath);
+
+            if (@is_link($destinationPath)) {
+                throw new RuntimeException('Room image removal failed.');
+            }
+
+            if (!@file_exists($destinationPath)) {
+                return;
+            }
+
+            if (!@is_file($destinationPath)) {
+                throw new RuntimeException('Room image removal failed.');
+            }
+
+            $this->revalidateRoot();
+
+            if (!(bool) ($this->remover)($destinationPath)) {
+                throw new RuntimeException('Room image removal failed.');
+            }
+        } catch (Throwable) {
+            throw new RuntimeException('Room image removal failed.');
+        }
+    }
+
     /**
      * @return array{string, array{device: int, inode: int}}
      */

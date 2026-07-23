@@ -12,4 +12,6 @@ use App\Core\UploadedFile;
 interface RoomImageStorage
 {
     public function store(UploadedFile $file, string $detectedMediaType): StoredRoomImage;
+
+    public function remove(string $relativePath): void;
 }

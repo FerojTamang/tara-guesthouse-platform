@@ -13,7 +13,7 @@ use Throwable;
 /**
  * Provides persistence access to ordered room-image metadata.
  */
-final class RoomImageRepository
+final class RoomImageRepository implements RoomImageCatalogRepository
 {
     use MapsRepositoryRows;
 

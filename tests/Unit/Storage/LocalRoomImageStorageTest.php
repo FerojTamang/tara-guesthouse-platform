@@ -55,6 +55,121 @@ final class LocalRoomImageStorageTest extends TestCase
         yield 'webp' => ['image/webp', 'guest-name.webp', 'webp'];
     }
 
+    #[DataProvider('removableExtensions')]
+    public function testItRemovesCanonicalStoredPathsAndTreatsAbsenceAsSuccess(string $extension): void
+    {
+        [$root] = $this->fixture('room.png');
+        $filename = str_repeat('a', 64) . '.' . $extension;
+        $path = $root . DIRECTORY_SEPARATOR . $filename;
+        file_put_contents($path, 'stored');
+        $this->cleanupPaths[] = $path;
+        $storage = new LocalRoomImageStorage($root);
+
+        $storage->remove('uploads/rooms/' . $filename);
+        self::assertFileDoesNotExist($path);
+        $storage->remove('uploads/rooms/' . $filename);
+        self::assertFileDoesNotExist($path);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function removableExtensions(): iterable
+    {
+        yield 'jpeg' => ['jpg'];
+        yield 'png' => ['png'];
+        yield 'webp' => ['webp'];
+    }
+
+    public function testRemoveRejectsUnsafePathsAndPreservesUnrelatedFiles(): void
+    {
+        [$root] = $this->fixture('room.png');
+        $unrelated = $root . DIRECTORY_SEPARATOR . 'unrelated.txt';
+        file_put_contents($unrelated, 'keep');
+        $this->cleanupPaths[] = $unrelated;
+        $storage = new LocalRoomImageStorage($root);
+        $paths = [
+            'other/' . str_repeat('a', 64) . '.png',
+            'uploads/rooms/' . str_repeat('a', 63) . '.png',
+            'uploads/rooms/' . str_repeat('A', 64) . '.png',
+            'uploads/rooms/' . str_repeat('a', 64) . '.gif',
+            '/uploads/rooms/' . str_repeat('a', 64) . '.png',
+            'uploads\\rooms\\' . str_repeat('a', 64) . '.png',
+            'uploads//rooms/' . str_repeat('a', 64) . '.png',
+            'uploads/rooms/../' . str_repeat('a', 64) . '.png',
+            'uploads/rooms/' . str_repeat('a', 32) . "\0" . str_repeat('a', 32) . '.png',
+        ];
+
+        foreach ($paths as $path) {
+            try {
+                $storage->remove($path);
+                self::fail('Expected unsafe removal rejection.');
+            } catch (RuntimeException $exception) {
+                self::assertSame('Room image removal failed.', $exception->getMessage());
+                self::assertStringNotContainsString($root, $exception->getMessage());
+                self::assertStringNotContainsString($path, $exception->getMessage());
+            }
+        }
+
+        self::assertSame('keep', file_get_contents($unrelated));
+    }
+
+    public function testRemoveRejectsDirectoryAndSymbolicLinkTargets(): void
+    {
+        [$root] = $this->fixture('room.png');
+        $filename = str_repeat('b', 64) . '.png';
+        $directory = $root . DIRECTORY_SEPARATOR . $filename;
+        mkdir($directory);
+        $this->cleanupPaths[] = $directory;
+        $storage = new LocalRoomImageStorage($root);
+
+        try {
+            $storage->remove('uploads/rooms/' . $filename);
+            self::fail('Expected directory removal rejection.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Room image removal failed.', $exception->getMessage());
+        }
+
+        @rmdir($directory);
+        $target = $root . DIRECTORY_SEPARATOR . 'target.txt';
+        file_put_contents($target, 'keep');
+        $this->cleanupPaths[] = $target;
+
+        if (@symlink($target, $directory)) {
+            $this->cleanupPaths[] = $directory;
+
+            try {
+                $storage->remove('uploads/rooms/' . $filename);
+                self::fail('Expected symbolic-link removal rejection.');
+            } catch (RuntimeException $exception) {
+                self::assertSame('Room image removal failed.', $exception->getMessage());
+                self::assertSame('keep', file_get_contents($target));
+            }
+        }
+    }
+
+    public function testRemoveRejectsReplacedRootWithoutTouchingReplacementFile(): void
+    {
+        [$root] = $this->fixture('room.png');
+        $storage = new LocalRoomImageStorage($root);
+        $moved = $root . '-moved';
+        self::assertTrue(rename($root, $moved));
+        $this->cleanupPaths[] = $moved;
+        $this->cleanupPaths[] = $moved . DIRECTORY_SEPARATOR . 'validated-upload.tmp';
+        self::assertTrue(mkdir($root, 0700));
+        $filename = str_repeat('c', 64) . '.png';
+        $replacement = $root . DIRECTORY_SEPARATOR . $filename;
+        file_put_contents($replacement, 'keep');
+        $this->cleanupPaths[] = $replacement;
+
+        try {
+            $storage->remove('uploads/rooms/' . $filename);
+            self::fail('Expected replaced-root removal rejection.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Room image removal failed.', $exception->getMessage());
+            self::assertSame('keep', file_get_contents($replacement));
+            self::assertStringNotContainsString($root, $exception->getMessage());
+        }
+    }
+
     public function testTwoStoresGenerateDifferentNamesAndDoNotChangeSource(): void
     {
         [$root, $source, $bytes] = $this->fixture('same.png');
