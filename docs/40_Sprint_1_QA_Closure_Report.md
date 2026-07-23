@@ -78,7 +78,7 @@ The following manual tests passed in the local development environment:
 - ✓ Administrator logout clears session
 - ✓ Unauthenticated requests to protected pages redirect to login
 
-### Room Type Management  
+### Room Type Management
 - ✓ Room type creation with name and slug
 - ✓ Room types selectable in room creation forms
 - ✓ Active room types available for selection
@@ -96,7 +96,7 @@ The following manual tests passed in the local development environment:
 ### Room Image Management
 - ✓ Image management interface loads for existing room
 - ✓ Upload form accepts valid image MIME types
-- ✓ JPEG, PNG, and WebP images upload successfully  
+- ✓ JPEG, PNG, and WebP images upload successfully
 - ✓ Uploaded image filenames are randomized
 - ✓ Administrator can set primary image
 - ✓ Administrator can delete uploaded images
