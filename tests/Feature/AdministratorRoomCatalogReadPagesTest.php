@@ -220,6 +220,7 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
             ),
         ]);
         $this->administratorSession->establish(new AdministratorIdentity(91));
+        $token = $this->csrfTokens->token();
 
         $response = $this->application->handle(Request::create('GET', '/admin/rooms'));
 
@@ -239,9 +240,10 @@ final class AdministratorRoomCatalogReadPagesTest extends TestCase
         self::assertStringContainsString('Maintenance', $response->body());
         self::assertStringContainsString('Published', $response->body());
         self::assertStringContainsString('Unpublished', $response->body());
-        self::assertStringNotContainsString('href="/admin/rooms/create"', $response->body());
-        self::assertStringNotContainsString('/edit', $response->body());
-        self::assertStringNotContainsString('/delete', $response->body());
+        self::assertStringContainsString('href="/admin/rooms/create"', $response->body());
+        self::assertStringContainsString('href="/admin/rooms/11/edit"', $response->body());
+        self::assertStringContainsString('action="/admin/rooms/11/delete"', $response->body());
+        self::assertStringContainsString('name="_csrf" value="' . $token . '"', $response->body());
     }
 
     public function testRoomTypesPageRendersEscapedDeterministicCatalogueData(): void

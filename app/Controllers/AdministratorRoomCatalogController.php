@@ -40,6 +40,7 @@ final readonly class AdministratorRoomCatalogController
             'pageTitle' => 'Rooms',
             'activeNavigation' => 'rooms',
             'rooms' => $rooms,
+            'notice' => $this->flashMessages->pullRoomSuccess(),
         ]);
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorRoomCatalogController;
+use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
@@ -22,6 +23,7 @@ return static function (
     ?AdministratorRoomCatalogController $catalogController = null,
     ?AdministratorRoomTypeController $roomTypeController = null,
     ?AdministratorAmenityController $amenityController = null,
+    ?AdministratorRoomController $roomController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -31,6 +33,7 @@ return static function (
     if (
         $dependencyCount === 0
         && $catalogController === null
+        && $roomController === null
         && $roomTypeController === null
         && $amenityController === null
     ) {
@@ -71,6 +74,35 @@ return static function (
         [$catalogController, 'rooms'],
         [$requireAdministrator],
     );
+
+    if ($roomController !== null) {
+        $router->get(
+            '/admin/rooms/create',
+            [$roomController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/rooms',
+            [$roomController, 'create'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->get(
+            '/admin/rooms/{id}/edit',
+            [$roomController, 'editForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/rooms/{id}',
+            [$roomController, 'update'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/rooms/{id}/delete',
+            [$roomController, 'softDelete'],
+            [$requireAdministrator, $csrf],
+        );
+    }
+
     $router->get(
         '/admin/room-types',
         [$catalogController, 'roomTypes'],
