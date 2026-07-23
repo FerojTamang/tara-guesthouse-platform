@@ -541,6 +541,7 @@ final class RoomManagementRoomTypeRepositoryFake implements RoomTypeCatalogRepos
         return array_values($this->items);
     }
 
+
     public function findAllActive(): array
     {
         return array_values(array_filter($this->items, static fn (RoomType $item): bool => $item->isActive()));
@@ -661,6 +662,10 @@ final class RoomManagementRoomRepositoryFake implements RoomCatalogRepository
 
         return array_values($items);
     }
+
+    public function findAllPublic(): array { return []; }
+    public function findPublicBySlug(string $slug): ?Room { return null; }
+    public function findActiveAmenitiesByRoomId(int $roomId): array { return []; }
 
     public function findAmenityIds(int $roomId): array
     {

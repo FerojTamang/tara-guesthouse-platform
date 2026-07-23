@@ -575,6 +575,9 @@ final class ServiceRoomRepository implements RoomCatalogRepository
     public function lockCurrentById(int $roomId): ?Room { $this->events[] = 'lock'; $this->locks++; return $this->room; }
     public function findById(int $id): ?Room { return $this->room; }
     public function findAll(): array { return []; }
+    public function findAllPublic(): array { return []; }
+    public function findPublicBySlug(string $slug): ?Room { return null; }
+    public function findActiveAmenitiesByRoomId(int $roomId): array { return []; }
     public function findAmenityIds(int $roomId): array { return []; }
     public function create(int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): Room { throw new LogicException(); }
     public function update(int $id, int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): ?Room { throw new LogicException(); }
