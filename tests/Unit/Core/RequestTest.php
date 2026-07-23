@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Core;
 
 use App\Core\Request;
+use App\Core\UploadedFile;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -87,5 +88,74 @@ final class RequestTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         Request::create('GET', '/', [], [' X-Test' => 'value']);
+    }
+
+    public function testItAcceptsInjectedFilesWithoutReadingGlobals(): void
+    {
+        $request = Request::create('POST', '/upload', files: [
+            'image' => [
+                'name' => 'room.jpg',
+                'type' => 'image/jpeg',
+                'tmp_name' => 'temporary-file',
+                'error' => UPLOAD_ERR_OK,
+                'size' => 123,
+            ],
+        ]);
+
+        $file = $request->file('image');
+
+        self::assertInstanceOf(UploadedFile::class, $file);
+        self::assertSame('room.jpg', $file->originalName());
+        self::assertSame(['image' => $file], $request->file());
+        self::assertNull($request->file('missing'));
+    }
+
+    public function testItNormalizesNestedPhpFileArrays(): void
+    {
+        $request = Request::create('POST', '/upload', files: [
+            'images' => [
+                'name' => ['room' => ['first' => 'one.png', 'second' => 'two.webp']],
+                'type' => ['room' => ['first' => 'image/png', 'second' => 'image/webp']],
+                'tmp_name' => ['room' => ['first' => 'tmp-one', 'second' => 'tmp-two']],
+                'error' => ['room' => ['first' => UPLOAD_ERR_OK, 'second' => UPLOAD_ERR_OK]],
+                'size' => ['room' => ['first' => 100, 'second' => 200]],
+            ],
+        ]);
+
+        $images = $request->file('images');
+
+        self::assertIsArray($images);
+        self::assertInstanceOf(UploadedFile::class, $images['room']['first']);
+        self::assertSame('two.webp', $images['room']['second']->originalName());
+    }
+
+    public function testItRejectsMalformedNestedPhpFileArrays(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Request::create('POST', '/upload', files: [
+            'images' => [
+                'name' => ['first' => 'one.png'],
+                'type' => ['different' => 'image/png'],
+                'tmp_name' => ['first' => 'tmp-one'],
+                'error' => ['first' => UPLOAD_ERR_OK],
+                'size' => ['first' => 100],
+            ],
+        ]);
+    }
+
+    public function testItRejectsMixedLeafAndNestedUploadFields(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Request::create('POST', '/upload', files: [
+            'image' => [
+                'name' => ['first' => 'one.png'],
+                'type' => 'image/png',
+                'tmp_name' => ['first' => 'tmp-one'],
+                'error' => ['first' => UPLOAD_ERR_OK],
+                'size' => ['first' => 100],
+            ],
+        ]);
     }
 }
