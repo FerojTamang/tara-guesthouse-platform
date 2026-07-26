@@ -199,6 +199,7 @@ final class Bootstrap
                     new RoomRepository($catalogConnectionProvider()),
                 ),
             ),
+            $viewRenderer,
         );
         $router = new Router();
         self::loadRoutes(
