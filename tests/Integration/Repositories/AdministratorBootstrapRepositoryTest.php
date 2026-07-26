@@ -228,7 +228,12 @@ final class AdministratorBootstrapRepositoryTest extends DatabaseTestCase
 
     public function testDatabaseFailuresDoNotDiscloseSqlOrIdentifiers(): void
     {
-        $this->connection->exec('DROP TABLE users');
+        $this->dropTables([
+            'booking_events',
+            'booking_rooms',
+            'bookings',
+            'users',
+        ]);
 
         try {
             $this->repository->withinTransaction(

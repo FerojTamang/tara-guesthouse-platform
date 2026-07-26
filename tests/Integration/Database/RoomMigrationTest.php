@@ -22,6 +22,9 @@ final class RoomMigrationTest extends DatabaseTestCase
         '20260722000400_create_amenities_table',
         '20260722000500_create_room_amenities_table',
         '20260723000100_add_room_image_persistence_constraints',
+        '20260726000100_create_bookings_table',
+        '20260726000200_create_booking_rooms_table',
+        '20260726000300_create_booking_events_table',
     ];
 
     private MigrationRunner $runner;
@@ -780,7 +783,14 @@ final class RoomMigrationTest extends DatabaseTestCase
 
     private function migrateBeforePersistenceConstraints(): void
     {
-        foreach (array_slice(self::APPLICATION_MIGRATIONS, 0, -1) as $migrationName) {
+        $position = array_search(
+            '20260723000100_add_room_image_persistence_constraints',
+            self::APPLICATION_MIGRATIONS,
+            true,
+        );
+        self::assertIsInt($position);
+
+        foreach (array_slice(self::APPLICATION_MIGRATIONS, 0, $position) as $migrationName) {
             $path = dirname(__DIR__, 3)
                 . DIRECTORY_SEPARATOR
                 . 'database'
