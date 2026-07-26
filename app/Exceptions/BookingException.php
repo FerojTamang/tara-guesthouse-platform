@@ -32,6 +32,11 @@ final class BookingException extends RuntimeException
         return new self('The selected room is not available for this stay.', 'conflict');
     }
 
+    public static function duplicateReference(?Throwable $previous = null): self
+    {
+        return new self('The booking reference is already in use.', 'duplicate_reference', $previous);
+    }
+
     public static function failure(?Throwable $previous = null): self
     {
         return new self('Booking operation failed.', 'system', $previous);
@@ -50,6 +55,11 @@ final class BookingException extends RuntimeException
     public function isConflict(): bool
     {
         return $this->category === 'conflict';
+    }
+
+    public function isDuplicateReference(): bool
+    {
+        return $this->category === 'duplicate_reference';
     }
 
     public function isSystemFailure(): bool
