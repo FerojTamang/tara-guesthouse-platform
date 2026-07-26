@@ -16,7 +16,7 @@ use Throwable;
 /**
  * Creates one pending booking while serializing competing requests for the selected room.
  */
-final readonly class BookingCreationService
+final readonly class BookingCreationService implements BookingCreator
 {
     public function __construct(
         private RoomCatalogRepository $rooms,
