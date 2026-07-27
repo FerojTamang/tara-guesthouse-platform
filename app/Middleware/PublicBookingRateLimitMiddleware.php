@@ -14,8 +14,15 @@ use App\Services\PublicBookingRateLimiter;
  */
 final readonly class PublicBookingRateLimitMiddleware implements Middleware
 {
-    public function __construct(private PublicBookingRateLimiter $limiter)
+    public function __construct(
+        private PublicBookingRateLimiter $limiter,
+        private bool $jsonResponse = true,
+    ) {
+    }
+
+    public function forWeb(): self
     {
+        return new self($this->limiter, false);
     }
 
     public function process(Request $request, callable $next): Response
@@ -33,18 +40,26 @@ final readonly class PublicBookingRateLimitMiddleware implements Middleware
         }
 
         if ($state->isBlocked()) {
-            return Response::json(
-                [
-                    'success' => false,
-                    'message' => 'Too many booking attempts.',
-                ],
-                429,
-                [
-                    'Cache-Control' => 'no-store',
-                    'Retry-After' => (string) $state->retryAfterSeconds(),
-                    'X-RateLimit-Remaining' => '0',
-                ],
-            );
+            $headers = [
+                'Cache-Control' => 'no-store',
+                'Retry-After' => (string) $state->retryAfterSeconds(),
+                'X-RateLimit-Remaining' => '0',
+            ];
+
+            return $this->jsonResponse
+                ? Response::json(
+                    [
+                        'success' => false,
+                        'message' => 'Too many booking attempts.',
+                    ],
+                    429,
+                    $headers,
+                )
+                : Response::text(
+                    'Too many booking attempts.',
+                    429,
+                    $headers,
+                );
         }
 
         return $next($request)
@@ -57,13 +72,19 @@ final readonly class PublicBookingRateLimitMiddleware implements Middleware
 
     private function failure(): Response
     {
-        return Response::json(
-            [
-                'success' => false,
-                'message' => 'Internal Server Error.',
-            ],
-            500,
-            ['Cache-Control' => 'no-store'],
-        );
+        return $this->jsonResponse
+            ? Response::json(
+                [
+                    'success' => false,
+                    'message' => 'Internal Server Error.',
+                ],
+                500,
+                ['Cache-Control' => 'no-store'],
+            )
+            : Response::text(
+                'Internal Server Error',
+                500,
+                ['Cache-Control' => 'no-store'],
+            );
     }
 }

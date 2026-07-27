@@ -14,6 +14,7 @@ use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
+use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
@@ -36,6 +37,7 @@ use App\Services\BookingService;
 use App\Services\BookingSubmissionService;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
+use App\Services\BookingSuccessFlash;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
@@ -221,44 +223,52 @@ final class Bootstrap
             ),
             $viewRenderer,
         );
-        $publicBookingController = new PublicBookingController(
-            new BookingSubmissionWorkflowProvider(
-                static function () use (
-                    $catalogConnectionProvider,
-                    $bookingConfiguration,
-                ): BookingSubmissionWorkflow {
-                    $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
-                    $deadlineMinutes = $bookingConfiguration['pending_deadline_minutes'] ?? null;
+        $responseTimezone = new \DateTimeZone($timezone);
+        $publicBookingWorkflows = new BookingSubmissionWorkflowProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $bookingConfiguration,
+            ): BookingSubmissionWorkflow {
+                $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+                $deadlineMinutes = $bookingConfiguration['pending_deadline_minutes'] ?? null;
 
-                    if (!is_string($accessTokenKey) || !is_int($deadlineMinutes)) {
-                        throw new ConfigurationException(
-                            'Public booking submission is not configured.',
-                        );
-                    }
+                if (!is_string($accessTokenKey) || !is_int($deadlineMinutes)) {
+                    throw new ConfigurationException(
+                        'Public booking submission is not configured.',
+                    );
+                }
 
-                    $connection = $catalogConnectionProvider();
-                    $rooms = new RoomRepository($connection);
-                    $creator = new BookingCreationService(
+                $connection = $catalogConnectionProvider();
+                $rooms = new RoomRepository($connection);
+                $creator = new BookingCreationService(
+                    $rooms,
+                    new BookingService(
                         $rooms,
-                        new BookingService(
-                            $rooms,
-                            new PdoAvailabilityRepository($connection),
-                        ),
-                        new PdoBookingWriteRepository($connection),
-                        new PdoBookingTransaction($connection),
-                    );
+                        new PdoAvailabilityRepository($connection),
+                    ),
+                    new PdoBookingWriteRepository($connection),
+                    new PdoBookingTransaction($connection),
+                );
 
-                    return new BookingSubmissionWorkflow(
-                        new BookingSubmissionService(
-                            $creator,
-                            new BookingReferenceGenerator(),
-                            new BookingDeadlinePolicy($deadlineMinutes),
-                        ),
-                        new BookingAccessToken($accessTokenKey),
-                    );
-                },
-            ),
-            new \DateTimeZone($timezone),
+                return new BookingSubmissionWorkflow(
+                    new BookingSubmissionService(
+                        $creator,
+                        new BookingReferenceGenerator(),
+                        new BookingDeadlinePolicy($deadlineMinutes),
+                    ),
+                    new BookingAccessToken($accessTokenKey),
+                );
+            },
+        );
+        $publicBookingController = new PublicBookingController(
+            $publicBookingWorkflows,
+            $responseTimezone,
+        );
+        $publicBookingPageController = new PublicBookingPageController(
+            $viewRenderer,
+            $publicBookingWorkflows,
+            new BookingSuccessFlash($session, $responseTimezone),
+            $csrfTokens,
         );
         $publicBookingRateLimit = new PublicBookingRateLimitMiddleware(
             new PublicBookingRateLimiter(
@@ -288,6 +298,7 @@ final class Bootstrap
             $publicRoomController,
             $publicAvailabilityController,
             $publicBookingController,
+            $publicBookingPageController,
             $publicBookingRateLimit,
         );
 
@@ -333,6 +344,7 @@ final class Bootstrap
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicBookingController $publicBookingController,
+        PublicBookingPageController $publicBookingPageController,
         PublicBookingRateLimitMiddleware $publicBookingRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
@@ -363,6 +375,7 @@ final class Bootstrap
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicBookingController,
+                $publicBookingPageController,
                 $publicBookingRateLimit,
             );
         }
