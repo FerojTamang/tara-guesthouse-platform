@@ -16,7 +16,7 @@ use Throwable;
 /**
  * Supplies secure references and configured deadlines to transactional creation.
  */
-final class BookingSubmissionService
+final class BookingSubmissionService implements BookingSubmitter
 {
     private const MAX_REFERENCE_ATTEMPTS = 5;
 
