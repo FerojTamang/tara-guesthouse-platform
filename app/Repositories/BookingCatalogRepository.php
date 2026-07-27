@@ -13,6 +13,11 @@ use App\Models\BookingRoom;
  */
 interface BookingCatalogRepository
 {
+    /**
+     * @return list<Booking>
+     */
+    public function findAll(?string $status = null): array;
+
     public function findById(int $id): ?Booking;
 
     public function findByReference(string $bookingReference): ?Booking;

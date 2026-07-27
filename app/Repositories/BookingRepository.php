@@ -84,6 +84,52 @@ final class BookingRepository implements BookingCatalogRepository
     {
     }
 
+    /**
+     * @return list<Booking>
+     */
+    public function findAll(?string $status = null): array
+    {
+        if ($status !== null && !Booking::isStatus($status)) {
+            return [];
+        }
+
+        try {
+            $sql = self::BOOKING_COLUMNS . ' WHERE deleted_at IS NULL';
+
+            if ($status !== null) {
+                $sql .= ' AND BINARY booking_status = BINARY :booking_status';
+            }
+
+            $sql .= ' ORDER BY created_at DESC, id DESC';
+            $statement = $this->connection->prepare($sql);
+
+            if ($status !== null) {
+                $statement->bindValue('booking_status', $status, PDO::PARAM_STR);
+            }
+
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The booking records could not be mapped.');
+            }
+
+            $bookings = [];
+
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The booking records could not be mapped.');
+                }
+
+                $bookings[] = $this->mapBooking($row);
+            }
+
+            return $bookings;
+        } catch (Throwable) {
+            throw new DatabaseException('The booking listing failed.');
+        }
+    }
+
     public function findById(int $id): ?Booking
     {
         if ($id <= 0) {

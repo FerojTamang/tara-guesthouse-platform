@@ -88,6 +88,58 @@ final class BookingRepositoryTest extends DatabaseTestCase
         self::assertSame(0, $byId->createdAt()->getOffset());
     }
 
+    public function testItListsCurrentBookingsNewestFirstAndFiltersCanonicalStatus(): void
+    {
+        $confirmedId = $this->insertBooking('TGH-READ-0002', null);
+        $this->connection->exec(
+            "UPDATE bookings SET booking_status = 'confirmed', "
+            . "created_at = '2026-08-01 12:00:00', "
+            . "updated_at = '2026-08-01 12:00:00' "
+            . 'WHERE id = ' . $confirmedId,
+        );
+        $this->connection->exec(
+            "UPDATE bookings SET created_at = '2026-08-01 09:00:00', "
+            . "updated_at = '2026-08-01 09:00:00' "
+            . 'WHERE id = ' . $this->bookingId,
+        );
+        $this->insertBooking(
+            'TGH-READ-DELETED-0001',
+            '2026-08-01 13:00:00',
+        );
+
+        $all = $this->repository->findAll();
+
+        self::assertSame(
+            [$confirmedId, $this->bookingId],
+            array_map(
+                static fn (Booking $booking): int => $booking->id(),
+                $all,
+            ),
+        );
+        self::assertSame(
+            [Booking::STATUS_CONFIRMED, Booking::STATUS_PENDING],
+            array_map(
+                static fn (Booking $booking): string => $booking->bookingStatus(),
+                $all,
+            ),
+        );
+
+        $pending = $this->repository->findAll(
+            Booking::STATUS_PENDING,
+        );
+        self::assertCount(1, $pending);
+        self::assertSame($this->bookingId, $pending[0]->id());
+
+        $confirmed = $this->repository->findAll(
+            Booking::STATUS_CONFIRMED,
+        );
+        self::assertCount(1, $confirmed);
+        self::assertSame($confirmedId, $confirmed[0]->id());
+
+        self::assertSame([], $this->repository->findAll('PENDING'));
+        self::assertSame([], $this->repository->findAll('completed'));
+    }
+
     public function testInvalidOrMissingLookupsReturnNullWithoutQueryDisclosure(): void
     {
         self::assertNull($this->repository->findById(0));
@@ -163,6 +215,14 @@ final class BookingRepositoryTest extends DatabaseTestCase
         }
 
         $this->dropTables(['bookings']);
+
+        try {
+            $this->repository->findAll();
+            self::fail('Expected a sanitized booking listing failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The booking listing failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
 
         try {
             $this->repository->findById($this->bookingId);

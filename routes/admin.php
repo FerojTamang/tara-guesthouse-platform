@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -26,6 +27,7 @@ return static function (
     ?AdministratorAmenityController $amenityController = null,
     ?AdministratorRoomController $roomController = null,
     ?AdministratorRoomImageController $roomImageController = null,
+    ?AdministratorBookingController $bookingController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -39,6 +41,7 @@ return static function (
         && $roomTypeController === null
         && $amenityController === null
         && $roomImageController === null
+        && $bookingController === null
     ) {
         return;
     }
@@ -67,6 +70,19 @@ return static function (
         [$controller, 'logout'],
         [$requireAdministrator, $csrf],
     );
+
+    if ($bookingController !== null) {
+        $router->get(
+            '/admin/bookings',
+            [$bookingController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/bookings/{id}',
+            [$bookingController, 'show'],
+            [$requireAdministrator],
+        );
+    }
 
     if ($roomImageController !== null) {
         $router->post(

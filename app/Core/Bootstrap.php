@@ -8,6 +8,7 @@ use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -22,6 +23,7 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
+use App\Repositories\BookingRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\RoomRepository;
@@ -29,6 +31,8 @@ use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AvailabilityService;
+use App\Services\AdministratorBookingService;
+use App\Services\AdministratorBookingServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -205,6 +209,16 @@ final class Bootstrap
             $roomImageServices->uploadConfiguration(...),
             $catalogFlashMessages,
         );
+        $administratorBookingController = new AdministratorBookingController(
+            $viewRenderer,
+            new AdministratorBookingServiceProvider(
+                static fn (): AdministratorBookingService => new AdministratorBookingService(
+                    new BookingRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
             new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
@@ -295,6 +309,7 @@ final class Bootstrap
             $amenityController,
             $roomController,
             $roomImageController,
+            $administratorBookingController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicBookingController,
@@ -341,6 +356,7 @@ final class Bootstrap
         AdministratorAmenityController $amenityController,
         AdministratorRoomController $roomController,
         AdministratorRoomImageController $roomImageController,
+        AdministratorBookingController $administratorBookingController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicBookingController $publicBookingController,
@@ -372,6 +388,7 @@ final class Bootstrap
                 $amenityController,
                 $roomController,
                 $roomImageController,
+                $administratorBookingController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicBookingController,
