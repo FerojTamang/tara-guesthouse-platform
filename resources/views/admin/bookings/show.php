@@ -167,6 +167,75 @@
         </div>
     </div>
 
+    <div class="card admin-panel mt-4" aria-labelledby="booking-status-actions-heading">
+        <div class="card-header bg-white">
+            <h2 id="booking-status-actions-heading" class="h5 mb-0">Status actions</h2>
+        </div>
+        <div class="card-body">
+            <?php if ($booking['statusActions'] === []): ?>
+                <p class="mb-0 text-secondary">
+                    This booking has no permitted Administrator status actions.
+                </p>
+            <?php else: ?>
+                <p class="text-secondary">
+                    Only the actions allowed from the current state are shown. Every successful change is recorded in booking history and the operational audit log.
+                </p>
+                <div
+                    id="booking-status-action-message"
+                    class="alert d-none"
+                    role="alert"
+                    aria-live="polite"
+                ></div>
+                <div class="row g-3">
+                    <?php foreach ($booking['statusActions'] as $index => $action): ?>
+                        <div class="col-lg-6">
+                            <form
+                                method="post"
+                                action="/api/v1/admin/bookings/<?= $e($booking['id']) ?>/status"
+                                class="border rounded p-3 h-100"
+                                data-booking-status-form
+                                data-target-status="<?= $e($action['status']) ?>"
+                            >
+                                <input type="hidden" name="_csrf" value="<?= $e($csrfToken) ?>">
+                                <h3 class="h6"><?= $e($action['label']) ?></h3>
+
+                                <?php if ($action['requiresReason']): ?>
+                                    <div class="mb-3">
+                                        <label
+                                            class="form-label"
+                                            for="booking-status-reason-<?= $e($index) ?>"
+                                        ><?= $e($action['reasonLabel']) ?></label>
+                                        <textarea
+                                            class="form-control"
+                                            id="booking-status-reason-<?= $e($index) ?>"
+                                            name="reason"
+                                            rows="3"
+                                            maxlength="1000"
+                                            required
+                                        ></textarea>
+                                        <div class="form-text">
+                                            Required. Maximum 1,000 characters.
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
+                                <button
+                                    class="btn <?= $e($action['buttonClass']) ?>"
+                                    type="submit"
+                                ><?= $e($action['label']) ?></button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <noscript>
+                    <p class="alert alert-warning mt-3 mb-0">
+                        JavaScript is required to submit a booking status action safely.
+                    </p>
+                </noscript>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <div class="card admin-panel mt-4">
         <div class="card-header bg-white">
             <h2 class="h5 mb-0">Booking event history</h2>
@@ -220,7 +289,86 @@
         </div>
     </div>
 
-    <div class="alert alert-secondary mt-4 mb-0" role="note">
-        This page is read-only in S2-011. Approved state-transition actions are implemented separately in S2-012.
-    </div>
 </section>
+
+<?php if ($booking['statusActions'] !== []): ?>
+    <script>
+        (() => {
+            const forms = document.querySelectorAll('[data-booking-status-form]');
+            const message = document.getElementById('booking-status-action-message');
+
+            const showMessage = (text, type) => {
+                if (!(message instanceof HTMLElement)) {
+                    return;
+                }
+
+                message.textContent = text;
+                message.className = `alert alert-${type}`;
+            };
+
+            forms.forEach((form) => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+
+                    const target = form.dataset.targetStatus;
+                    const csrf = form.querySelector('input[name="_csrf"]');
+                    const reason = form.querySelector('textarea[name="reason"]');
+                    const button = form.querySelector('button[type="submit"]');
+
+                    if (!target || !(csrf instanceof HTMLInputElement)) {
+                        showMessage('The booking action could not be prepared.', 'danger');
+                        return;
+                    }
+
+                    const payload = {status: target};
+
+                    if (reason instanceof HTMLTextAreaElement) {
+                        payload.reason = reason.value;
+                    }
+
+                    if (button instanceof HTMLButtonElement) {
+                        button.disabled = true;
+                    }
+
+                    showMessage('Saving the booking status…', 'info');
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'PATCH',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrf.value,
+                            },
+                            body: JSON.stringify(payload),
+                        });
+                        const body = await response.json().catch(() => null);
+
+                        if (!response.ok) {
+                            const validationMessage = body?.errors?.booking?.[0];
+                            throw new Error(
+                                validationMessage
+                                || body?.message
+                                || 'The booking status could not be updated.',
+                            );
+                        }
+
+                        showMessage('Booking status updated. Refreshing…', 'success');
+                        window.location.reload();
+                    } catch (failure) {
+                        showMessage(
+                            failure instanceof Error
+                                ? failure.message
+                                : 'The booking status could not be updated.',
+                            'danger',
+                        );
+
+                        if (button instanceof HTMLButtonElement) {
+                            button.disabled = false;
+                        }
+                    }
+                });
+            });
+        })();
+    </script>
+<?php endif; ?>

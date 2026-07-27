@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AdministratorAuthenticationController;
+use App\Controllers\AdministratorBookingController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Core\Router;
@@ -18,6 +19,7 @@ return static function (
     mixed ...$dependencies,
 ): void {
     $controller = null;
+    $administratorBooking = null;
     $guestOnly = null;
     $requireAdministrator = null;
     $csrf = null;
@@ -28,6 +30,8 @@ return static function (
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof AdministratorAuthenticationController) {
             $controller ??= $dependency;
+        } elseif ($dependency instanceof AdministratorBookingController) {
+            $administratorBooking ??= $dependency;
         } elseif ($dependency instanceof GuestOnlyMiddleware) {
             $guestOnly ??= $dependency;
         } elseif ($dependency instanceof RequireAdministratorMiddleware) {
@@ -58,6 +62,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator JSON routes require complete authentication dependencies.',
+        );
+    }
+
+    if (
+        $administratorBooking !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator booking JSON routes require complete security dependencies.',
         );
     }
 
@@ -96,4 +109,12 @@ return static function (
         [$controller, 'apiLogout'],
         [$requireAdministrator->forJson(), $csrf->forJson()],
     );
+
+    if ($administratorBooking !== null) {
+        $router->patch(
+            '/api/v1/admin/bookings/{id}/status',
+            [$administratorBooking, 'updateStatus'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
 };

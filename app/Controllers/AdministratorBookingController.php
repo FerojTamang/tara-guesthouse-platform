@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Authentication\AdministratorSession;
 use App\Core\CsrfTokenManager;
 use App\Core\Request;
 use App\Core\Response;
@@ -12,18 +13,23 @@ use App\Exceptions\BookingException;
 use App\Models\AdministratorBookingDetail;
 use App\Models\Booking;
 use App\Models\BookingEvent;
+use App\Requests\AdministratorBookingStatusRequest;
 use App\Services\AdministratorBookingServiceProvider;
+use App\Services\AdministratorBookingStatusServiceProvider;
 use DateTimeImmutable;
 use DateTimeZone;
+use JsonException;
 
 /**
- * Formats authenticated, read-only Administrator booking pages.
+ * Formats authenticated Administrator booking pages and status actions.
  */
 final readonly class AdministratorBookingController
 {
     public function __construct(
         private ViewRenderer $views,
         private AdministratorBookingServiceProvider $services,
+        private AdministratorBookingStatusServiceProvider $statusServices,
+        private AdministratorSession $administratorSession,
         private CsrfTokenManager $csrfTokens,
         private DateTimeZone $timezone,
     ) {
@@ -103,6 +109,113 @@ final readonly class AdministratorBookingController
         }
     }
 
+    /** @param array<string, string> $parameters */
+    public function updateStatus(Request $request, array $parameters): Response
+    {
+        $bookingId = $this->routeId($parameters);
+
+        if ($bookingId === null) {
+            return $this->jsonError('The booking was not found.', 404);
+        }
+
+        if (!$this->usesJsonContentType($request)) {
+            return $this->jsonError(
+                'Content-Type must be application/json.',
+                415,
+            );
+        }
+
+        try {
+            $decodedPayload = json_decode(
+                $request->body(),
+                false,
+                16,
+                JSON_THROW_ON_ERROR,
+            );
+        } catch (JsonException) {
+            return $this->jsonError(
+                'Request body must contain valid JSON.',
+                400,
+            );
+        }
+
+        if (!$decodedPayload instanceof \stdClass) {
+            return $this->jsonError(
+                'Request body must contain a JSON object.',
+                400,
+            );
+        }
+
+        $payload = get_object_vars($decodedPayload);
+
+        if (!$this->hasApprovedStatusPayload($payload)) {
+            return $this->jsonError('Request payload is invalid.', 422);
+        }
+
+        $identity = $this->administratorSession->identity();
+
+        if ($identity === null) {
+            return $this->jsonError('Authentication required.', 401);
+        }
+
+        try {
+            $statusRequest = AdministratorBookingStatusRequest::fromInput(
+                $payload['status'],
+                $payload['reason'] ?? null,
+                array_key_exists('reason', $payload),
+            );
+            $result = $this->statusServices->service()->transition(
+                $bookingId,
+                $statusRequest,
+                $identity->userId(),
+                $request->remoteAddress(),
+                $this->auditUserAgent($request),
+            );
+
+            return Response::json(
+                [
+                    'success' => true,
+                    'message' => 'Booking status updated.',
+                    'data' => [
+                        'booking_id' => $result->bookingId(),
+                        'booking_reference' => $result->bookingReference(),
+                        'previous_status' => $result->fromStatus(),
+                        'booking_status' => $result->toStatus(),
+                        'changed_at' => $result->changedAt()
+                            ->setTimezone($this->timezone)
+                            ->format(DATE_ATOM),
+                    ],
+                ],
+                200,
+                ['Cache-Control' => 'no-store'],
+            );
+        } catch (BookingException $exception) {
+            if ($exception->isValidationFailure()) {
+                return Response::json(
+                    [
+                        'success' => false,
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'booking' => [$exception->getMessage()],
+                        ],
+                    ],
+                    422,
+                    ['Cache-Control' => 'no-store'],
+                );
+            }
+
+            if ($exception->isNotFound()) {
+                return $this->jsonError($exception->getMessage(), 404);
+            }
+
+            if ($exception->isConflict()) {
+                return $this->jsonError($exception->getMessage(), 409);
+            }
+
+            return $this->jsonError('Internal Server Error.', 500);
+        }
+    }
+
     /**
      * @return array{
      *     id: int,
@@ -143,9 +256,7 @@ final readonly class AdministratorBookingController
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function detailData(AdministratorBookingDetail $detail): array
     {
         $booking = $detail->booking();
@@ -160,6 +271,9 @@ final readonly class AdministratorBookingController
             'status' => $booking->bookingStatus(),
             'statusLabel' => $statusLabel,
             'statusBadge' => $statusBadge,
+            'statusActions' => $this->statusActions(
+                $booking->bookingStatus(),
+            ),
             'guestName' => $booking->guestFullName(),
             'guestEmail' => $booking->guestEmail(),
             'guestPhone' => $booking->guestPhone(),
@@ -247,9 +361,7 @@ final readonly class AdministratorBookingController
         ];
     }
 
-    /**
-     * @return list<array{value: string, label: string}>
-     */
+    /** @return list<array{value: string, label: string}> */
     private function statusOptions(): array
     {
         return [
@@ -263,8 +375,54 @@ final readonly class AdministratorBookingController
     }
 
     /**
-     * @return array{string, string}
+     * @return list<array{
+     *     status: string,
+     *     label: string,
+     *     buttonClass: string,
+     *     requiresReason: bool,
+     *     reasonLabel: string
+     * }>
      */
+    private function statusActions(string $status): array
+    {
+        $reject = [
+            'status' => Booking::STATUS_REJECTED,
+            'label' => 'Reject booking',
+            'buttonClass' => 'btn-outline-danger',
+            'requiresReason' => true,
+            'reasonLabel' => 'Rejection reason',
+        ];
+        $cancel = [
+            'status' => Booking::STATUS_CANCELLED,
+            'label' => 'Cancel booking',
+            'buttonClass' => 'btn-outline-secondary',
+            'requiresReason' => true,
+            'reasonLabel' => 'Cancellation reason',
+        ];
+        $checkIn = [
+            'status' => Booking::STATUS_CHECKED_IN,
+            'label' => 'Check in Guest',
+            'buttonClass' => 'btn-primary',
+            'requiresReason' => false,
+            'reasonLabel' => '',
+        ];
+        $checkOut = [
+            'status' => Booking::STATUS_CHECKED_OUT,
+            'label' => 'Check out Guest',
+            'buttonClass' => 'btn-success',
+            'requiresReason' => false,
+            'reasonLabel' => '',
+        ];
+
+        return match ($status) {
+            Booking::STATUS_PENDING => [$reject, $cancel],
+            Booking::STATUS_CONFIRMED => [$checkIn, $cancel],
+            Booking::STATUS_CHECKED_IN => [$checkOut],
+            default => [],
+        };
+    }
+
+    /** @return array{string, string} */
     private function statusPresentation(string $status): array
     {
         return match ($status) {
@@ -304,6 +462,58 @@ final readonly class AdministratorBookingController
         return $status;
     }
 
+    /** @param array<string, mixed> $payload */
+    private function hasApprovedStatusPayload(array $payload): bool
+    {
+        if (!array_key_exists('status', $payload)) {
+            return false;
+        }
+
+        foreach (array_keys($payload) as $key) {
+            if (!in_array($key, ['status', 'reason'], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function usesJsonContentType(Request $request): bool
+    {
+        $contentType = $request->header('Content-Type');
+
+        if ($contentType === null) {
+            return false;
+        }
+
+        return strtolower(trim(explode(';', $contentType, 2)[0]))
+            === 'application/json';
+    }
+
+    private function auditUserAgent(Request $request): ?string
+    {
+        $value = $request->header('User-Agent');
+
+        if (
+            $value === null
+            || !mb_check_encoding($value, 'UTF-8')
+        ) {
+            return null;
+        }
+
+        $normalized = preg_replace(
+            '/[\x00-\x20\x7F]+/u',
+            ' ',
+            trim($value),
+        );
+
+        if (!is_string($normalized) || $normalized === '') {
+            return null;
+        }
+
+        return mb_strcut($normalized, 0, 255, 'UTF-8');
+    }
+
     /** @param array<string, string> $parameters */
     private function routeId(array $parameters): ?int
     {
@@ -337,9 +547,7 @@ final readonly class AdministratorBookingController
         return $value === null ? null : $this->dateTime($value);
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private function page(
         string $view,
         array $data,
@@ -372,6 +580,18 @@ final readonly class AdministratorBookingController
         return Response::text(
             'Internal Server Error',
             500,
+            ['Cache-Control' => 'no-store'],
+        );
+    }
+
+    private function jsonError(string $message, int $statusCode): Response
+    {
+        return Response::json(
+            [
+                'success' => false,
+                'message' => $message,
+            ],
+            $statusCode,
             ['Cache-Control' => 'no-store'],
         );
     }

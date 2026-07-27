@@ -24,6 +24,7 @@ final class BookingMigrationTest extends DatabaseTestCase
         '20260726000100_create_bookings_table',
         '20260726000200_create_booking_rooms_table',
         '20260726000300_create_booking_events_table',
+        '20260727000100_create_audit_logs_table',
     ];
 
     private MigrationRunner $runner;

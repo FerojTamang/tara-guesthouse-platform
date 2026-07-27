@@ -24,6 +24,7 @@ use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
+use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\AdministratorLogoutService;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -94,6 +95,12 @@ final class AdministratorBookingReadPagesTest extends TestCase
                     $this->repository,
                 ),
             ),
+            new AdministratorBookingStatusServiceProvider(
+                static fn (): mixed => throw new \LogicException(
+                    'Status service must remain lazy during booking reads.',
+                ),
+            ),
+            $this->administratorSession,
             $this->csrfTokens,
             new DateTimeZone('Asia/Kathmandu'),
         );
@@ -332,13 +339,88 @@ final class AdministratorBookingReadPagesTest extends TestCase
             $response->body(),
         );
         self::assertStringContainsString(
-            'read-only in S2-011',
+            'action="/api/v1/admin/bookings/31/status"',
+            $response->body(),
+        );
+        self::assertStringContainsString(
+            'data-target-status="rejected"',
+            $response->body(),
+        );
+        self::assertStringContainsString(
+            'data-target-status="cancelled"',
             $response->body(),
         );
         self::assertStringNotContainsString(
-            'action="/admin/bookings/31/status"',
+            'data-target-status="confirmed"',
             $response->body(),
         );
+        self::assertStringNotContainsString(
+            'data-target-status="checked_in"',
+            $response->body(),
+        );
+    }
+
+    #[DataProvider('statusActionPages')]
+    public function testDetailShowsOnlyPermittedStatusActions(
+        string $currentStatus,
+        array $expectedTargets,
+    ): void {
+        $this->repository->method('findById')->willReturn(
+            self::booking($currentStatus),
+        );
+        $this->repository->method('findRoomByBookingId')->willReturn(
+            self::room(),
+        );
+        $this->repository->method('findEventsByBookingId')->willReturn([]);
+        $this->administratorSession->establish(
+            new AdministratorIdentity(91),
+        );
+
+        $response = $this->router->dispatch(
+            Request::create('GET', '/admin/bookings/31'),
+        );
+
+        self::assertSame(200, $response->statusCode());
+
+        foreach ([
+            Booking::STATUS_REJECTED,
+            Booking::STATUS_CANCELLED,
+            Booking::STATUS_CHECKED_IN,
+            Booking::STATUS_CHECKED_OUT,
+        ] as $target) {
+            $needle = 'data-target-status="' . $target . '"';
+
+            if (in_array($target, $expectedTargets, true)) {
+                self::assertStringContainsString($needle, $response->body());
+            } else {
+                self::assertStringNotContainsString($needle, $response->body());
+            }
+        }
+
+        self::assertStringNotContainsString(
+            'data-target-status="confirmed"',
+            $response->body(),
+        );
+    }
+
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function statusActionPages(): iterable
+    {
+        yield 'pending' => [
+            Booking::STATUS_PENDING,
+            [Booking::STATUS_REJECTED, Booking::STATUS_CANCELLED],
+        ];
+        yield 'confirmed' => [
+            Booking::STATUS_CONFIRMED,
+            [Booking::STATUS_CHECKED_IN, Booking::STATUS_CANCELLED],
+        ];
+        yield 'checked in' => [
+            Booking::STATUS_CHECKED_IN,
+            [Booking::STATUS_CHECKED_OUT],
+        ];
+        yield 'checked out terminal' => [Booking::STATUS_CHECKED_OUT, []];
+        yield 'cancelled terminal' => [Booking::STATUS_CANCELLED, []];
+        yield 'rejected terminal' => [Booking::STATUS_REJECTED, []];
     }
 
     #[DataProvider('missingDetailPaths')]
@@ -369,7 +451,9 @@ final class AdministratorBookingReadPagesTest extends TestCase
         yield 'missing' => ['/admin/bookings/999'];
     }
 
-    private static function booking(): Booking
+    private static function booking(
+        string $status = Booking::STATUS_PENDING,
+    ): Booking
     {
         $createdAt = new DateTimeImmutable(
             '2026-08-01 10:00:00 UTC',
@@ -389,7 +473,7 @@ final class AdministratorBookingReadPagesTest extends TestCase
             Booking::CURRENCY_NPR,
             '18000.00',
             '18000.00',
-            Booking::STATUS_PENDING,
+            $status,
             'Late arrival.',
             $createdAt,
             'v1',

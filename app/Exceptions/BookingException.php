@@ -27,6 +27,11 @@ final class BookingException extends RuntimeException
         return new self('The selected room was not found.', 'not_found');
     }
 
+    public static function bookingNotFound(): self
+    {
+        return new self('The booking was not found.', 'not_found');
+    }
+
     public static function roomUnavailable(): self
     {
         return new self('The selected room is not available for this stay.', 'conflict');
@@ -35,6 +40,14 @@ final class BookingException extends RuntimeException
     public static function duplicateReference(?Throwable $previous = null): self
     {
         return new self('The booking reference is already in use.', 'duplicate_reference', $previous);
+    }
+
+    public static function transitionConflict(): self
+    {
+        return new self(
+            'The requested booking status transition is not allowed.',
+            'conflict',
+        );
     }
 
     public static function failure(?Throwable $previous = null): self

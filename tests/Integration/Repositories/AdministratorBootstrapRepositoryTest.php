@@ -229,6 +229,7 @@ final class AdministratorBootstrapRepositoryTest extends DatabaseTestCase
     public function testDatabaseFailuresDoNotDiscloseSqlOrIdentifiers(): void
     {
         $this->dropTables([
+            'audit_logs',
             'booking_events',
             'booking_rooms',
             'bookings',

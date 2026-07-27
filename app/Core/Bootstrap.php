@@ -24,7 +24,9 @@ use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
+use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
+use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
@@ -33,6 +35,8 @@ use App\Services\AdministratorAuthenticationService;
 use App\Services\AvailabilityService;
 use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
+use App\Services\AdministratorBookingStatusService;
+use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -216,6 +220,18 @@ final class Bootstrap
                     new BookingRepository($catalogConnectionProvider()),
                 ),
             ),
+            new AdministratorBookingStatusServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorBookingStatusService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorBookingStatusService(
+                        new PdoBookingStatusWriteRepository($connection),
+                        new PdoAuditLogRepository($connection),
+                        new PdoBookingTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
