@@ -75,6 +75,8 @@ final class BootstrapTest extends TestCase
             'SESSION_SAME_SITE' => 'Lax',
             'SESSION_PATH' => '/',
             'SESSION_DOMAIN' => '',
+            'BOOKING_PENDING_DEADLINE_MINUTES' => '360',
+            'BOOKING_ACCESS_TOKEN_KEY' => 'bootstrap-test-booking-key-32-bytes',
         ]);
     }
 
@@ -162,6 +164,8 @@ final class BootstrapTest extends TestCase
         $config = Config::load(CONFIG_PATH, $environment);
 
         self::assertTrue($config->has('app'));
+        self::assertTrue($config->has('booking'));
+        self::assertSame(360, $config->get('booking.pending_deadline_minutes'));
         self::assertTrue($config->has('logging'));
         self::assertTrue($config->has('database'));
         self::assertFalse($config->has('mail'));

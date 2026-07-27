@@ -31,6 +31,7 @@ final class Config
 
         return new self([
             'app' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'app.php', $environment),
+            'booking' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'booking.php', $environment),
             'database' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment),
             'logging' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'logging.php', $environment),
             'security' => self::loadSecurity($resolvedConfigPath, $environment),
@@ -149,12 +150,19 @@ final class Config
      */
     private static function validateSecurity(array $configuration): array
     {
-        if (array_keys($configuration) !== ['administrator_bootstrap', 'administrator_login']) {
+        if (
+            array_keys($configuration) !== [
+                'administrator_bootstrap',
+                'administrator_login',
+                'public_booking',
+            ]
+        ) {
             throw new ConfigurationException('Security configuration is invalid.');
         }
 
         self::validateAdministratorBootstrapPolicy($configuration['administrator_bootstrap']);
         self::validateAdministratorLoginPolicy($configuration['administrator_login']);
+        self::validatePublicBookingPolicy($configuration['public_booking']);
 
         return $configuration;
     }
@@ -255,5 +263,34 @@ final class Config
             throw new ConfigurationException('Security configuration is invalid.');
         }
     }
+
+
+    private static function validatePublicBookingPolicy(mixed $policy): void
+    {
+        $requiredKeys = [
+            'max_attempts',
+            'attempt_window_seconds',
+            'block_duration_seconds',
+        ];
+
+        if (!is_array($policy) || array_keys($policy) !== $requiredKeys) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+
+        foreach ($requiredKeys as $key) {
+            if (!is_int($policy[$key]) || $policy[$key] <= 0) {
+                throw new ConfigurationException('Security configuration is invalid.');
+            }
+        }
+
+        if (
+            $policy['max_attempts'] > 20
+            || $policy['attempt_window_seconds'] > 86400
+            || $policy['block_duration_seconds'] > 86400
+        ) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+    }
+
 
 }

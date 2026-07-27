@@ -13,21 +13,33 @@ use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicAvailabilityController;
+use App\Controllers\PublicBookingController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
+use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
 use App\Repositories\PdoAvailabilityRepository;
+use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AvailabilityService;
+use App\Services\BookingAccessToken;
+use App\Services\BookingCreationService;
+use App\Services\BookingDeadlinePolicy;
+use App\Services\BookingReferenceGenerator;
+use App\Services\BookingService;
+use App\Services\BookingSubmissionService;
+use App\Services\BookingSubmissionWorkflow;
+use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
+use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
@@ -37,6 +49,7 @@ use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
+use App\Services\PublicBookingRateLimiter;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
@@ -97,9 +110,16 @@ final class Bootstrap
         $administratorSession = new AdministratorSession($session, $csrfTokens);
         $databaseConfiguration = $config->require('database');
         $loginPolicy = $config->require('security.administrator_login');
+        $publicBookingPolicy = $config->require('security.public_booking');
+        $bookingConfiguration = $config->require('booking');
 
-        if (!is_array($databaseConfiguration) || !is_array($loginPolicy)) {
-            throw new ConfigurationException('Administrator authentication configuration is invalid.');
+        if (
+            !is_array($databaseConfiguration)
+            || !is_array($loginPolicy)
+            || !is_array($publicBookingPolicy)
+            || !is_array($bookingConfiguration)
+        ) {
+            throw new ConfigurationException('Application service configuration is invalid.');
         }
 
         $connectionFactory = new ConnectionFactory($databaseConfiguration);
@@ -201,6 +221,57 @@ final class Bootstrap
             ),
             $viewRenderer,
         );
+        $publicBookingController = new PublicBookingController(
+            new BookingSubmissionWorkflowProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $bookingConfiguration,
+                ): BookingSubmissionWorkflow {
+                    $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+                    $deadlineMinutes = $bookingConfiguration['pending_deadline_minutes'] ?? null;
+
+                    if (!is_string($accessTokenKey) || !is_int($deadlineMinutes)) {
+                        throw new ConfigurationException(
+                            'Public booking submission is not configured.',
+                        );
+                    }
+
+                    $connection = $catalogConnectionProvider();
+                    $rooms = new RoomRepository($connection);
+                    $creator = new BookingCreationService(
+                        $rooms,
+                        new BookingService(
+                            $rooms,
+                            new PdoAvailabilityRepository($connection),
+                        ),
+                        new PdoBookingWriteRepository($connection),
+                        new PdoBookingTransaction($connection),
+                    );
+
+                    return new BookingSubmissionWorkflow(
+                        new BookingSubmissionService(
+                            $creator,
+                            new BookingReferenceGenerator(),
+                            new BookingDeadlinePolicy($deadlineMinutes),
+                        ),
+                        new BookingAccessToken($accessTokenKey),
+                    );
+                },
+            ),
+            new \DateTimeZone($timezone),
+        );
+        $publicBookingRateLimit = new PublicBookingRateLimitMiddleware(
+            new PublicBookingRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'booking-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicBookingPolicy,
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -216,6 +287,8 @@ final class Bootstrap
             $roomImageController,
             $publicRoomController,
             $publicAvailabilityController,
+            $publicBookingController,
+            $publicBookingRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -259,6 +332,8 @@ final class Bootstrap
         AdministratorRoomImageController $roomImageController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
+        PublicBookingController $publicBookingController,
+        PublicBookingRateLimitMiddleware $publicBookingRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -287,6 +362,8 @@ final class Bootstrap
                 $roomImageController,
                 $publicRoomController,
                 $publicAvailabilityController,
+                $publicBookingController,
+                $publicBookingRateLimit,
             );
         }
     }
