@@ -18,4 +18,14 @@ return [
         'filesystem_root' => 'public/uploads/rooms',
         'database_path_prefix' => 'uploads/rooms/',
     ],
+    'payment_proofs' => [
+        'allowed_mime_extensions' => [
+            'image/jpeg' => ['jpg', 'jpeg'],
+            'image/png' => ['png'],
+            'application/pdf' => ['pdf'],
+        ],
+        'maximum_file_size_bytes' => 5_242_880,
+        'filesystem_root' => 'storage/private/payment-proofs',
+        'database_path_prefix' => 'payment-proofs/',
+    ],
 ];
