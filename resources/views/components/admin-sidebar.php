@@ -63,7 +63,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Bookings</span>
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'bookings' ? ' active' : '' ?>"
+                        href="/admin/bookings"
+                        <?= $activeNavigation === 'bookings' ? 'aria-current="page"' : '' ?>
+                    >
+                        Bookings
+                    </a>
                 </li>
                 <li class="nav-item">
                     <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Payments</span>

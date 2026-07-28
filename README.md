@@ -79,7 +79,7 @@ Copy-Item .env.example .env
 
 Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
 
-Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The Sprint 0 suite includes genuine unit, integration, feature, and isolated database coverage for the repository, HTTP, session/CSRF, database-runner, and view-renderer foundations.
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The suite covers the foundation, Administrator authentication, room management, public room pages, date-range availability, transactional one-room Guest booking, concurrency protection, secure booking references and follow-up tokens, public rate limiting, Administrator booking reads, booking status actions, booking events, and booking-status audit records.
 
 The core HTTP bootstrap is executable. After configuring the required local environment values, start PHP's development server from the repository root:
 
@@ -95,7 +95,7 @@ The application includes a secure PHP view renderer for trusted project template
 
 Templates must escape HTML text and quoted attribute values through the provided `$e` helper. There is no raw HTML helper; renderer-owned layout content is the only approved unescaped composition value. The HTML helper is not a JavaScript, CSS, JSON, URL, or URL-scheme sanitizer. Templates must not access PDO, repositories, services, sessions, environment values, or configuration, and must not send headers, terminate execution, query data, or contain business logic.
 
-The current `/` page is infrastructure-only and confirms that the application and renderer are operational. Final Bootstrap styling, frontend assets, the public website layout, and the Administrator layout remain deferred to later approved tickets.
+The current `/` page remains infrastructure-only. The secure view foundation now also renders the Administrator layout, room-management pages, public room pages, public availability and booking pages, and Administrator booking list/detail pages. Final homepage/content design and later Version 1 modules remain deferred to their approved tickets.
 
 Run the genuine core test suite with:
 
@@ -105,11 +105,11 @@ composer test
 
 Version 1 uses hardened native PHP sessions. The approved local settings use a 30-minute inactivity timeout, a 12-hour absolute lifetime, `SameSite=Lax`, `HttpOnly`, `Path=/`, and a non-Secure cookie only for local HTTP development. Staging and production require HTTPS with `SESSION_SECURE_COOKIE=true`. Private session files are stored in `storage/sessions/`, outside the public document root.
 
-The session-backed CSRF token primitives are available for future forms, but route-level enforcement is intentionally deferred until the first real state-changing form and its narrowly scoped middleware are implemented. Session identifiers, cookie contents, session values, and CSRF tokens must never be logged.
+The session-backed CSRF token system is enforced through narrowly scoped middleware on implemented state-changing HTML and JSON routes, including Administrator authentication, room management, public booking submission, and Administrator booking-status actions. Session identifiers, cookie contents, session values, and CSRF tokens must never be logged.
 
 ## Database Foundation
 
-S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. It creates only the infrastructure-owned `schema_migrations` table; guest-house domain tables and seed data belong to later approved tickets.
+S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. Applied domain migrations now include Administrator authentication, rooms, amenities, room images, bookings, one-room snapshots, booking events, and the audit-log foundation. Migrations remain the executable schema source of truth.
 
 MariaDB 11.8 is the primary tested database engine. Connections use `utf8mb4`, `utf8mb4_unicode_ci`, UTC session time, native prepared statements, and a five-second timeout. Application display dates remain configured through `APP_TIMEZONE=Asia/Kathmandu`. HTTP bootstrap validates database settings but does not eagerly connect.
 
@@ -147,7 +147,7 @@ php bin/admin.php bootstrap --full-name "<full name>" --username "<username>" --
 
 An optional `--phone` identity value is supported. Staging and production require the exact `--force` flag; it does not bypass validation, prerequisite, conflict, database-account, or transaction safeguards. There is no password command-line flag, password-file option, or password environment-variable contract.
 
-Bootstrap is single-use. It never modifies, resets, activates, unlocks, restores, or replaces an existing account. Passwords and hashes must never be placed in migrations, seeders, tracked environment files, commands, or documentation. Persistent audit records, login/logout, session authentication identity, authorization middleware, rate limiting, password reset, and authentication views remain deferred to later approved tickets.
+Bootstrap is single-use. It never modifies, resets, activates, unlocks, restores, or replaces an existing account. Passwords and hashes must never be placed in migrations, seeders, tracked environment files, commands, or documentation. Administrator login/logout, session identity, protected middleware, login rate limiting, CSRF, and authentication views are implemented. Staff password reset and audit-log administration remain deferred to later approved tickets; booking-status changes already write append-only audit records.
 
 Create task branches from `develop`, open a pull request back to `develop`, and merge approved releases to `main` according to `docs/07_Git_Workflow.md`. Direct commits to `main` and `develop` are prohibited.
 
@@ -232,9 +232,21 @@ The required baseline includes unit, integration, feature, security, responsive/
 - Public room listing and detail pages with safe Not Found responses
 - Calculated eligibility filtering (active, published, capacity, unexpired bookings)
 
-Automated baseline: **970 tests, 6088 assertions, 10 skipped, 0 failures**. See [Sprint 1 QA Closure Report](docs/40_Sprint_1_QA_Closure_Report.md).
+Sprint 1 automated baseline: **970 tests, 6088 assertions, 10 skipped, 0 failures**. See [Sprint 1 QA Closure Report](docs/40_Sprint_1_QA_Closure_Report.md).
 
-**Later phases** — Availability, booking, payments, invoices, operations/content, hardening, UAT, and production deployment remain unimplemented.
+**Sprint 2 Phase 3 slice** — Availability and Booking is implemented and tested:
+- Public date-range availability page and `GET /api/v1/availability`
+- Strict overlap boundaries, canonical blocking statuses, and expired-pending behavior
+- Transactional one-room Guest booking with room locking and concurrency protection
+- Secure non-sequential booking references and opaque signed follow-up tokens
+- Public JSON and PHP-rendered booking forms with CSRF, rate limiting, PRG success flow, and no-store responses
+- Administrator booking list/detail pages and canonical status filtering
+- Protected `PATCH /api/v1/admin/bookings/{id}/status` actions with transition enforcement
+- Append-only booking events and audit records for Administrator status changes
+
+Sprint 2 automated baseline: **1245 tests, 7597 assertions, 10 skipped, 0 failures**. See [Sprint 2 QA Closure Report](docs/41_Sprint_2_QA_Closure_Report.md).
+
+**Later phases** — Manual payments and invoices, remaining operations/content modules, notification delivery, dashboard completion, hardening, UAT, and production deployment remain unimplemented. Booking confirmation through verified payment is intentionally reserved for the later Payment Service slice.
 
 ## Ownership
 

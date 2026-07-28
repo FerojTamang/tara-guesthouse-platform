@@ -38,6 +38,10 @@ final class SecurityConfigTest extends TestCase
         unset($missingLoginKey['administrator_login']['block_duration_seconds']);
         yield 'missing login key' => [$missingLoginKey];
 
+        $missingPublicBookingKey = $valid;
+        unset($missingPublicBookingKey['public_booking']['block_duration_seconds']);
+        yield 'missing public booking key' => [$missingPublicBookingKey];
+
         $wrongBootstrapType = $valid;
         $wrongBootstrapType['administrator_bootstrap']['password_min_characters'] = '15';
         yield 'bootstrap numeric string' => [$wrongBootstrapType];
@@ -45,6 +49,10 @@ final class SecurityConfigTest extends TestCase
         $wrongLoginType = $valid;
         $wrongLoginType['administrator_login']['max_failed_attempts'] = '5';
         yield 'login numeric string' => [$wrongLoginType];
+
+        $wrongPublicBookingType = $valid;
+        $wrongPublicBookingType['public_booking']['max_attempts'] = '5';
+        yield 'public booking numeric string' => [$wrongPublicBookingType];
 
         $invalidBootstrapRange = $valid;
         $invalidBootstrapRange['administrator_bootstrap']['full_name_min_characters'] = 101;
@@ -77,6 +85,14 @@ final class SecurityConfigTest extends TestCase
         $unsafeWindow = $valid;
         $unsafeWindow['administrator_login']['attempt_window_seconds'] = 86401;
         yield 'excessive attempt window' => [$unsafeWindow];
+
+        $unsafePublicBookingAttempts = $valid;
+        $unsafePublicBookingAttempts['public_booking']['max_attempts'] = 21;
+        yield 'excessive public booking attempts' => [$unsafePublicBookingAttempts];
+
+        $unsafePublicBookingWindow = $valid;
+        $unsafePublicBookingWindow['public_booking']['attempt_window_seconds'] = 86401;
+        yield 'excessive public booking window' => [$unsafePublicBookingWindow];
     }
 
     /** @param array<string, mixed> $configuration */
@@ -128,6 +144,11 @@ final class SecurityConfigTest extends TestCase
                 'identifier_max_bytes' => 150,
                 'password_max_bytes' => 72,
                 'max_failed_attempts' => 5,
+                'attempt_window_seconds' => 900,
+                'block_duration_seconds' => 900,
+            ],
+            'public_booking' => [
+                'max_attempts' => 5,
                 'attempt_window_seconds' => 900,
                 'block_duration_seconds' => 900,
             ],

@@ -332,6 +332,10 @@ PHP);
 
         try {
             foreach ([
+                'audit_logs',
+            'booking_events',
+                'booking_rooms',
+                'bookings',
                 'room_amenities',
                 'room_images',
                 'rooms',
