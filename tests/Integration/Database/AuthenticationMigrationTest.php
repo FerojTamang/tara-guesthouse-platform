@@ -26,6 +26,8 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         '20260726000200_create_booking_rooms_table',
         '20260726000300_create_booking_events_table',
         '20260727000100_create_audit_logs_table',
+        '20260728000100_create_payment_methods_table',
+        '20260728000200_create_payments_table',
     ];
 
     private MigrationRunner $runner;
@@ -230,7 +232,7 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         self::assertSame(0, (int) $this->connection->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
 
         self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
-        self::assertSame(11, $this->applicationTableCount());
+        self::assertSame(13, $this->applicationTableCount());
         self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
         self::assertSame(0, $this->applicationTableCount());
     }
@@ -379,7 +381,8 @@ final class AuthenticationMigrationTest extends DatabaseTestCase
         return (int) $this->connection->query(
             "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
             . "AND TABLE_NAME IN ('roles', 'users', 'room_types', 'rooms', 'room_images', "
-            . "'amenities', 'room_amenities', 'bookings', 'booking_rooms', 'booking_events', 'audit_logs')",
+            . "'amenities', 'room_amenities', 'bookings', 'booking_rooms', 'booking_events', "
+            . "'audit_logs', 'payment_methods', 'payments')",
         )->fetchColumn();
     }
 
