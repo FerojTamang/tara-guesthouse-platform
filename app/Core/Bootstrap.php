@@ -9,6 +9,7 @@ use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -28,6 +29,7 @@ use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
+use App\Repositories\PaymentMethodRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
@@ -51,6 +53,9 @@ use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
+use App\Services\PaymentMethodFlashMessages;
+use App\Services\PaymentMethodManagementService;
+use App\Services\PaymentMethodManagementServiceProvider;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
@@ -235,6 +240,16 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $paymentMethodController = new AdministratorPaymentMethodController(
+            $viewRenderer,
+            new PaymentMethodManagementServiceProvider(
+                static fn (): PaymentMethodManagementService => new PaymentMethodManagementService(
+                    new PaymentMethodRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $csrfTokens,
+            new PaymentMethodFlashMessages($session),
+        );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
             new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
@@ -326,6 +341,7 @@ final class Bootstrap
             $roomController,
             $roomImageController,
             $administratorBookingController,
+            $paymentMethodController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicBookingController,
@@ -373,6 +389,7 @@ final class Bootstrap
         AdministratorRoomController $roomController,
         AdministratorRoomImageController $roomImageController,
         AdministratorBookingController $administratorBookingController,
+        AdministratorPaymentMethodController $paymentMethodController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicBookingController $publicBookingController,
@@ -405,6 +422,7 @@ final class Bootstrap
                 $roomController,
                 $roomImageController,
                 $administratorBookingController,
+                $paymentMethodController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicBookingController,

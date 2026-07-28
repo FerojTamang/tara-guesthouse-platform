@@ -72,6 +72,15 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'payment-methods' ? ' active' : '' ?>"
+                        href="/admin/payment-methods"
+                        <?= $activeNavigation === 'payment-methods' ? 'aria-current="page"' : '' ?>
+                    >
+                        Payment methods
+                    </a>
+                </li>
+                <li class="nav-item">
                     <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Payments</span>
                 </li>
                 <li class="nav-item">
