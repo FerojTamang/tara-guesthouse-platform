@@ -42,6 +42,10 @@ final class SecurityConfigTest extends TestCase
         unset($missingPublicBookingKey['public_booking']['block_duration_seconds']);
         yield 'missing public booking key' => [$missingPublicBookingKey];
 
+        $missingPublicPaymentKey = $valid;
+        unset($missingPublicPaymentKey['public_payment']['block_duration_seconds']);
+        yield 'missing public payment key' => [$missingPublicPaymentKey];
+
         $wrongBootstrapType = $valid;
         $wrongBootstrapType['administrator_bootstrap']['password_min_characters'] = '15';
         yield 'bootstrap numeric string' => [$wrongBootstrapType];
@@ -53,6 +57,10 @@ final class SecurityConfigTest extends TestCase
         $wrongPublicBookingType = $valid;
         $wrongPublicBookingType['public_booking']['max_attempts'] = '5';
         yield 'public booking numeric string' => [$wrongPublicBookingType];
+
+        $wrongPublicPaymentType = $valid;
+        $wrongPublicPaymentType['public_payment']['max_attempts'] = '5';
+        yield 'public payment numeric string' => [$wrongPublicPaymentType];
 
         $invalidBootstrapRange = $valid;
         $invalidBootstrapRange['administrator_bootstrap']['full_name_min_characters'] = 101;
@@ -93,6 +101,16 @@ final class SecurityConfigTest extends TestCase
         $unsafePublicBookingWindow = $valid;
         $unsafePublicBookingWindow['public_booking']['attempt_window_seconds'] = 86401;
         yield 'excessive public booking window' => [$unsafePublicBookingWindow];
+
+        foreach ([
+            'max_attempts' => 6,
+            'attempt_window_seconds' => 901,
+            'block_duration_seconds' => 899,
+        ] as $key => $value) {
+            $changedPublicPayment = $valid;
+            $changedPublicPayment['public_payment'][$key] = $value;
+            yield 'changed public payment ' . $key => [$changedPublicPayment];
+        }
     }
 
     /** @param array<string, mixed> $configuration */
@@ -148,6 +166,11 @@ final class SecurityConfigTest extends TestCase
                 'block_duration_seconds' => 900,
             ],
             'public_booking' => [
+                'max_attempts' => 5,
+                'attempt_window_seconds' => 900,
+                'block_duration_seconds' => 900,
+            ],
+            'public_payment' => [
                 'max_attempts' => 5,
                 'attempt_window_seconds' => 900,
                 'block_duration_seconds' => 900,
