@@ -17,6 +17,7 @@ use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicPaymentMethodController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
@@ -65,6 +66,8 @@ use App\Services\RoomTypeCatalogService;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
 use App\Services\PublicBookingRateLimiter;
+use App\Services\PublicPaymentMethodService;
+use App\Services\PublicPaymentMethodServiceProvider;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
@@ -268,6 +271,13 @@ final class Bootstrap
             ),
             $viewRenderer,
         );
+        $publicPaymentMethodController = new PublicPaymentMethodController(
+            new PublicPaymentMethodServiceProvider(
+                static fn (): PublicPaymentMethodService => new PublicPaymentMethodService(
+                    new PaymentMethodRepository($catalogConnectionProvider()),
+                ),
+            ),
+        );
         $responseTimezone = new \DateTimeZone($timezone);
         $publicBookingWorkflows = new BookingSubmissionWorkflowProvider(
             static function () use (
@@ -344,6 +354,7 @@ final class Bootstrap
             $paymentMethodController,
             $publicRoomController,
             $publicAvailabilityController,
+            $publicPaymentMethodController,
             $publicBookingController,
             $publicBookingPageController,
             $publicBookingRateLimit,
@@ -392,6 +403,7 @@ final class Bootstrap
         AdministratorPaymentMethodController $paymentMethodController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
+        PublicPaymentMethodController $publicPaymentMethodController,
         PublicBookingController $publicBookingController,
         PublicBookingPageController $publicBookingPageController,
         PublicBookingRateLimitMiddleware $publicBookingRateLimit,
@@ -425,6 +437,7 @@ final class Bootstrap
                 $paymentMethodController,
                 $publicRoomController,
                 $publicAvailabilityController,
+                $publicPaymentMethodController,
                 $publicBookingController,
                 $publicBookingPageController,
                 $publicBookingRateLimit,

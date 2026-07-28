@@ -6,6 +6,7 @@ use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
+use App\Controllers\PublicPaymentMethodController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
@@ -25,6 +26,7 @@ return static function (
     $csrf = null;
     $publicAvailability = null;
     $publicBooking = null;
+    $publicPaymentMethods = null;
     $publicBookingRateLimit = null;
 
     foreach ($dependencies as $dependency) {
@@ -42,6 +44,8 @@ return static function (
             $publicAvailability ??= $dependency;
         } elseif ($dependency instanceof PublicBookingController) {
             $publicBooking ??= $dependency;
+        } elseif ($dependency instanceof PublicPaymentMethodController) {
+            $publicPaymentMethods ??= $dependency;
         } elseif ($dependency instanceof PublicBookingRateLimitMiddleware) {
             $publicBookingRateLimit ??= $dependency;
         }
@@ -85,6 +89,10 @@ return static function (
 
     if ($publicAvailability !== null) {
         $router->get('/api/v1/availability', $publicAvailability->index(...));
+    }
+
+    if ($publicPaymentMethods !== null) {
+        $router->get('/api/v1/payment-methods', $publicPaymentMethods->index(...));
     }
 
     if ($bookingDependencyCount === 2) {
