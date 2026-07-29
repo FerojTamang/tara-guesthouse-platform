@@ -18,6 +18,7 @@ use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicPaymentController;
+use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicPaymentMethodController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
@@ -53,8 +54,12 @@ use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
 use App\Services\GuestPaymentAccessValidator;
+use App\Services\GuestPaymentContinuation;
+use App\Services\GuestPaymentPageService;
+use App\Services\GuestPaymentPageServiceProvider;
 use App\Services\GuestPaymentSubmissionService;
 use App\Services\GuestPaymentSubmissionServiceProvider;
+use App\Services\GuestPaymentSuccessFlash;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
@@ -281,12 +286,13 @@ final class Bootstrap
             ),
             $viewRenderer,
         );
-        $publicPaymentMethodController = new PublicPaymentMethodController(
-            new PublicPaymentMethodServiceProvider(
-                static fn (): PublicPaymentMethodService => new PublicPaymentMethodService(
-                    new PaymentMethodRepository($catalogConnectionProvider()),
-                ),
+        $publicPaymentMethodServices = new PublicPaymentMethodServiceProvider(
+            static fn (): PublicPaymentMethodService => new PublicPaymentMethodService(
+                new PaymentMethodRepository($catalogConnectionProvider()),
             ),
+        );
+        $publicPaymentMethodController = new PublicPaymentMethodController(
+            $publicPaymentMethodServices,
         );
         $responseTimezone = new \DateTimeZone($timezone);
         $publicBookingWorkflows = new BookingSubmissionWorkflowProvider(
@@ -329,10 +335,12 @@ final class Bootstrap
             $publicBookingWorkflows,
             $responseTimezone,
         );
+        $paymentContinuation = new GuestPaymentContinuation($session);
         $publicBookingPageController = new PublicBookingPageController(
             $viewRenderer,
             $publicBookingWorkflows,
             new BookingSuccessFlash($session, $responseTimezone),
+            $paymentContinuation,
             $csrfTokens,
         );
         $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
@@ -371,6 +379,36 @@ final class Bootstrap
         $publicPaymentController = new PublicPaymentController(
             $publicPaymentServices,
             $paymentProofServices->uploadConfiguration(...),
+        );
+        $publicPaymentPageServices = new GuestPaymentPageServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $bookingConfiguration,
+            ): GuestPaymentPageService {
+                $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+
+                if (!is_string($accessTokenKey)) {
+                    throw new ConfigurationException(
+                        'Public payment page is not configured.',
+                    );
+                }
+
+                return new GuestPaymentPageService(
+                    new BookingRepository($catalogConnectionProvider()),
+                    new PaymentMethodRepository($catalogConnectionProvider()),
+                    new BookingAccessToken($accessTokenKey),
+                );
+            },
+        );
+        $publicPaymentPageController = new PublicPaymentPageController(
+            $viewRenderer,
+            $publicPaymentPageServices,
+            $publicPaymentServices,
+            $paymentContinuation,
+            new GuestPaymentSuccessFlash($session, $responseTimezone),
+            $csrfTokens,
+            $paymentProofServices->uploadConfiguration(...),
+            $responseTimezone,
         );
         $publicBookingRateLimit = new PublicBookingRateLimitMiddleware(
             new PublicBookingRateLimiter(
@@ -418,6 +456,7 @@ final class Bootstrap
             $publicBookingPageController,
             $publicBookingRateLimit,
             $publicPaymentController,
+            $publicPaymentPageController,
             $publicPaymentRateLimit,
         );
 
@@ -469,6 +508,7 @@ final class Bootstrap
         PublicBookingPageController $publicBookingPageController,
         PublicBookingRateLimitMiddleware $publicBookingRateLimit,
         PublicPaymentController $publicPaymentController,
+        PublicPaymentPageController $publicPaymentPageController,
         PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
@@ -505,6 +545,7 @@ final class Bootstrap
                 $publicBookingPageController,
                 $publicBookingRateLimit,
                 $publicPaymentController,
+                $publicPaymentPageController,
                 $publicPaymentRateLimit,
             );
         }

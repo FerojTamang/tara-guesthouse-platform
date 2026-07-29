@@ -20,6 +20,7 @@ use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSubmitter;
 use App\Services\BookingSuccessFlash;
+use App\Services\GuestPaymentContinuation;
 use App\Services\PublicBookingRateLimiter;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -41,6 +42,8 @@ final class PublicBookingPageTest extends TestCase
 
     private Router $router;
 
+    private GuestPaymentContinuation $paymentContinuation;
+
     private PublicBookingPageSubmitterFake $submitter;
 
     protected function setUp(): void
@@ -60,6 +63,7 @@ final class PublicBookingPageTest extends TestCase
 
         $this->session = Session::start($this->sessionConfiguration());
         $this->tokens = new CsrfTokenManager($this->session);
+        $this->paymentContinuation = new GuestPaymentContinuation($this->session);
         $this->submitter = new PublicBookingPageSubmitterFake();
         $timezone = new DateTimeZone('Asia/Kathmandu');
         $controller = new PublicBookingPageController(
@@ -77,6 +81,7 @@ final class PublicBookingPageTest extends TestCase
                 ),
             ),
             new BookingSuccessFlash($this->session, $timezone),
+            $this->paymentContinuation,
             $this->tokens,
         );
 
@@ -211,6 +216,17 @@ final class PublicBookingPageTest extends TestCase
         self::assertStringNotContainsString('asha@example.test', $success->body());
         self::assertStringNotContainsString('+9779800000000', $success->body());
         self::assertStringNotContainsString('v1.', $success->body());
+        self::assertStringContainsString('/booking/payment', $success->body());
+        $continuation = $this->paymentContinuation->current();
+        self::assertNotNull($continuation);
+        self::assertSame(
+            'TGH-2026-REFERENCE00000000001',
+            $continuation['booking_reference'],
+        );
+        self::assertMatchesRegularExpression(
+            '/^v1\.[A-Za-z0-9_-]{43}$/D',
+            $continuation['booking_access_token'],
+        );
 
         $refresh = $this->router->dispatch(
             Request::create('GET', '/booking/success'),

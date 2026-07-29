@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicRoomController;
 use App\Core\Request;
 use App\Core\Response;
@@ -11,13 +12,16 @@ use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicPaymentRateLimitMiddleware;
 
 return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$dependencies): void {
     $publicRooms = null;
     $publicAvailability = null;
     $publicBooking = null;
+    $publicPayment = null;
     $csrf = null;
     $publicBookingRateLimit = null;
+    $publicPaymentRateLimit = null;
 
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof PublicRoomController) {
@@ -26,10 +30,14 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
             $publicAvailability ??= $dependency;
         } elseif ($dependency instanceof PublicBookingPageController) {
             $publicBooking ??= $dependency;
+        } elseif ($dependency instanceof PublicPaymentPageController) {
+            $publicPayment ??= $dependency;
         } elseif ($dependency instanceof CsrfMiddleware) {
             $csrf ??= $dependency;
         } elseif ($dependency instanceof PublicBookingRateLimitMiddleware) {
             $publicBookingRateLimit ??= $dependency;
+        } elseif ($dependency instanceof PublicPaymentRateLimitMiddleware) {
+            $publicPaymentRateLimit ??= $dependency;
         }
     }
 
@@ -66,5 +74,21 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
             [$csrf, $publicBookingRateLimit->forWeb()],
         );
         $router->get('/booking/success', $publicBooking->success(...));
+    }
+
+    if ($publicPayment !== null) {
+        if ($csrf === null || $publicPaymentRateLimit === null) {
+            throw new \LogicException(
+                'Public payment pages require complete security dependencies.',
+            );
+        }
+
+        $router->get('/booking/payment', $publicPayment->form(...));
+        $router->post(
+            '/booking/payment',
+            $publicPayment->submit(...),
+            [$csrf, $publicPaymentRateLimit->forWeb()],
+        );
+        $router->get('/booking/payment/success', $publicPayment->success(...));
     }
 };
