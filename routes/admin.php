@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
@@ -30,6 +31,7 @@ return static function (
     ?AdministratorRoomImageController $roomImageController = null,
     ?AdministratorBookingController $bookingController = null,
     ?AdministratorPaymentMethodController $paymentMethodController = null,
+    ?AdministratorPaymentController $paymentController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -45,6 +47,7 @@ return static function (
         && $roomImageController === null
         && $bookingController === null
         && $paymentMethodController === null
+        && $paymentController === null
     ) {
         return;
     }
@@ -83,6 +86,24 @@ return static function (
         $router->get(
             '/admin/bookings/{id}',
             [$bookingController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($paymentController !== null) {
+        $router->get(
+            '/admin/payments',
+            [$paymentController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/payments/{id}',
+            [$paymentController, 'show'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/payments/{id}/proof',
+            [$paymentController, 'proof'],
             [$requireAdministrator],
         );
     }

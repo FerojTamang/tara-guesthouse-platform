@@ -9,6 +9,7 @@ use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
@@ -34,6 +35,7 @@ use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\PaymentMethodRepository;
+use App\Repositories\PdoAdministratorPaymentRepository;
 use App\Repositories\PdoPaymentWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
@@ -61,6 +63,8 @@ use App\Services\GuestPaymentSubmissionService;
 use App\Services\GuestPaymentSubmissionServiceProvider;
 use App\Services\GuestPaymentSuccessFlash;
 use App\Services\AdministratorLogoutService;
+use App\Services\AdministratorPaymentService;
+use App\Services\AdministratorPaymentServiceProvider;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoBookingTransaction;
@@ -236,6 +240,7 @@ final class Bootstrap
             $roomImageServices->uploadConfiguration(...),
             $catalogFlashMessages,
         );
+        $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
         $administratorBookingController = new AdministratorBookingController(
             $viewRenderer,
             new AdministratorBookingServiceProvider(
@@ -267,6 +272,27 @@ final class Bootstrap
             ),
             $csrfTokens,
             new PaymentMethodFlashMessages($session),
+        );
+        $administratorPaymentController = new AdministratorPaymentController(
+            $viewRenderer,
+            new AdministratorPaymentServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $paymentProofServices,
+                ): AdministratorPaymentService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorPaymentService(
+                        new PdoAdministratorPaymentRepository($connection),
+                        $paymentProofServices->reader(),
+                        new PdoAuditLogRepository($connection),
+                        new PdoBookingTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
         );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
@@ -343,7 +369,6 @@ final class Bootstrap
             $paymentContinuation,
             $csrfTokens,
         );
-        $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
         $publicPaymentServices = new GuestPaymentSubmissionServiceProvider(
             static function () use (
                 $catalogConnectionProvider,
@@ -449,6 +474,7 @@ final class Bootstrap
             $roomImageController,
             $administratorBookingController,
             $paymentMethodController,
+            $administratorPaymentController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -501,6 +527,7 @@ final class Bootstrap
         AdministratorRoomImageController $roomImageController,
         AdministratorBookingController $administratorBookingController,
         AdministratorPaymentMethodController $paymentMethodController,
+        AdministratorPaymentController $administratorPaymentController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -538,6 +565,7 @@ final class Bootstrap
                 $roomImageController,
                 $administratorBookingController,
                 $paymentMethodController,
+                $administratorPaymentController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,

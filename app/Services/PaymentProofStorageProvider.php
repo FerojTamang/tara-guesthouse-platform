@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Exceptions\PaymentProofException;
 use App\Storage\LocalPaymentProofStorage;
+use App\Storage\PaymentProofReader;
 use App\Storage\PaymentProofStorage;
 use Throwable;
 
@@ -31,6 +32,17 @@ final class PaymentProofStorageProvider
 
     public function __construct(private readonly string $basePath)
     {
+    }
+
+    public function reader(): PaymentProofReader
+    {
+        $storage = $this->storage();
+
+        if (!$storage instanceof PaymentProofReader) {
+            throw PaymentProofException::system();
+        }
+
+        return $storage;
     }
 
     public function storage(): PaymentProofStorage

@@ -45,6 +45,7 @@ final class PaymentProofStorageProviderTest extends TestCase
 
         self::assertSame($configuration, $provider->uploadConfiguration());
         self::assertSame($storage, $provider->storage());
+        self::assertSame($storage, $provider->reader());
         self::assertInstanceOf(LocalPaymentProofStorage::class, $storage);
         self::assertSame('storage/private/payment-proofs', $configuration['filesystem_root']);
         self::assertSame('payment-proofs/', $configuration['database_path_prefix']);

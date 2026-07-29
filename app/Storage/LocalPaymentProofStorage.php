@@ -12,7 +12,7 @@ use Throwable;
 /**
  * Stores validated payment proofs in one private local directory.
  */
-final class LocalPaymentProofStorage implements PaymentProofStorage
+final class LocalPaymentProofStorage implements PaymentProofStorage, PaymentProofReader
 {
     private const DATABASE_PATH_PREFIX = 'payment-proofs/';
     private const MAXIMUM_COLLISION_ATTEMPTS = 8;
@@ -169,6 +169,112 @@ final class LocalPaymentProofStorage implements PaymentProofStorage
         }
 
         throw new RuntimeException('Payment proof storage failed.');
+    }
+
+
+    public function read(string $relativePath): ?RetrievedPaymentProof
+    {
+        if (
+            preg_match(
+                '/^payment-proofs\/([a-f0-9]{64}\.(jpg|png|pdf))$/D',
+                $relativePath,
+                $matches,
+            ) !== 1
+        ) {
+            throw new RuntimeException('Payment proof read failed.');
+        }
+
+        $filename = $matches[1];
+        $extension = $matches[2];
+        $expectedMediaType = match ($extension) {
+            'jpg' => 'image/jpeg',
+            'png' => 'image/png',
+            'pdf' => 'application/pdf',
+        };
+
+        try {
+            $this->revalidateRoot();
+            $path = $this->destinationPath($filename);
+            clearstatcache(true, $path);
+
+            if (@is_link($path)) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            if (!@file_exists($path)) {
+                return null;
+            }
+
+            if (!@is_file($path) || !@is_readable($path)) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            $size = $this->readFileSize($path);
+            $pathIdentityBefore = $this->fileIdentity($path);
+
+            if (
+                !is_int($size)
+                || $size <= 0
+                || $size > $this->maximumFileSizeBytes
+                || $pathIdentityBefore === null
+                || $pathIdentityBefore['size'] !== $size
+            ) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            $this->revalidateRoot();
+            $handle = @fopen($path, 'rb');
+
+            if ($handle === false) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            try {
+                $streamIdentityBefore = $this->streamIdentity(@fstat($handle));
+                $bytes = @stream_get_contents($handle, $this->maximumFileSizeBytes + 1);
+                $streamIdentityAfter = $this->streamIdentity(@fstat($handle));
+
+                if (
+                    !is_string($bytes)
+                    || strlen($bytes) !== $size
+                    || $streamIdentityBefore !== $pathIdentityBefore
+                    || $streamIdentityAfter !== $pathIdentityBefore
+                ) {
+                    throw new RuntimeException('Payment proof read failed.');
+                }
+            } finally {
+                @fclose($handle);
+            }
+
+            $this->revalidateRoot();
+            clearstatcache(true, $path);
+
+            if (
+                @is_link($path)
+                || $this->fileIdentity($path) !== $pathIdentityBefore
+            ) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            $detector = new \finfo(FILEINFO_MIME_TYPE);
+            $detectedMediaType = $detector->buffer($bytes);
+
+            if ($detectedMediaType !== $expectedMediaType) {
+                throw new RuntimeException('Payment proof read failed.');
+            }
+
+            $this->revalidateRoot();
+
+            return new RetrievedPaymentProof(
+                $bytes,
+                $extension,
+                $expectedMediaType,
+            );
+        } catch (RuntimeException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new RuntimeException('Payment proof read failed.');
+        }
     }
 
     public function remove(string $relativePath): void
@@ -330,6 +436,50 @@ final class LocalPaymentProofStorage implements PaymentProofStorage
         }
 
         return ['device' => $stats['dev'], 'inode' => $stats['ino']];
+    }
+
+
+    /** @return null|array{device: int, inode: int, size: int} */
+    private function fileIdentity(string $path): ?array
+    {
+        clearstatcache(true, $path);
+        $stats = @lstat($path);
+
+        return $this->regularFileIdentity($stats);
+    }
+
+    /**
+     * @param array<string|int, mixed>|false $stats
+     * @return null|array{device: int, inode: int, size: int}
+     */
+    private function streamIdentity(array|false $stats): ?array
+    {
+        return $this->regularFileIdentity($stats);
+    }
+
+    /**
+     * @param array<string|int, mixed>|false $stats
+     * @return null|array{device: int, inode: int, size: int}
+     */
+    private function regularFileIdentity(array|false $stats): ?array
+    {
+        if (
+            !is_array($stats)
+            || !isset($stats['dev'], $stats['ino'], $stats['size'], $stats['mode'])
+            || !is_int($stats['dev'])
+            || !is_int($stats['ino'])
+            || !is_int($stats['size'])
+            || !is_int($stats['mode'])
+            || ($stats['mode'] & 0170000) !== 0100000
+        ) {
+            return null;
+        }
+
+        return [
+            'device' => $stats['dev'],
+            'inode' => $stats['ino'],
+            'size' => $stats['size'],
+        ];
     }
 
     private function readFileSize(string $path): int|false

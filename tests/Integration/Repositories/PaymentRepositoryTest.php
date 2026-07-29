@@ -6,8 +6,10 @@ namespace Tests\Integration\Repositories;
 
 use App\Core\MigrationRunner;
 use App\Exceptions\DatabaseException;
+use App\Models\AdministratorPaymentRecord;
 use App\Models\Payment;
 use App\Repositories\PaymentRepository;
+use App\Repositories\PdoAdministratorPaymentRepository;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
@@ -159,6 +161,33 @@ final class PaymentRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testAdministratorReadRepositoryMapsJoinedReviewContext(): void
+    {
+        $repository = new PdoAdministratorPaymentRepository($this->connection);
+        $submitted = $repository->findAll(Payment::STATUS_SUBMITTED);
+
+        self::assertCount(1, $submitted);
+        self::assertInstanceOf(AdministratorPaymentRecord::class, $submitted[0]);
+        self::assertSame($this->paymentIds['submitted'], $submitted[0]->payment()->id());
+        self::assertSame('TGH-PAY-READ-001', $submitted[0]->bookingReference());
+        self::assertSame('Payment Repository Guest', $submitted[0]->guestFullName());
+        self::assertSame('Bank Transfer', $submitted[0]->paymentMethodName());
+        self::assertSame('TEST-BANK-ACCOUNT', $submitted[0]->paymentMethodAccountReference());
+        self::assertTrue($submitted[0]->paymentMethodRequiresProof());
+        self::assertTrue($submitted[0]->paymentMethodActive());
+        self::assertSame('10000.00', $submitted[0]->bookingTotalAmount());
+        self::assertSame('2026-08-10', $submitted[0]->checkIn()->format('Y-m-d'));
+        self::assertSame('2026-08-12', $submitted[0]->checkOut()->format('Y-m-d'));
+
+        $detail = $repository->findById($this->paymentIds['verified']);
+        self::assertInstanceOf(AdministratorPaymentRecord::class, $detail);
+        self::assertSame(Payment::STATUS_VERIFIED, $detail->payment()->paymentStatus());
+        self::assertSame($this->administratorId, $detail->payment()->verifiedBy());
+        self::assertNull($repository->findById(0));
+        self::assertNull($repository->findById(999999));
+        self::assertSame([], $repository->findAll('completed'));
+    }
+
     public function testItFindsTheQualifyingVerifiedPaymentForAConfirmedWorkflow(): void
     {
         $verified = $this->repository->findVerifiedByBookingId($this->secondBookingId);
@@ -188,6 +217,9 @@ final class PaymentRepositoryTest extends DatabaseTestCase
 
     public function testDatabaseFailuresExposeOnlyStableMessages(): void
     {
+        $administratorRepository = new PdoAdministratorPaymentRepository(
+            $this->connection,
+        );
         $this->dropTables(['payments']);
 
         try {
@@ -219,6 +251,22 @@ final class PaymentRepositoryTest extends DatabaseTestCase
             self::fail('Expected a sanitized verified-payment lookup failure.');
         } catch (DatabaseException $exception) {
             self::assertSame('The verified payment lookup failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
+
+        try {
+            $administratorRepository->findAll();
+            self::fail('Expected a sanitized Administrator payment listing failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The Administrator payment listing failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
+
+        try {
+            $administratorRepository->findById($this->paymentIds['submitted']);
+            self::fail('Expected a sanitized Administrator payment lookup failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The Administrator payment lookup failed.', $exception->getMessage());
             self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
         }
     }
