@@ -6,7 +6,9 @@ namespace Tests\Integration\Repositories;
 
 use App\Core\MigrationRunner;
 use App\Exceptions\DatabaseException;
+use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Repositories\PdoPaymentWriteRepository;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\Group;
@@ -64,6 +66,42 @@ final class PdoPaymentWriteRepositoryTest extends DatabaseTestCase
             self::assertTrue($payment->isSubmitted());
             self::assertTrue($this->connection->inTransaction());
             self::assertNull($this->writer->lockCurrent(999999));
+        } finally {
+            $this->connection->rollBack();
+        }
+    }
+
+    public function testItLocksAndReloadsSubmissionBookingAndMethodInsideATransaction(): void
+    {
+        foreach ([
+            fn () => $this->writer->lockBookingByReference('TGH-PAY-WRITE-001'),
+            fn () => $this->writer->lockPaymentMethodById($this->methodId),
+        ] as $operation) {
+            try {
+                $operation();
+                self::fail('Expected a caller-owned transaction requirement.');
+            } catch (DatabaseException $exception) {
+                self::assertStringContainsString('lock failed', $exception->getMessage());
+            }
+        }
+
+        $this->connection->beginTransaction();
+
+        try {
+            $booking = $this->writer->lockBookingByReference('TGH-PAY-WRITE-001');
+            $method = $this->writer->lockPaymentMethodById($this->methodId);
+
+            self::assertInstanceOf(Booking::class, $booking);
+            self::assertSame($this->bookingId, $booking->id());
+            self::assertSame(Booking::STATUS_PENDING, $booking->bookingStatus());
+            self::assertInstanceOf(PaymentMethod::class, $method);
+            self::assertSame($this->methodId, $method->id());
+            self::assertTrue($method->isActive());
+            self::assertTrue($method->requiresProof());
+            self::assertNull(
+                $this->writer->lockBookingByReference('TGH-PAY-WRITE-MISSING'),
+            );
+            self::assertNull($this->writer->lockPaymentMethodById(999999));
         } finally {
             $this->connection->rollBack();
         }

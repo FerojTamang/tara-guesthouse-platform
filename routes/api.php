@@ -6,12 +6,14 @@ use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
+use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 
 return static function (
@@ -26,8 +28,10 @@ return static function (
     $csrf = null;
     $publicAvailability = null;
     $publicBooking = null;
+    $publicPayment = null;
     $publicPaymentMethods = null;
     $publicBookingRateLimit = null;
+    $publicPaymentRateLimit = null;
 
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof AdministratorAuthenticationController) {
@@ -44,10 +48,14 @@ return static function (
             $publicAvailability ??= $dependency;
         } elseif ($dependency instanceof PublicBookingController) {
             $publicBooking ??= $dependency;
+        } elseif ($dependency instanceof PublicPaymentController) {
+            $publicPayment ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentMethodController) {
             $publicPaymentMethods ??= $dependency;
         } elseif ($dependency instanceof PublicBookingRateLimitMiddleware) {
             $publicBookingRateLimit ??= $dependency;
+        } elseif ($dependency instanceof PublicPaymentRateLimitMiddleware) {
+            $publicPaymentRateLimit ??= $dependency;
         }
     }
 
@@ -57,6 +65,10 @@ return static function (
     ));
     $bookingDependencyCount = count(array_filter(
         [$publicBooking, $publicBookingRateLimit],
+        static fn (object|null $dependency): bool => $dependency !== null,
+    ));
+    $paymentDependencyCount = count(array_filter(
+        [$publicPayment, $publicPaymentRateLimit],
         static fn (object|null $dependency): bool => $dependency !== null,
     ));
 
@@ -87,6 +99,15 @@ return static function (
         );
     }
 
+    if (
+        $paymentDependencyCount !== 0
+        && ($paymentDependencyCount !== 2 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Public payment routes require complete security dependencies.',
+        );
+    }
+
     if ($publicAvailability !== null) {
         $router->get('/api/v1/availability', $publicAvailability->index(...));
     }
@@ -100,6 +121,14 @@ return static function (
             '/api/v1/bookings',
             $publicBooking->create(...),
             [$csrf->forJson(), $publicBookingRateLimit],
+        );
+    }
+
+    if ($paymentDependencyCount === 2) {
+        $router->post(
+            '/api/v1/payments',
+            $publicPayment->create(...),
+            [$csrf->forJson(), $publicPaymentRateLimit],
         );
     }
 

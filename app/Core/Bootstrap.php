@@ -17,12 +17,14 @@ use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
@@ -31,6 +33,7 @@ use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\PaymentMethodRepository;
+use App\Repositories\PdoPaymentWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
@@ -49,6 +52,9 @@ use App\Services\BookingSubmissionService;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
+use App\Services\GuestPaymentAccessValidator;
+use App\Services\GuestPaymentSubmissionService;
+use App\Services\GuestPaymentSubmissionServiceProvider;
 use App\Services\AdministratorLogoutService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
@@ -57,6 +63,7 @@ use App\Services\PdoRoomCatalogTransaction;
 use App\Services\PaymentMethodFlashMessages;
 use App\Services\PaymentMethodManagementService;
 use App\Services\PaymentMethodManagementServiceProvider;
+use App\Services\PaymentProofStorageProvider;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
@@ -68,6 +75,7 @@ use App\Services\PublicAvailabilityServiceProvider;
 use App\Services\PublicBookingRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
+use App\Services\PublicPaymentRateLimiter;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
@@ -129,12 +137,14 @@ final class Bootstrap
         $databaseConfiguration = $config->require('database');
         $loginPolicy = $config->require('security.administrator_login');
         $publicBookingPolicy = $config->require('security.public_booking');
+        $publicPaymentPolicy = $config->require('security.public_payment');
         $bookingConfiguration = $config->require('booking');
 
         if (
             !is_array($databaseConfiguration)
             || !is_array($loginPolicy)
             || !is_array($publicBookingPolicy)
+            || !is_array($publicPaymentPolicy)
             || !is_array($bookingConfiguration)
         ) {
             throw new ConfigurationException('Application service configuration is invalid.');
@@ -325,6 +335,43 @@ final class Bootstrap
             new BookingSuccessFlash($session, $responseTimezone),
             $csrfTokens,
         );
+        $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
+        $publicPaymentServices = new GuestPaymentSubmissionServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $bookingConfiguration,
+                $paymentProofServices,
+            ): GuestPaymentSubmissionService {
+                $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+
+                if (!is_string($accessTokenKey)) {
+                    throw new ConfigurationException(
+                        'Public payment submission is not configured.',
+                    );
+                }
+
+                $connection = $catalogConnectionProvider();
+                $bookings = new BookingRepository($connection);
+                $paymentMethods = new PaymentMethodRepository($connection);
+                $tokens = new BookingAccessToken($accessTokenKey);
+
+                return new GuestPaymentSubmissionService(
+                    new GuestPaymentAccessValidator(
+                        $bookings,
+                        $paymentMethods,
+                        $tokens,
+                    ),
+                    $tokens,
+                    new PdoPaymentWriteRepository($connection),
+                    $paymentProofServices->storage(),
+                    new PdoBookingTransaction($connection),
+                );
+            },
+        );
+        $publicPaymentController = new PublicPaymentController(
+            $publicPaymentServices,
+            $paymentProofServices->uploadConfiguration(...),
+        );
         $publicBookingRateLimit = new PublicBookingRateLimitMiddleware(
             new PublicBookingRateLimiter(
                 STORAGE_PATH
@@ -335,6 +382,18 @@ final class Bootstrap
                     . DIRECTORY_SEPARATOR
                     . 'public',
                 $publicBookingPolicy,
+            ),
+        );
+        $publicPaymentRateLimit = new PublicPaymentRateLimitMiddleware(
+            new PublicPaymentRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'payment-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicPaymentPolicy,
             ),
         );
         $router = new Router();
@@ -358,6 +417,8 @@ final class Bootstrap
             $publicBookingController,
             $publicBookingPageController,
             $publicBookingRateLimit,
+            $publicPaymentController,
+            $publicPaymentRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -407,6 +468,8 @@ final class Bootstrap
         PublicBookingController $publicBookingController,
         PublicBookingPageController $publicBookingPageController,
         PublicBookingRateLimitMiddleware $publicBookingRateLimit,
+        PublicPaymentController $publicPaymentController,
+        PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -441,6 +504,8 @@ final class Bootstrap
                 $publicBookingController,
                 $publicBookingPageController,
                 $publicBookingRateLimit,
+                $publicPaymentController,
+                $publicPaymentRateLimit,
             );
         }
     }

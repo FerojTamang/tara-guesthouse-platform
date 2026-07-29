@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use DateTimeImmutable;
 
 /**
@@ -12,6 +14,10 @@ use DateTimeImmutable;
  */
 interface PaymentWriteRepository
 {
+    public function lockBookingByReference(string $bookingReference): ?Booking;
+
+    public function lockPaymentMethodById(int $paymentMethodId): ?PaymentMethod;
+
     public function lockCurrent(int $paymentId): ?Payment;
 
     public function createSubmitted(

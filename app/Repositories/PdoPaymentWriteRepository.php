@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Exceptions\DatabaseException;
+use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use DateTimeImmutable;
 use PDO;
 use RuntimeException;
@@ -18,6 +20,85 @@ final readonly class PdoPaymentWriteRepository implements PaymentWriteRepository
 {
     public function __construct(private PDO $connection)
     {
+    }
+
+    public function lockBookingByReference(string $bookingReference): ?Booking
+    {
+        if (
+            $bookingReference === ''
+            || strlen($bookingReference) > 30
+            || !$this->connection->inTransaction()
+        ) {
+            throw new DatabaseException('The booking payment lock failed.');
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT id FROM bookings '
+                . 'WHERE BINARY booking_reference = BINARY :booking_reference '
+                . 'AND deleted_at IS NULL LIMIT 1 FOR UPDATE',
+            );
+            $statement->bindValue(
+                'booking_reference',
+                $bookingReference,
+                PDO::PARAM_STR,
+            );
+            $statement->execute();
+            $identifier = $statement->fetchColumn();
+
+            if ($identifier === false) {
+                return null;
+            }
+
+            $bookingId = filter_var($identifier, FILTER_VALIDATE_INT);
+            $booking = is_int($bookingId)
+                ? (new BookingRepository($this->connection))->findById($bookingId)
+                : null;
+
+            if (!$booking instanceof Booking) {
+                throw new RuntimeException('The locked booking could not be loaded.');
+            }
+
+            return $booking;
+        } catch (Throwable) {
+            throw new DatabaseException('The booking payment lock failed.');
+        }
+    }
+
+    public function lockPaymentMethodById(int $paymentMethodId): ?PaymentMethod
+    {
+        if ($paymentMethodId <= 0 || !$this->connection->inTransaction()) {
+            throw new DatabaseException('The payment method lock failed.');
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT id FROM payment_methods '
+                . 'WHERE id = :payment_method_id LIMIT 1 FOR UPDATE',
+            );
+            $statement->bindValue(
+                'payment_method_id',
+                $paymentMethodId,
+                PDO::PARAM_INT,
+            );
+            $statement->execute();
+
+            if ($statement->fetchColumn() === false) {
+                return null;
+            }
+
+            $method = (new PaymentMethodRepository($this->connection))->findById(
+                $paymentMethodId,
+            );
+
+            if (!$method instanceof PaymentMethod) {
+                throw new RuntimeException('The locked payment method could not be loaded.');
+            }
+
+            return $method;
+        } catch (Throwable) {
+            throw new DatabaseException('The payment method lock failed.');
+        }
     }
 
     public function lockCurrent(int $paymentId): ?Payment
