@@ -6,6 +6,7 @@ use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
@@ -36,6 +37,7 @@ return static function (
     ?AdministratorPaymentController $paymentController = null,
     ?AdministratorInvoiceController $invoiceController = null,
     ?AdministratorActivityController $activityController = null,
+    ?AdministratorGalleryController $galleryController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -54,6 +56,7 @@ return static function (
         && $paymentController === null
         && $invoiceController === null
         && $activityController === null
+        && $galleryController === null
     ) {
         return;
     }
@@ -146,6 +149,29 @@ return static function (
         $router->get(
             '/admin/activities/{id}/edit',
             [$activityController, 'editForm'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($galleryController !== null) {
+        $router->get(
+            '/admin/gallery',
+            [$galleryController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/categories',
+            [$galleryController, 'categories'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/create',
+            [$galleryController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/{id}/edit',
+            [$galleryController, 'editForm'],
             [$requireAdministrator],
         );
     }

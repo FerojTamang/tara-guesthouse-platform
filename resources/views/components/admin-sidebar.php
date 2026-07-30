@@ -107,6 +107,15 @@
                         Activities
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'gallery' ? ' active' : '' ?>"
+                        href="/admin/gallery"
+                        <?= $activeNavigation === 'gallery' ? 'aria-current="page"' : '' ?>
+                    >
+                        Gallery
+                    </a>
+                </li>
             </ul>
         </nav>
 

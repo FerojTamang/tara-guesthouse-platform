@@ -10,6 +10,7 @@ use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
@@ -34,6 +35,7 @@ use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\ActivityRepository;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
+use App\Repositories\GalleryRepository;
 use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
@@ -46,6 +48,7 @@ use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorActivityService;
+use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\ActivityManagementServiceProvider;
 use App\Services\AvailabilityService;
@@ -71,6 +74,9 @@ use App\Services\GuestPaymentPageServiceProvider;
 use App\Services\GuestPaymentSubmissionService;
 use App\Services\GuestPaymentSubmissionServiceProvider;
 use App\Services\GuestPaymentSuccessFlash;
+use App\Services\GalleryImageStorageProvider;
+use App\Services\GalleryManagementServiceProvider;
+use App\Services\PdoGalleryTransaction;
 use App\Services\InvoiceIssueService;
 use App\Services\InvoiceIssueServiceProvider;
 use App\Services\AdministratorLogoutService;
@@ -105,6 +111,7 @@ use App\Services\PublicPaymentRateLimiter;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
+use App\Storage\LazyGalleryImageStorage;
 
 /**
  * Builds the approved core application runtime.
@@ -324,6 +331,29 @@ final class Bootstrap
                     );
                 },
             ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $galleryImageStorage = new GalleryImageStorageProvider($resolvedBasePath);
+        $administratorGalleryController = new AdministratorGalleryController(
+            $viewRenderer,
+            new GalleryManagementServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $galleryImageStorage,
+                ): AdministratorGalleryService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorGalleryService(
+                        new GalleryRepository($connection),
+                        new LazyGalleryImageStorage($galleryImageStorage->storage(...)),
+                        new PdoAuditLogRepository($connection),
+                        new PdoGalleryTransaction($connection),
+                    );
+                },
+            ),
+            $galleryImageStorage,
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
@@ -565,6 +595,7 @@ final class Bootstrap
             $administratorPaymentController,
             $administratorInvoiceController,
             $administratorActivityController,
+            $administratorGalleryController,
             $publicActivityController,
             $publicRoomController,
             $publicAvailabilityController,
@@ -621,6 +652,7 @@ final class Bootstrap
         AdministratorPaymentController $administratorPaymentController,
         AdministratorInvoiceController $administratorInvoiceController,
         AdministratorActivityController $administratorActivityController,
+        AdministratorGalleryController $administratorGalleryController,
         PublicActivityController $publicActivityController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
@@ -662,6 +694,7 @@ final class Bootstrap
                 $administratorPaymentController,
                 $administratorInvoiceController,
                 $administratorActivityController,
+                $administratorGalleryController,
                 $publicActivityController,
                 $publicRoomController,
                 $publicAvailabilityController,

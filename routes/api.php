@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\PublicActivityController;
@@ -28,6 +29,7 @@ return static function (
     $controller = null;
     $administratorActivity = null;
     $administratorBooking = null;
+    $administratorGallery = null;
     $administratorInvoice = null;
     $administratorPayment = null;
     $guestOnly = null;
@@ -48,6 +50,8 @@ return static function (
             $controller ??= $dependency;
         } elseif ($dependency instanceof AdministratorBookingController) {
             $administratorBooking ??= $dependency;
+        } elseif ($dependency instanceof AdministratorGalleryController) {
+            $administratorGallery ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
             $administratorPayment ??= $dependency;
         } elseif ($dependency instanceof AdministratorInvoiceController) {
@@ -103,6 +107,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator activity JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorGallery !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator gallery JSON routes require complete security dependencies.',
         );
     }
 
@@ -228,6 +241,59 @@ return static function (
         $router->delete(
             '/api/v1/admin/activities/{id}',
             [$administratorActivity, 'apiDelete'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
+
+    if ($administratorGallery !== null) {
+        $router->get(
+            '/api/v1/admin/gallery-categories',
+            [$administratorGallery, 'apiCategories'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->post(
+            '/api/v1/admin/gallery-categories',
+            [$administratorGallery, 'apiCreateCategory'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->put(
+            '/api/v1/admin/gallery-categories/{id}',
+            [$administratorGallery, 'apiUpdateCategory'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->get(
+            '/api/v1/admin/gallery',
+            [$administratorGallery, 'apiIndex'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->post(
+            '/api/v1/admin/gallery',
+            [$administratorGallery, 'apiCreate'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->put(
+            '/api/v1/admin/gallery/{id}',
+            [$administratorGallery, 'apiUpdate'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/gallery/{id}/active',
+            [$administratorGallery, 'apiSetActive'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/gallery/{id}/publication',
+            [$administratorGallery, 'apiSetPublication'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/gallery/reorder',
+            [$administratorGallery, 'apiReorder'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->delete(
+            '/api/v1/admin/gallery/{id}',
+            [$administratorGallery, 'apiDelete'],
             [$requireAdministrator->forJson(), $csrf->forJson()],
         );
     }
