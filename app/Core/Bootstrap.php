@@ -17,6 +17,7 @@ use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
+use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
@@ -93,6 +94,8 @@ use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
 use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
+use App\Services\PublicActivityService;
+use App\Services\PublicActivityServiceProvider;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
 use App\Services\PublicBookingRateLimiter;
@@ -371,6 +374,14 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $publicActivityController = new PublicActivityController(
+            $viewRenderer,
+            new PublicActivityServiceProvider(
+                static fn (): PublicActivityService => new PublicActivityService(
+                    new ActivityRepository($catalogConnectionProvider()),
+                ),
+            ),
+        );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
             new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
@@ -554,6 +565,7 @@ final class Bootstrap
             $administratorPaymentController,
             $administratorInvoiceController,
             $administratorActivityController,
+            $publicActivityController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -609,6 +621,7 @@ final class Bootstrap
         AdministratorPaymentController $administratorPaymentController,
         AdministratorInvoiceController $administratorInvoiceController,
         AdministratorActivityController $administratorActivityController,
+        PublicActivityController $publicActivityController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -649,6 +662,7 @@ final class Bootstrap
                 $administratorPaymentController,
                 $administratorInvoiceController,
                 $administratorActivityController,
+                $publicActivityController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,

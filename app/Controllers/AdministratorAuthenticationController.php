@@ -274,6 +274,7 @@ final class AdministratorAuthenticationController
                 'csrfToken' => $this->csrfTokens->token(),
                 'error' => $error,
                 'identifier' => $identifier,
+                'showPublicNavigation' => false,
             ],
             'layouts.base',
         );

@@ -7,6 +7,7 @@ use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
+use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicPaymentController;
@@ -32,6 +33,7 @@ return static function (
     $guestOnly = null;
     $requireAdministrator = null;
     $csrf = null;
+    $publicActivities = null;
     $publicAvailability = null;
     $publicBooking = null;
     $publicPayment = null;
@@ -56,6 +58,8 @@ return static function (
             $requireAdministrator ??= $dependency;
         } elseif ($dependency instanceof CsrfMiddleware) {
             $csrf ??= $dependency;
+        } elseif ($dependency instanceof PublicActivityController) {
+            $publicActivities ??= $dependency;
         } elseif ($dependency instanceof PublicAvailabilityController) {
             $publicAvailability ??= $dependency;
         } elseif ($dependency instanceof PublicBookingController) {
@@ -145,6 +149,10 @@ return static function (
         throw new \LogicException(
             'Public payment routes require complete security dependencies.',
         );
+    }
+
+    if ($publicActivities !== null) {
+        $router->get('/api/v1/activities', $publicActivities->index(...));
     }
 
     if ($publicAvailability !== null) {
