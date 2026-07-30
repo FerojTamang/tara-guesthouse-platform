@@ -410,6 +410,7 @@ final class AdministratorBootstrapCommandTest extends TestCase
 
         try {
             foreach ([
+                'activities',
                 'invoice_items',
                 'invoices',
                 'payments',

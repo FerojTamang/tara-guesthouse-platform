@@ -332,6 +332,7 @@ PHP);
 
         try {
             foreach ([
+                'activities',
                 'invoice_items',
                 'invoices',
                 'payments',
