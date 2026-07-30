@@ -27,6 +27,8 @@
 !/storage/exports/.gitkeep
 /storage/private/payment-proofs/*
 !/storage/private/payment-proofs/.gitkeep
+/storage/private/gallery/*
+!/storage/private/gallery/.htaccess
 
 # Database backups
 /database/backups/*

@@ -28,4 +28,15 @@ return [
         'filesystem_root' => 'storage/private/payment-proofs',
         'database_path_prefix' => 'payment-proofs/',
     ],
+    'gallery_images' => [
+        'allowed_formats_environment_key' => 'GALLERY_IMAGE_FORMATS',
+        'maximum_file_size_environment_key' => 'GALLERY_IMAGE_MAX_BYTES',
+        'minimum_width_environment_key' => 'GALLERY_IMAGE_MIN_WIDTH',
+        'minimum_height_environment_key' => 'GALLERY_IMAGE_MIN_HEIGHT',
+        'maximum_width_environment_key' => 'GALLERY_IMAGE_MAX_WIDTH',
+        'maximum_height_environment_key' => 'GALLERY_IMAGE_MAX_HEIGHT',
+        'require_decodability_environment_key' => 'GALLERY_IMAGE_REQUIRE_DECODABILITY',
+        'filesystem_root' => 'storage/private/gallery',
+        'database_path_prefix' => 'gallery/',
+    ],
 ];
