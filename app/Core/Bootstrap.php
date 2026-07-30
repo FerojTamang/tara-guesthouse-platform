@@ -6,6 +6,7 @@ namespace App\Core;
 
 use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
+use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
@@ -29,6 +30,7 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
+use App\Repositories\ActivityRepository;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
 use App\Repositories\PdoAuditLogRepository;
@@ -42,7 +44,9 @@ use App\Repositories\PdoPaymentWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
+use App\Services\AdministratorActivityService;
 use App\Services\AdministratorAuthenticationService;
+use App\Services\ActivityManagementServiceProvider;
 use App\Services\AvailabilityService;
 use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
@@ -76,6 +80,7 @@ use App\Services\AdministratorPaymentStatusServiceProvider;
 use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
+use App\Services\PdoActivityTransaction;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
 use App\Services\PaymentMethodFlashMessages;
@@ -302,6 +307,23 @@ final class Bootstrap
             ),
             $csrfTokens,
             new PaymentMethodFlashMessages($session),
+        );
+        $administratorActivityController = new AdministratorActivityController(
+            $viewRenderer,
+            new ActivityManagementServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorActivityService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorActivityService(
+                        new ActivityRepository($connection),
+                        new PdoAuditLogRepository($connection),
+                        new PdoActivityTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
         );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
@@ -531,6 +553,7 @@ final class Bootstrap
             $paymentMethodController,
             $administratorPaymentController,
             $administratorInvoiceController,
+            $administratorActivityController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -585,6 +608,7 @@ final class Bootstrap
         AdministratorPaymentMethodController $paymentMethodController,
         AdministratorPaymentController $administratorPaymentController,
         AdministratorInvoiceController $administratorInvoiceController,
+        AdministratorActivityController $administratorActivityController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -624,6 +648,7 @@ final class Bootstrap
                 $paymentMethodController,
                 $administratorPaymentController,
                 $administratorInvoiceController,
+                $administratorActivityController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,

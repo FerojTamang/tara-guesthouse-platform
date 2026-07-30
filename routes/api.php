@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorInvoiceController;
@@ -24,6 +25,7 @@ return static function (
     mixed ...$dependencies,
 ): void {
     $controller = null;
+    $administratorActivity = null;
     $administratorBooking = null;
     $administratorInvoice = null;
     $administratorPayment = null;
@@ -38,7 +40,9 @@ return static function (
     $publicPaymentRateLimit = null;
 
     foreach ($dependencies as $dependency) {
-        if ($dependency instanceof AdministratorAuthenticationController) {
+        if ($dependency instanceof AdministratorActivityController) {
+            $administratorActivity ??= $dependency;
+        } elseif ($dependency instanceof AdministratorAuthenticationController) {
             $controller ??= $dependency;
         } elseif ($dependency instanceof AdministratorBookingController) {
             $administratorBooking ??= $dependency;
@@ -86,6 +90,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator JSON routes require complete authentication dependencies.',
+        );
+    }
+
+    if (
+        $administratorActivity !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator activity JSON routes require complete security dependencies.',
         );
     }
 
@@ -172,6 +185,44 @@ return static function (
         [$controller, 'apiLogout'],
         [$requireAdministrator->forJson(), $csrf->forJson()],
     );
+
+    if ($administratorActivity !== null) {
+        $router->get(
+            '/api/v1/admin/activities',
+            [$administratorActivity, 'apiIndex'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->post(
+            '/api/v1/admin/activities',
+            [$administratorActivity, 'apiCreate'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->get(
+            '/api/v1/admin/activities/{id}',
+            [$administratorActivity, 'apiShow'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->put(
+            '/api/v1/admin/activities/{id}',
+            [$administratorActivity, 'apiUpdate'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/activities/{id}/active',
+            [$administratorActivity, 'apiSetActive'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/activities/{id}/publication',
+            [$administratorActivity, 'apiSetPublication'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->delete(
+            '/api/v1/admin/activities/{id}',
+            [$administratorActivity, 'apiDelete'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
 
     if ($administratorBooking !== null) {
         $router->patch(

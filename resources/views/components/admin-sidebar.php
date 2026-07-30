@@ -99,7 +99,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Content</span>
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'activities' ? ' active' : '' ?>"
+                        href="/admin/activities"
+                        <?= $activeNavigation === 'activities' ? 'aria-current="page"' : '' ?>
+                    >
+                        Activities
+                    </a>
                 </li>
             </ul>
         </nav>

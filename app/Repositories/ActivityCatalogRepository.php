@@ -13,6 +13,8 @@ interface ActivityCatalogRepository
 {
     public function findById(int $id): ?Activity;
 
+    public function lockById(int $id): ?Activity;
+
     public function findBySlug(string $slug): ?Activity;
 
     /** @return list<Activity> */

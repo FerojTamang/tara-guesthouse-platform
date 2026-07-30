@@ -53,6 +53,19 @@ final class ActivityRepository implements ActivityCatalogRepository
         );
     }
 
+    public function lockById(int $id): ?Activity
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        return $this->lookup(
+            self::SELECT_COLUMNS . ' WHERE id = :lookup LIMIT 1 FOR UPDATE',
+            $id,
+            PDO::PARAM_INT,
+        );
+    }
+
     public function findBySlug(string $slug): ?Activity
     {
         if ($slug === '') {

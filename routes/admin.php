@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AdministratorAmenityController;
+use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorInvoiceController;
@@ -34,6 +35,7 @@ return static function (
     ?AdministratorPaymentMethodController $paymentMethodController = null,
     ?AdministratorPaymentController $paymentController = null,
     ?AdministratorInvoiceController $invoiceController = null,
+    ?AdministratorActivityController $activityController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -51,6 +53,7 @@ return static function (
         && $paymentMethodController === null
         && $paymentController === null
         && $invoiceController === null
+        && $activityController === null
     ) {
         return;
     }
@@ -125,6 +128,24 @@ return static function (
         $router->get(
             '/admin/invoices/{id}',
             [$invoiceController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($activityController !== null) {
+        $router->get(
+            '/admin/activities',
+            [$activityController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/activities/create',
+            [$activityController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/activities/{id}/edit',
+            [$activityController, 'editForm'],
             [$requireAdministrator],
         );
     }

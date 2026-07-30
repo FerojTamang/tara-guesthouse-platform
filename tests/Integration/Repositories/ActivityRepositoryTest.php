@@ -97,6 +97,21 @@ final class ActivityRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testItLocksOneActivityInsideACallerOwnedTransaction(): void
+    {
+        self::assertTrue($this->connection->beginTransaction());
+
+        try {
+            $activity = $this->repository->lockById($this->activityIds['public-late']);
+
+            self::assertInstanceOf(Activity::class, $activity);
+            self::assertSame('jungle-walk', $activity->slug());
+            self::assertNull($this->repository->lockById(999999));
+        } finally {
+            self::assertTrue($this->connection->rollBack());
+        }
+    }
+
     public function testItListsAllAndPublicActivitiesInStableApprovedOrder(): void
     {
         self::assertSame(
@@ -181,6 +196,7 @@ final class ActivityRepositoryTest extends DatabaseTestCase
 
         self::assertNull($this->repository->findById(0));
         self::assertNull($this->repository->findById(-1));
+        self::assertNull($this->repository->lockById(0));
         self::assertNull($this->repository->findById(999999));
         self::assertNull($this->repository->findBySlug(''));
         self::assertNull($this->repository->findBySlug('missing'));
