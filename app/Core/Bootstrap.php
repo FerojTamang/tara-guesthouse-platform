@@ -9,6 +9,9 @@ use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorPaymentController;
+use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -16,11 +19,15 @@ use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicPaymentController;
+use App\Controllers\PublicPaymentPageController;
+use App\Controllers\PublicPaymentMethodController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
@@ -28,6 +35,10 @@ use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
+use App\Repositories\PdoInvoiceRepository;
+use App\Repositories\PaymentMethodRepository;
+use App\Repositories\PdoAdministratorPaymentRepository;
+use App\Repositories\PdoPaymentWriteRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
@@ -37,6 +48,8 @@ use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
+use App\Services\AdministratorInvoiceService;
+use App\Services\AdministratorInvoiceServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -46,11 +59,29 @@ use App\Services\BookingSubmissionService;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
+use App\Services\GuestPaymentAccessValidator;
+use App\Services\GuestPaymentContinuation;
+use App\Services\GuestPaymentPageService;
+use App\Services\GuestPaymentPageServiceProvider;
+use App\Services\GuestPaymentSubmissionService;
+use App\Services\GuestPaymentSubmissionServiceProvider;
+use App\Services\GuestPaymentSuccessFlash;
+use App\Services\InvoiceIssueService;
+use App\Services\InvoiceIssueServiceProvider;
 use App\Services\AdministratorLogoutService;
+use App\Services\AdministratorPaymentService;
+use App\Services\AdministratorPaymentServiceProvider;
+use App\Services\AdministratorPaymentStatusService;
+use App\Services\AdministratorPaymentStatusServiceProvider;
+use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
+use App\Services\PaymentMethodFlashMessages;
+use App\Services\PaymentMethodManagementService;
+use App\Services\PaymentMethodManagementServiceProvider;
+use App\Services\PaymentProofStorageProvider;
 use App\Services\RoomCatalogFlashMessages;
 use App\Services\RoomCatalogService;
 use App\Services\RoomCatalogServiceProvider;
@@ -60,6 +91,9 @@ use App\Services\RoomTypeCatalogService;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
 use App\Services\PublicBookingRateLimiter;
+use App\Services\PublicPaymentMethodService;
+use App\Services\PublicPaymentMethodServiceProvider;
+use App\Services\PublicPaymentRateLimiter;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
@@ -121,12 +155,14 @@ final class Bootstrap
         $databaseConfiguration = $config->require('database');
         $loginPolicy = $config->require('security.administrator_login');
         $publicBookingPolicy = $config->require('security.public_booking');
+        $publicPaymentPolicy = $config->require('security.public_payment');
         $bookingConfiguration = $config->require('booking');
 
         if (
             !is_array($databaseConfiguration)
             || !is_array($loginPolicy)
             || !is_array($publicBookingPolicy)
+            || !is_array($publicPaymentPolicy)
             || !is_array($bookingConfiguration)
         ) {
             throw new ConfigurationException('Application service configuration is invalid.');
@@ -213,6 +249,27 @@ final class Bootstrap
             $roomImageServices->uploadConfiguration(...),
             $catalogFlashMessages,
         );
+        $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
+        $administratorInvoiceServices = new AdministratorInvoiceServiceProvider(
+            static fn (): AdministratorInvoiceService => new AdministratorInvoiceService(
+                new PdoInvoiceRepository($catalogConnectionProvider()),
+            ),
+        );
+        $invoiceIssueServices = new InvoiceIssueServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $timezone,
+            ): InvoiceIssueService {
+                $connection = $catalogConnectionProvider();
+
+                return new InvoiceIssueService(
+                    new PdoInvoiceRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoBookingTransaction($connection),
+                    new \DateTimeZone($timezone),
+                );
+            },
+        );
         $administratorBookingController = new AdministratorBookingController(
             $viewRenderer,
             new AdministratorBookingServiceProvider(
@@ -234,6 +291,63 @@ final class Bootstrap
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
+            $administratorInvoiceServices,
+        );
+        $paymentMethodController = new AdministratorPaymentMethodController(
+            $viewRenderer,
+            new PaymentMethodManagementServiceProvider(
+                static fn (): PaymentMethodManagementService => new PaymentMethodManagementService(
+                    new PaymentMethodRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $csrfTokens,
+            new PaymentMethodFlashMessages($session),
+        );
+        $administratorPaymentController = new AdministratorPaymentController(
+            $viewRenderer,
+            new AdministratorPaymentServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $paymentProofServices,
+                ): AdministratorPaymentService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorPaymentService(
+                        new PdoAdministratorPaymentRepository($connection),
+                        $paymentProofServices->reader(),
+                        new PdoAuditLogRepository($connection),
+                        new PdoBookingTransaction($connection),
+                    );
+                },
+            ),
+            new AdministratorPaymentStatusServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorPaymentStatusService {
+                    $connection = $catalogConnectionProvider();
+
+                    $auditLogs = new PdoAuditLogRepository($connection);
+
+                    return new AdministratorPaymentStatusService(
+                        new PdoPaymentWriteRepository($connection),
+                        $auditLogs,
+                        new VerifiedPaymentBookingConfirmationService(
+                            new PdoBookingStatusWriteRepository($connection),
+                            $auditLogs,
+                        ),
+                        new PdoBookingTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $administratorInvoiceController = new AdministratorInvoiceController(
+            $viewRenderer,
+            $administratorInvoiceServices,
+            $invoiceIssueServices,
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
         );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
@@ -252,6 +366,14 @@ final class Bootstrap
                 ),
             ),
             $viewRenderer,
+        );
+        $publicPaymentMethodServices = new PublicPaymentMethodServiceProvider(
+            static fn (): PublicPaymentMethodService => new PublicPaymentMethodService(
+                new PaymentMethodRepository($catalogConnectionProvider()),
+            ),
+        );
+        $publicPaymentMethodController = new PublicPaymentMethodController(
+            $publicPaymentMethodServices,
         );
         $responseTimezone = new \DateTimeZone($timezone);
         $publicBookingWorkflows = new BookingSubmissionWorkflowProvider(
@@ -294,11 +416,79 @@ final class Bootstrap
             $publicBookingWorkflows,
             $responseTimezone,
         );
+        $paymentContinuation = new GuestPaymentContinuation($session);
         $publicBookingPageController = new PublicBookingPageController(
             $viewRenderer,
             $publicBookingWorkflows,
             new BookingSuccessFlash($session, $responseTimezone),
+            $paymentContinuation,
             $csrfTokens,
+        );
+        $publicPaymentServices = new GuestPaymentSubmissionServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $bookingConfiguration,
+                $paymentProofServices,
+            ): GuestPaymentSubmissionService {
+                $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+
+                if (!is_string($accessTokenKey)) {
+                    throw new ConfigurationException(
+                        'Public payment submission is not configured.',
+                    );
+                }
+
+                $connection = $catalogConnectionProvider();
+                $bookings = new BookingRepository($connection);
+                $paymentMethods = new PaymentMethodRepository($connection);
+                $tokens = new BookingAccessToken($accessTokenKey);
+
+                return new GuestPaymentSubmissionService(
+                    new GuestPaymentAccessValidator(
+                        $bookings,
+                        $paymentMethods,
+                        $tokens,
+                    ),
+                    $tokens,
+                    new PdoPaymentWriteRepository($connection),
+                    $paymentProofServices->storage(),
+                    new PdoBookingTransaction($connection),
+                );
+            },
+        );
+        $publicPaymentController = new PublicPaymentController(
+            $publicPaymentServices,
+            $paymentProofServices->uploadConfiguration(...),
+        );
+        $publicPaymentPageServices = new GuestPaymentPageServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $bookingConfiguration,
+            ): GuestPaymentPageService {
+                $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
+
+                if (!is_string($accessTokenKey)) {
+                    throw new ConfigurationException(
+                        'Public payment page is not configured.',
+                    );
+                }
+
+                return new GuestPaymentPageService(
+                    new BookingRepository($catalogConnectionProvider()),
+                    new PaymentMethodRepository($catalogConnectionProvider()),
+                    new BookingAccessToken($accessTokenKey),
+                );
+            },
+        );
+        $publicPaymentPageController = new PublicPaymentPageController(
+            $viewRenderer,
+            $publicPaymentPageServices,
+            $publicPaymentServices,
+            $paymentContinuation,
+            new GuestPaymentSuccessFlash($session, $responseTimezone),
+            $csrfTokens,
+            $paymentProofServices->uploadConfiguration(...),
+            $responseTimezone,
         );
         $publicBookingRateLimit = new PublicBookingRateLimitMiddleware(
             new PublicBookingRateLimiter(
@@ -310,6 +500,18 @@ final class Bootstrap
                     . DIRECTORY_SEPARATOR
                     . 'public',
                 $publicBookingPolicy,
+            ),
+        );
+        $publicPaymentRateLimit = new PublicPaymentRateLimitMiddleware(
+            new PublicPaymentRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'payment-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicPaymentPolicy,
             ),
         );
         $router = new Router();
@@ -326,11 +528,18 @@ final class Bootstrap
             $roomController,
             $roomImageController,
             $administratorBookingController,
+            $paymentMethodController,
+            $administratorPaymentController,
+            $administratorInvoiceController,
             $publicRoomController,
             $publicAvailabilityController,
+            $publicPaymentMethodController,
             $publicBookingController,
             $publicBookingPageController,
             $publicBookingRateLimit,
+            $publicPaymentController,
+            $publicPaymentPageController,
+            $publicPaymentRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -373,11 +582,18 @@ final class Bootstrap
         AdministratorRoomController $roomController,
         AdministratorRoomImageController $roomImageController,
         AdministratorBookingController $administratorBookingController,
+        AdministratorPaymentMethodController $paymentMethodController,
+        AdministratorPaymentController $administratorPaymentController,
+        AdministratorInvoiceController $administratorInvoiceController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
+        PublicPaymentMethodController $publicPaymentMethodController,
         PublicBookingController $publicBookingController,
         PublicBookingPageController $publicBookingPageController,
         PublicBookingRateLimitMiddleware $publicBookingRateLimit,
+        PublicPaymentController $publicPaymentController,
+        PublicPaymentPageController $publicPaymentPageController,
+        PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -405,11 +621,18 @@ final class Bootstrap
                 $roomController,
                 $roomImageController,
                 $administratorBookingController,
+                $paymentMethodController,
+                $administratorPaymentController,
+                $administratorInvoiceController,
                 $publicRoomController,
                 $publicAvailabilityController,
+                $publicPaymentMethodController,
                 $publicBookingController,
                 $publicBookingPageController,
                 $publicBookingRateLimit,
+                $publicPaymentController,
+                $publicPaymentPageController,
+                $publicPaymentRateLimit,
             );
         }
     }

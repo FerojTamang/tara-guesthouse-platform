@@ -27,12 +27,12 @@
                     </dl>
 
                     <div class="alert alert-info mb-4" role="status">
-                        No payment has been recorded. Contact Tara Guest House before
-                        the confirmation deadline to arrange the approved manual payment.
+                        No payment has been recorded. Submit the approved manual payment details
+                        before the confirmation deadline.
                     </div>
 
-                    <a href="/rooms" class="btn btn-primary">View rooms</a>
-                    <a href="/availability" class="btn btn-link">Check another stay</a>
+                    <a href="/booking/payment" class="btn btn-primary">Continue to payment</a>
+                    <a href="/rooms" class="btn btn-link">View rooms</a>
                 </div>
             </div>
         </div>

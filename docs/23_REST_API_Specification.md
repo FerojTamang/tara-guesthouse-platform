@@ -279,17 +279,15 @@ Metrics use canonical booking/payment statuses and calculated room availability.
 
 No endpoint writes Available, Reserved, or Occupied to a room. Administrator list responses may include calculated `is_available_for_dates`, `has_current_checked_in_booking`, and blocking-booking summaries derived from bookings.
 
-# 10. Administrator Booking APIs
+# 10. Administrator Booking API
+
+Administrator booking list and detail reads are protected PHP-rendered routes at `/admin/bookings` and `/admin/bookings/{id}`. The implemented same-origin JSON contract contains only the state mutation below:
 
 | Method | Exact endpoint | Purpose |
 |---|---|---|
-| GET | `/api/v1/admin/bookings` | Search/filter bookings |
-| POST | `/api/v1/admin/bookings` | Create one-room booking from guest snapshot |
-| GET | `/api/v1/admin/bookings/{id}` | Booking detail/history/payment attempts/invoice |
-| PUT | `/api/v1/admin/bookings/{id}` | Edit permitted non-state fields |
 | PATCH | `/api/v1/admin/bookings/{id}/status` | Request an allowed Booking Service transition |
 
-Admin create-booking request uses the same guest snapshot, one `room_id`, dates, occupancy, policy acceptance, and price-confirmation inputs as the public booking contract. It does not accept `customer_id`, `user_id`, multiple rooms, arbitrary initial booking status, payment status, or required payment record. New bookings start as `pending`.
+Sprint 3 does not add Administrator booking-create, booking-edit, or booking-read JSON endpoints.
 
 ## 10.1 Status Request
 
@@ -304,12 +302,12 @@ Accepted target values depend on the current state and are limited to the transi
 
 The frontend must not submit `confirmed` as an arbitrary Administrator choice. In Version 1, that transition occurs only through the Payment Service verification use case coordinated with Booking Service.
 
-# 11. Administrator Payment APIs
+# 11. Administrator Payment API
+
+Administrator payment list/detail/proof reads are protected PHP routes at `/admin/payments`, `/admin/payments/{id}`, and `/admin/payments/{id}/proof`. The implemented same-origin JSON contract contains only:
 
 | Method | Exact endpoint | Purpose |
 |---|---|---|
-| GET | `/api/v1/admin/payments` | Search/filter all attempts |
-| GET | `/api/v1/admin/payments/{id}` | Attempt detail/proof/audit data |
 | PATCH | `/api/v1/admin/payments/{id}/status` | Verify or reject a submitted attempt |
 
 ```json
@@ -323,15 +321,15 @@ Only `submitted → verified` or `submitted → rejected` is accepted by this en
 
 The exact full-versus-partial manual-refund policy is unresolved. No Version 1 refund mutation endpoint is implementable until **Architect/Client Confirmation Required** is approved. `refunded` remains a canonical data status for the later approved manual recording rule.
 
-# 12. Administrator Invoice APIs
+# 12. Administrator Invoice API
+
+Invoice list, detail, and print reads are protected PHP routes at `/admin/invoices`, `/admin/invoices/{id}`, and `/admin/invoices/{id}/print`. The implemented same-origin JSON contract contains only:
 
 | Method | Exact endpoint | Purpose |
 |---|---|---|
-| GET | `/api/v1/admin/invoices` | List invoices |
-| GET | `/api/v1/admin/invoices/{id}` | Invoice detail |
-| POST | `/api/v1/admin/bookings/{bookingId}/invoice` | Issue stable invoice from snapshots |
+| POST | `/api/v1/admin/bookings/{bookingId}/invoice` | Issue or return the stable invoice derived from snapshots |
 
-Invoice request does not accept arbitrary totals. Invoice Service derives totals from booking and verified-payment snapshots. Client tax/VAT presentation is **Architect/Client Confirmation Required**. Printing is performed through the authenticated PHP-rendered invoice page.
+The request accepts only an empty JSON object and never accepts arbitrary totals, currency, tax, service charge, or invoice number. Invoice Service derives immutable NPR totals from the confirmed booking and its one verified payment. Sprint 3 stores `tax_amount = 0.00` and no service charge. Printing uses the authenticated PHP-rendered route with no-store and anti-indexing headers.
 
 # 13. Administrator Activity APIs
 

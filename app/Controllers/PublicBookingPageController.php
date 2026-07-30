@@ -12,6 +12,8 @@ use App\Exceptions\BookingException;
 use App\Requests\GuestBookingRequest;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
+use App\Services\GuestPaymentContinuation;
+use Throwable;
 
 /**
  * Handles the server-rendered Guest booking and success workflow.
@@ -22,6 +24,7 @@ final readonly class PublicBookingPageController
         private ViewRenderer $views,
         private BookingSubmissionWorkflowProvider $workflows,
         private BookingSuccessFlash $successFlash,
+        private GuestPaymentContinuation $paymentContinuation,
         private CsrfTokenManager $csrfTokens,
     ) {
     }
@@ -57,6 +60,7 @@ final readonly class PublicBookingPageController
             );
             $result = $this->workflows->workflow()->submit($bookingRequest);
             $this->successFlash->store($result);
+            $this->paymentContinuation->store($result);
 
             return Response::redirect(
                 '/booking/success',
@@ -88,6 +92,12 @@ final readonly class PublicBookingPageController
                 );
             }
 
+            return Response::text(
+                'Internal Server Error',
+                500,
+                ['Cache-Control' => 'no-store'],
+            );
+        } catch (Throwable) {
             return Response::text(
                 'Internal Server Error',
                 500,

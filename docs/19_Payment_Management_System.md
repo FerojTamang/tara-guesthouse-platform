@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Implemented and QA synchronized — Sprint 3
 * Scope: Version 1 manual payment methods, submissions and Administrator verification
 
 ## 1. Core Rules
@@ -46,16 +46,17 @@ Refund amount and final refund-specific fields are not approved until the refund
 * `GET /api/v1/payment-methods`
 * `POST /api/v1/payments`
 
-The Guest proves secure booking access and submits `booking_reference`, signed access value, `payment_method_id`, NPR `amount`, transaction reference, optional notes and proof where configured. Payment Service validates the booking/deadline/method/amount/evidence, stores a new attempt as `submitted`, and commits before notification.
+The Guest proves secure booking access and submits `booking_reference`, signed access value, `payment_method_id`, NPR `amount`, transaction reference, optional notes and proof where configured. Payment Service validates the booking/deadline/method/amount/evidence, stores a new attempt as `submitted`, commits, and returns a safe review-pending response.
 
 There is no automatically created `pending` attempt during booking. `pending` remains a canonical value only for an explicitly created-but-not-submitted attempt if a later approved service flow uses it; the active Guest endpoint creates `submitted` after complete validation.
 
 ## 4. Administrator Verification
 
 * Pages: `/admin/payments`, `/admin/payments/{id}`
-* `GET /api/v1/admin/payments`
-* `GET /api/v1/admin/payments/{id}`
-* `PATCH /api/v1/admin/payments/{id}/status`
+* Protected proof: `GET /admin/payments/{id}/proof`
+* JSON mutation: `PATCH /api/v1/admin/payments/{id}/status`
+
+Administrator list/detail/proof reads are PHP-rendered/protected page routes; Sprint 3 does not expose separate Administrator payment-read JSON endpoints.
 
 Only a `submitted` attempt may transition to `verified` or `rejected`. Payment Service records Administrator, time and note. Verification coordinates with Booking Service so only it may transition a currently `pending` booking to `confirmed`. Duplicate qualifying verification is prevented transactionally.
 
@@ -67,7 +68,7 @@ Version 1 documentation defines no refund button, request payload, mutation endp
 
 ## 6. Proof Upload
 
-Proof uploads use approved configuration for size, MIME, extension and storage. Filenames are randomized, content is validated, and storage cannot execute PHP. No numeric maximum is hardcoded here.
+Proof uploads accept server-validated JPEG (`.jpg`/`.jpeg`), PNG (`.png`), or PDF (`.pdf`) content up to exactly `5,242,880` bytes (5 MiB). Filenames are randomized, storage is private and non-executable, safe relative paths are stored, failed transactions clean up orphan candidates, and protected reads validate path, type, size, and stream identity before returning bytes.
 
 ## 7. Security and Responsibilities
 
@@ -75,7 +76,7 @@ Payment Service owns validation, transitions, transactions and Booking Service c
 
 ## 8. Notifications
 
-Guests receive transactional SMTP email for submitted/verified/rejected events. Administrators receive in-app notifications and may also receive configured transactional email. Delivery failures do not roll back committed payment/booking transitions.
+Sprint 3 commits payment, booking, proof-access, and invoice state without notification delivery. Transactional SMTP and in-app delivery remain a later approved slice; when implemented, delivery failures must not roll back committed payment, booking, or invoice transactions.
 
 ## 9. Acceptance Tests
 

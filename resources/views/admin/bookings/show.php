@@ -167,6 +167,57 @@
         </div>
     </div>
 
+    <div class="card admin-panel mt-4" aria-labelledby="booking-invoice-heading">
+        <div class="card-header bg-white">
+            <h2 id="booking-invoice-heading" class="h5 mb-0">Invoice</h2>
+        </div>
+        <div class="card-body">
+            <?php if ($booking['invoice'] !== null): ?>
+                <p class="mb-3">
+                    Stable invoice <strong><?= $e($booking['invoice']['number']) ?></strong>
+                    was issued <?= $e($booking['invoice']['issuedAt']) ?>.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a
+                        class="btn btn-outline-primary"
+                        href="/admin/invoices/<?= $e($booking['invoice']['id']) ?>"
+                    >View invoice</a>
+                    <a
+                        class="btn btn-outline-secondary"
+                        href="/admin/invoices/<?= $e($booking['invoice']['id']) ?>/print"
+                    >Print invoice</a>
+                </div>
+            <?php elseif ($booking['canIssueInvoice']): ?>
+                <p class="text-secondary">
+                    This confirmed booking is eligible for a server-derived invoice when its one verified payment and booking snapshots pass final checks.
+                </p>
+                <div
+                    id="booking-invoice-action-message"
+                    class="alert d-none"
+                    role="alert"
+                    aria-live="polite"
+                ></div>
+                <form
+                    method="post"
+                    action="/api/v1/admin/bookings/<?= $e($booking['id']) ?>/invoice"
+                    data-booking-invoice-form
+                >
+                    <input type="hidden" name="_csrf" value="<?= $e($csrfToken) ?>">
+                    <button class="btn btn-primary" type="submit">Issue invoice</button>
+                </form>
+                <noscript>
+                    <p class="alert alert-warning mt-3 mb-0">
+                        JavaScript is required to issue an invoice safely.
+                    </p>
+                </noscript>
+            <?php else: ?>
+                <p class="mb-0 text-secondary">
+                    An invoice may be issued only while the booking is confirmed with its qualifying verified payment.
+                </p>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <div class="card admin-panel mt-4" aria-labelledby="booking-status-actions-heading">
         <div class="card-header bg-white">
             <h2 id="booking-status-actions-heading" class="h5 mb-0">Status actions</h2>
@@ -368,6 +419,89 @@
                         }
                     }
                 });
+            });
+        })();
+    </script>
+<?php endif; ?>
+
+<?php if ($booking['canIssueInvoice']): ?>
+    <script>
+        (() => {
+            const form = document.querySelector('[data-booking-invoice-form]');
+            const message = document.getElementById('booking-invoice-action-message');
+
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const showMessage = (text, type) => {
+                if (!(message instanceof HTMLElement)) {
+                    return;
+                }
+
+                message.textContent = text;
+                message.className = `alert alert-${type}`;
+            };
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const csrf = form.querySelector('input[name="_csrf"]');
+                const button = form.querySelector('button[type="submit"]');
+
+                if (!(csrf instanceof HTMLInputElement)) {
+                    showMessage('The invoice action could not be prepared.', 'danger');
+                    return;
+                }
+
+                if (button instanceof HTMLButtonElement) {
+                    button.disabled = true;
+                }
+
+                showMessage('Issuing the invoice…', 'info');
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-Token': csrf.value,
+                        },
+                        body: JSON.stringify({}),
+                    });
+                    const body = await response.json().catch(() => null);
+
+                    if (!response.ok) {
+                        const validationMessage = body?.errors?.invoice?.[0];
+                        throw new Error(
+                            validationMessage
+                            || body?.message
+                            || 'The invoice could not be issued.',
+                        );
+                    }
+
+                    const detailUrl = body?.data?.detail_url;
+
+                    if (typeof detailUrl !== 'string' || !detailUrl.startsWith('/admin/invoices/')) {
+                        throw new Error('The invoice response was invalid.');
+                    }
+
+                    showMessage('Invoice ready. Opening…', 'success');
+                    window.location.assign(detailUrl);
+                } catch (failure) {
+                    showMessage(
+                        failure instanceof Error
+                            ? failure.message
+                            : 'The invoice could not be issued.',
+                        'danger',
+                    );
+
+                    if (button instanceof HTMLButtonElement) {
+                        button.disabled = false;
+                    }
+                }
             });
         })();
     </script>

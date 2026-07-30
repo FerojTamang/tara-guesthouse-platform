@@ -72,7 +72,31 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Payments</span>
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'payment-methods' ? ' active' : '' ?>"
+                        href="/admin/payment-methods"
+                        <?= $activeNavigation === 'payment-methods' ? 'aria-current="page"' : '' ?>
+                    >
+                        Payment methods
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'payments' ? ' active' : '' ?>"
+                        href="/admin/payments"
+                        <?= $activeNavigation === 'payments' ? 'aria-current="page"' : '' ?>
+                    >
+                        Payments
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'invoices' ? ' active' : '' ?>"
+                        href="/admin/invoices"
+                        <?= $activeNavigation === 'invoices' ? 'aria-current="page"' : '' ?>
+                    >
+                        Invoices
+                    </a>
                 </li>
                 <li class="nav-item">
                     <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Content</span>

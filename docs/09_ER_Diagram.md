@@ -39,7 +39,7 @@ erDiagram
 
     bookings ||--o{ payments : has_attempts
     payment_methods ||--o{ payments : used_by
-    users o|--o{ payments : verifies_rejects_refunds
+    users o|--o{ payments : verifies_or_rejects
 
     bookings ||--o| invoices : may_have
     users ||--o{ invoices : creates

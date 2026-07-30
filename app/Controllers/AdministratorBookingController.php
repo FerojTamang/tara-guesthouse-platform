@@ -9,13 +9,16 @@ use App\Core\CsrfTokenManager;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\ViewRenderer;
+use App\Exceptions\AdministratorInvoiceException;
 use App\Exceptions\BookingException;
 use App\Models\AdministratorBookingDetail;
 use App\Models\Booking;
 use App\Models\BookingEvent;
+use App\Models\Invoice;
 use App\Requests\AdministratorBookingStatusRequest;
 use App\Services\AdministratorBookingServiceProvider;
 use App\Services\AdministratorBookingStatusServiceProvider;
+use App\Services\AdministratorInvoiceServiceProvider;
 use DateTimeImmutable;
 use DateTimeZone;
 use JsonException;
@@ -32,6 +35,7 @@ final readonly class AdministratorBookingController
         private AdministratorSession $administratorSession,
         private CsrfTokenManager $csrfTokens,
         private DateTimeZone $timezone,
+        private ?AdministratorInvoiceServiceProvider $invoiceServices = null,
     ) {
     }
 
@@ -94,6 +98,9 @@ final readonly class AdministratorBookingController
                 return $this->notFound();
             }
 
+            $invoice = $this->invoiceServices?->service()
+                ->findByBookingId($bookingId);
+
             return $this->page(
                 'admin.bookings.show',
                 [
@@ -101,10 +108,10 @@ final readonly class AdministratorBookingController
                         . ' | Tara Guest House',
                     'pageTitle' => 'Booking detail',
                     'activeNavigation' => 'bookings',
-                    'booking' => $this->detailData($detail),
+                    'booking' => $this->detailData($detail, $invoice),
                 ],
             );
-        } catch (BookingException) {
+        } catch (BookingException|AdministratorInvoiceException) {
             return $this->failure();
         }
     }
@@ -257,7 +264,10 @@ final readonly class AdministratorBookingController
     }
 
     /** @return array<string, mixed> */
-    private function detailData(AdministratorBookingDetail $detail): array
+    private function detailData(
+        AdministratorBookingDetail $detail,
+        ?Invoice $invoice = null,
+    ): array
     {
         $booking = $detail->booking();
         $room = $detail->room();
@@ -274,6 +284,14 @@ final readonly class AdministratorBookingController
             'statusActions' => $this->statusActions(
                 $booking->bookingStatus(),
             ),
+            'invoice' => $invoice === null ? null : [
+                'id' => $invoice->id(),
+                'number' => $invoice->invoiceNumber(),
+                'issuedAt' => $this->dateTime($invoice->issuedAt()),
+            ],
+            'canIssueInvoice' => $this->invoiceServices !== null
+                && $invoice === null
+                && $booking->bookingStatus() === Booking::STATUS_CONFIRMED,
             'guestName' => $booking->guestFullName(),
             'guestEmail' => $booking->guestEmail(),
             'guestPhone' => $booking->guestPhone(),

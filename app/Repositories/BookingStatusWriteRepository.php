@@ -29,5 +29,6 @@ interface BookingStatusWriteRepository
         int $performedBy,
         ?string $reason,
         DateTimeImmutable $createdAt,
+        ?string $metadataJson = null,
     ): void;
 }

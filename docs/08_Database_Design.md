@@ -149,9 +149,9 @@ Automatic gateway callbacks and gateway refunds are future. The client policy fo
 - Invoice numbers are unique and stable.
 - Monetary values are fixed-precision NPR snapshots derived from booking and verified-payment data.
 - Later room-price changes do not alter issued invoices.
-- Issued invoices are not deleted; corrections are audited.
-- Invoice issue and correction events are audited.
-- Client-specific tax/VAT presentation remains **Architect/Client Confirmation Required**.
+- Issued invoices are not deleted or edited through Sprint 3 routes.
+- Invoice issue is audited; a later approved correction policy must add separate audited behavior rather than rewriting issued snapshots.
+- Version 1 Sprint 3 tax is exactly `NPR 0.00`; no service charge is stored or calculated.
 
 # 9. CMS and Settings
 
@@ -220,9 +220,8 @@ Migrations must create all approved Version 1 tables, fields, foreign keys, inde
 
 The database implementation must not guess these values:
 
-- exact pending-booking deadline;
 - full versus partial manual refund policy;
-- invoice tax/VAT presentation;
+- any future non-zero tax/VAT, service-charge, credit-note, or invoice-correction policy;
 - review-invitation expiry;
 - contact-message retention duration.
 

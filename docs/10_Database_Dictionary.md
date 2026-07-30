@@ -283,8 +283,8 @@ A booking has zero or more payment rows.
 | `invoice_number` | VARCHAR(50) | No | Unique stable number |
 | `currency` | CHAR(3) | No | `NPR` |
 | `subtotal` | DECIMAL(12,2) | No | Snapshot |
-| `tax_amount` | DECIMAL(12,2) | No | Snapshot; policy requires confirmation |
-| `total_amount` | DECIMAL(12,2) | No | Snapshot |
+| `tax_amount` | DECIMAL(12,2) | No | Exactly `0.00` in Sprint 3 |
+| `total_amount` | DECIMAL(12,2) | No | `subtotal + tax_amount`; no service charge |
 | `issued_at` | DATETIME | No | Issue timestamp |
 | `created_by` | BIGINT UNSIGNED | No | FK to Administrator `users` |
 | `created_at` | DATETIME | No | Created timestamp |

@@ -333,6 +333,7 @@ final class BookingStatusWriteRepositoryFake implements BookingStatusWriteReposi
         int $performedBy,
         ?string $reason,
         DateTimeImmutable $createdAt,
+        ?string $metadataJson = null,
     ): void {
         $this->eventType = $eventType;
         $this->eventFromStatus = $fromStatus;

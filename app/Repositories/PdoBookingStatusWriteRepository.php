@@ -8,6 +8,7 @@ use App\Exceptions\DatabaseException;
 use App\Models\Booking;
 use App\Models\BookingStatusSnapshot;
 use DateTimeImmutable;
+use JsonException;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -80,6 +81,10 @@ final readonly class PdoBookingStatusWriteRepository implements BookingStatusWri
 
         try {
             [$assignment, $parameters] = match ($targetStatus) {
+                Booking::STATUS_CONFIRMED => [
+                    'confirmed_at = :state_at',
+                    [],
+                ],
                 Booking::STATUS_REJECTED => [
                     'rejected_at = :state_at, rejection_reason = :reason',
                     ['reason' => $reason],
@@ -135,6 +140,7 @@ final readonly class PdoBookingStatusWriteRepository implements BookingStatusWri
         int $performedBy,
         ?string $reason,
         DateTimeImmutable $createdAt,
+        ?string $metadataJson = null,
     ): void {
         if (
             !$this->connection->inTransaction()
@@ -147,6 +153,7 @@ final readonly class PdoBookingStatusWriteRepository implements BookingStatusWri
             || !Booking::isStatus($toStatus)
             || $fromStatus === $toStatus
             || $createdAt->getOffset() !== 0
+            || !$this->isValidMetadata($metadataJson)
         ) {
             throw new DatabaseException('The booking event write failed.');
         }
@@ -158,7 +165,7 @@ final readonly class PdoBookingStatusWriteRepository implements BookingStatusWri
                 . 'performed_by, reason, metadata_json, created_at'
                 . ') VALUES ('
                 . ':booking_id, :event_type, :from_status, :to_status, '
-                . ':performed_by, :reason, NULL, :created_at'
+                . ':performed_by, :reason, :metadata_json, :created_at'
                 . ')',
             );
             $statement->execute([
@@ -168,10 +175,26 @@ final readonly class PdoBookingStatusWriteRepository implements BookingStatusWri
                 'to_status' => $toStatus,
                 'performed_by' => $performedBy,
                 'reason' => $reason,
+                'metadata_json' => $metadataJson,
                 'created_at' => $createdAt->format('Y-m-d H:i:s'),
             ]);
         } catch (Throwable) {
             throw new DatabaseException('The booking event write failed.');
+        }
+    }
+
+    private function isValidMetadata(?string $metadataJson): bool
+    {
+        if ($metadataJson === null) {
+            return true;
+        }
+
+        try {
+            json_decode($metadataJson, true, 32, JSON_THROW_ON_ERROR);
+
+            return true;
+        } catch (JsonException) {
+            return false;
         }
     }
 }

@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorPaymentController;
+use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -28,6 +31,9 @@ return static function (
     ?AdministratorRoomController $roomController = null,
     ?AdministratorRoomImageController $roomImageController = null,
     ?AdministratorBookingController $bookingController = null,
+    ?AdministratorPaymentMethodController $paymentMethodController = null,
+    ?AdministratorPaymentController $paymentController = null,
+    ?AdministratorInvoiceController $invoiceController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -42,6 +48,9 @@ return static function (
         && $amenityController === null
         && $roomImageController === null
         && $bookingController === null
+        && $paymentMethodController === null
+        && $paymentController === null
+        && $invoiceController === null
     ) {
         return;
     }
@@ -81,6 +90,80 @@ return static function (
             '/admin/bookings/{id}',
             [$bookingController, 'show'],
             [$requireAdministrator],
+        );
+    }
+
+    if ($paymentController !== null) {
+        $router->get(
+            '/admin/payments',
+            [$paymentController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/payments/{id}',
+            [$paymentController, 'show'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/payments/{id}/proof',
+            [$paymentController, 'proof'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($invoiceController !== null) {
+        $router->get(
+            '/admin/invoices',
+            [$invoiceController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/invoices/{id}/print',
+            [$invoiceController, 'print'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/invoices/{id}',
+            [$invoiceController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($paymentMethodController !== null) {
+        $router->get(
+            '/admin/payment-methods',
+            [$paymentMethodController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/payment-methods/create',
+            [$paymentMethodController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/payment-methods',
+            [$paymentMethodController, 'create'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->get(
+            '/admin/payment-methods/{id}/edit',
+            [$paymentMethodController, 'editForm'],
+            [$requireAdministrator],
+        );
+        $router->post(
+            '/admin/payment-methods/{id}',
+            [$paymentMethodController, 'update'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/payment-methods/{id}/activate',
+            [$paymentMethodController, 'activate'],
+            [$requireAdministrator, $csrf],
+        );
+        $router->post(
+            '/admin/payment-methods/{id}/deactivate',
+            [$paymentMethodController, 'deactivate'],
+            [$requireAdministrator, $csrf],
         );
     }
 

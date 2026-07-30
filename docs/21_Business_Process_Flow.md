@@ -74,13 +74,13 @@ JSON endpoint: `POST /api/v1/payments`
 
 1. Guest uses the secure booking-access mechanism supplied by the booking flow.
 2. Guest selects an active configured manual payment method.
-3. Payment Service creates an attempt as `pending` if no attempt has yet been created for this submission flow.
-4. Guest supplies amount, transaction/reference code, notes, and proof where required.
-5. Upload and input validation run.
-6. Payment Service changes that attempt to `submitted` and records `submitted_at`.
-7. Administrator receives an in-app notification and transactional SMTP notification may be sent.
+3. Guest supplies the exact booking amount, transaction/reference code, optional notes, and proof where required.
+4. Payment Service validates signed booking access, deadline, active method, exact NPR amount, and upload policy.
+5. Payment Service stores any required proof privately and inserts one new attempt directly as `submitted` with `submitted_at`.
+6. The transaction commits; a failed transaction leaves neither a payment row nor an orphaned proof.
+7. A later resubmission creates another retained row; it never resets or overwrites an earlier attempt.
 
-If an earlier attempt is `rejected`, resubmission creates a new attempt. It does not reset the rejected record.
+Sprint 3 does not deliver in-app or SMTP notifications. Later notification delivery must occur only after commit and must not roll back payment or booking state.
 
 # 7. Administrator Payment Verification Flow
 
@@ -91,10 +91,10 @@ JSON endpoint: `PATCH /api/v1/admin/payments/{id}/status`
 2. Administrator reviews a `submitted` payment attempt.
 3. Administrator selects `verified` or `rejected` and supplies the required note.
 4. Payment Service validates and records the transition with actor and timestamp.
-5. When a payment becomes `verified`, Payment Service notifies Booking Service.
-6. Booking Service may transition the booking from `pending` to `confirmed`, records `confirmed_at`, and appends the booking event.
-7. Confirmation notifications/email are attempted after commit.
-8. A rejected attempt leaves the booking `pending` until its deadline unless the Booking Service separately cancels/rejects it.
+5. When a payment becomes `verified`, Payment Service invokes the approved internal Booking Service confirmation operation in the same transaction.
+6. Booking Service transitions the booking from `pending` to `confirmed`, records `confirmed_at`, and appends the payment-linked booking event.
+7. Payment verification, booking confirmation, event history, and audit evidence commit together or all roll back.
+8. A rejected attempt leaves the booking `pending` until its deadline unless the Booking Service separately cancels/rejects it. Notification delivery remains deferred.
 
 Payment status remains on payment records. It is never represented as Pending Payment or Payment Verified booking status.
 
@@ -105,7 +105,7 @@ Payment status remains on payment records. It is never represented as Pending Pa
 3. Booking Service may transition each to `cancelled` with an expiry reason and timestamp.
 4. A booking event and applicable notification are recorded.
 
-The exact deadline and cron interval require approved configuration.
+The current deadline is the configured 360 minutes. The optional scheduled cancellation process and cron interval remain deferred; expired pending bookings already stop blocking availability.
 
 # 9. Check-In Flow
 
@@ -149,9 +149,9 @@ The change is made only by Booking Service, appended to booking history, and ref
 3. Invoice Service uses booking and verified-payment NPR snapshots.
 4. It creates a stable unique invoice number and immutable issued values.
 5. The invoice may be rendered/printed again after checkout without changing its number.
-6. Corrections are audited; issued invoices are not deleted.
+6. Issued invoices are not edited or deleted; any later approved correction/credit-note workflow must be separately audited.
 
-Client tax/VAT presentation remains **Architect/Client Confirmation Required**.
+Sprint 3 invoices use `NPR 0.00` tax and no service charge. Any future non-zero tax, service charge, correction, or credit-note workflow requires a separately approved policy.
 
 # 13. Review Flow
 

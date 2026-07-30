@@ -62,7 +62,11 @@ final class ViewFoundationTest extends TestCase
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringStartsWith('<!doctype html>', $response->body());
         self::assertStringContainsString('<html lang="en">', $response->body());
-        self::assertStringContainsString('<main>', $response->body());
+        self::assertStringContainsString(
+            '<a class="visually-hidden-focusable" href="#main-content">Skip to main content</a>',
+            $response->body(),
+        );
+        self::assertStringContainsString('<main id="main-content" tabindex="-1">', $response->body());
         self::assertStringContainsString('Application foundation is running', $response->body());
         self::assertStringContainsString('The PHP view renderer is operational.', $response->body());
         self::assertStringNotContainsString('Book now', $response->body());

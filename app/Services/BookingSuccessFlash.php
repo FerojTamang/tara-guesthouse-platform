@@ -14,7 +14,7 @@ use Throwable;
 /**
  * Transfers one booking success result through the private server-side session.
  *
- * The access token is stored only in the session and is never returned to a view.
+ * Sensitive payment continuation is retained separately from this one-time flash.
  */
 final readonly class BookingSuccessFlash
 {
@@ -50,7 +50,6 @@ final readonly class BookingSuccessFlash
                     ->format(DATE_ATOM),
                 'currency' => $booking->currency(),
                 'total_amount' => $booking->totalAmount(),
-                'booking_access_token' => $result->bookingAccessToken(),
             ]);
         } catch (BookingException $exception) {
             throw $exception;
@@ -100,7 +99,6 @@ final readonly class BookingSuccessFlash
                 'confirmation_deadline_at',
                 'currency',
                 'total_amount',
-                'booking_access_token',
             ]
             || $stored['version'] !== self::VERSION
             || !is_string($stored['booking_reference'])
@@ -108,7 +106,6 @@ final readonly class BookingSuccessFlash
             || !is_string($stored['confirmation_deadline_at'])
             || !is_string($stored['currency'])
             || !is_string($stored['total_amount'])
-            || !is_string($stored['booking_access_token'])
         ) {
             return false;
         }
@@ -117,10 +114,6 @@ final readonly class BookingSuccessFlash
             && strlen($stored['booking_reference']) <= 30
             && $stored['booking_status'] === Booking::STATUS_PENDING
             && $stored['currency'] === Booking::CURRENCY_NPR
-            && preg_match('/^\d+\.\d{2}$/D', $stored['total_amount']) === 1
-            && preg_match(
-                '/^v1\.[A-Za-z0-9_-]{43}$/D',
-                $stored['booking_access_token'],
-            ) === 1;
+            && preg_match('/^\d+\.\d{2}$/D', $stored['total_amount']) === 1;
     }
 }
