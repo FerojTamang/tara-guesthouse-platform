@@ -717,6 +717,24 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
         return $this->items[$id] ?? null;
     }
 
+    public function findPublicItemById(int $id): ?GalleryItem
+    {
+        $item = $this->findItemById($id);
+
+        if (!$item instanceof GalleryItem || !$item->isPubliclyVisible()) {
+            return null;
+        }
+
+        if (
+            $item->categoryId() !== null
+            && ($this->categories[$item->categoryId()] ?? null)?->isActive() !== true
+        ) {
+            return null;
+        }
+
+        return $item;
+    }
+
     public function lockItemById(int $id): ?GalleryItem
     {
         return $this->findItemById($id);

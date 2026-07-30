@@ -191,6 +191,22 @@ final class GalleryRepository implements GalleryCatalogRepository
         );
     }
 
+    public function findPublicItemById(int $id): ?GalleryItem
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        return $this->itemLookup(
+            self::ITEM_COLUMNS
+            . ' LEFT JOIN gallery_categories c ON c.id = g.gallery_category_id'
+            . ' WHERE g.id = :lookup AND g.is_active = 1 AND g.is_published = 1'
+            . ' AND (g.gallery_category_id IS NULL OR c.is_active = 1)'
+            . ' LIMIT 1',
+            $id,
+        );
+    }
+
     public function lockItemById(int $id): ?GalleryItem
     {
         if ($id <= 0) {

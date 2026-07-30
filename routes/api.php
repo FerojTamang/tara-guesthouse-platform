@@ -10,6 +10,7 @@ use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
+use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
@@ -37,6 +38,7 @@ return static function (
     $csrf = null;
     $publicActivities = null;
     $publicAvailability = null;
+    $publicGallery = null;
     $publicBooking = null;
     $publicPayment = null;
     $publicPaymentMethods = null;
@@ -66,6 +68,8 @@ return static function (
             $publicActivities ??= $dependency;
         } elseif ($dependency instanceof PublicAvailabilityController) {
             $publicAvailability ??= $dependency;
+        } elseif ($dependency instanceof PublicGalleryController) {
+            $publicGallery ??= $dependency;
         } elseif ($dependency instanceof PublicBookingController) {
             $publicBooking ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentController) {
@@ -166,6 +170,10 @@ return static function (
 
     if ($publicActivities !== null) {
         $router->get('/api/v1/activities', $publicActivities->index(...));
+    }
+
+    if ($publicGallery !== null) {
+        $router->get('/api/v1/gallery', $publicGallery->index(...));
     }
 
     if ($publicAvailability !== null) {

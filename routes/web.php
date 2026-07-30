@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
+use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicRoomController;
@@ -17,6 +18,7 @@ use App\Middleware\PublicPaymentRateLimitMiddleware;
 
 return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$dependencies): void {
     $publicActivities = null;
+    $publicGallery = null;
     $publicRooms = null;
     $publicAvailability = null;
     $publicBooking = null;
@@ -28,6 +30,8 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof PublicActivityController) {
             $publicActivities ??= $dependency;
+        } elseif ($dependency instanceof PublicGalleryController) {
+            $publicGallery ??= $dependency;
         } elseif ($dependency instanceof PublicRoomController) {
             $publicRooms ??= $dependency;
         } elseif ($dependency instanceof PublicAvailabilityController) {
@@ -57,6 +61,10 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
 
     if ($publicActivities !== null) {
         $router->get('/activities', $publicActivities->page(...));
+    }
+
+    if ($publicGallery !== null) {
+        $router->get('/gallery', $publicGallery->page(...));
     }
 
     if ($publicRooms !== null) {

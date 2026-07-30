@@ -33,6 +33,7 @@
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item"><a class="nav-link" href="/rooms">Rooms</a></li>
                         <li class="nav-item"><a class="nav-link" href="/activities">Activities</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="/availability">Availability</a></li>
                     </ul>
                 </div>

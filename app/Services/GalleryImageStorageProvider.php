@@ -6,7 +6,9 @@ namespace App\Services;
 
 use App\Core\Environment;
 use App\Exceptions\GalleryImageException;
+use App\Storage\GalleryImageReader;
 use App\Storage\GalleryImageStorage;
+use App\Storage\LocalGalleryImageReader;
 use App\Storage\LocalGalleryImageStorage;
 use Throwable;
 
@@ -22,6 +24,7 @@ final class GalleryImageStorageProvider
     ];
 
     private ?GalleryImageStorage $storage = null;
+    private ?GalleryImageReader $reader = null;
 
     /** @var null|array<string, mixed> */
     private ?array $uploadConfiguration = null;
@@ -48,6 +51,29 @@ final class GalleryImageStorageProvider
             }
 
             return $this->storage = new LocalGalleryImageStorage($root);
+        } catch (GalleryImageException $exception) {
+            throw $exception;
+        } catch (Throwable $failure) {
+            throw GalleryImageException::system($failure);
+        }
+    }
+
+    public function reader(): GalleryImageReader
+    {
+        if ($this->reader !== null) {
+            return $this->reader;
+        }
+
+        try {
+            $configuration = $this->uploadConfiguration();
+            $root = $this->absoluteRoot($configuration['filesystem_root']);
+            $public = $this->absoluteRoot('public');
+
+            if ($this->isInside($root, $public)) {
+                throw GalleryImageException::system();
+            }
+
+            return $this->reader = new LocalGalleryImageReader($root, $configuration);
         } catch (GalleryImageException $exception) {
             throw $exception;
         } catch (Throwable $failure) {

@@ -7,6 +7,7 @@ namespace Tests\Unit\Services;
 use App\Core\Environment;
 use App\Exceptions\GalleryImageException;
 use App\Services\GalleryImageStorageProvider;
+use App\Storage\GalleryImageReader;
 use App\Storage\GalleryImageStorage;
 use PHPUnit\Framework\TestCase;
 
@@ -71,6 +72,8 @@ final class GalleryImageStorageProviderTest extends TestCase
         self::assertSame($configuration, $provider->uploadConfiguration());
         self::assertInstanceOf(GalleryImageStorage::class, $provider->storage());
         self::assertSame($provider->storage(), $provider->storage());
+        self::assertInstanceOf(GalleryImageReader::class, $provider->reader());
+        self::assertSame($provider->reader(), $provider->reader());
     }
 
     public function testMissingDecisionValuesFailClosedWithoutPathsOrSecrets(): void

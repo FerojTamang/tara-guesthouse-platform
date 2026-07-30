@@ -139,6 +139,13 @@ final class GalleryRepositoryTest extends DatabaseTestCase
                 $this->repository->findAllPublicItems(),
             ),
         );
+        self::assertSame(
+            $this->itemIds['public-early'],
+            $this->repository->findPublicItemById($this->itemIds['public-early'])?->id(),
+        );
+        self::assertNull($this->repository->findPublicItemById($this->itemIds['draft']));
+        self::assertNull($this->repository->findPublicItemById($this->itemIds['inactive-category']));
+        self::assertNull($this->repository->findPublicItemById(999999));
     }
 
     public function testItCreatesAndUpdatesCategoriesAndItemsWithoutOverwritingVisibility(): void

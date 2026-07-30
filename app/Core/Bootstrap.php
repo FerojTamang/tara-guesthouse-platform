@@ -20,6 +20,7 @@ use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
 use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
+use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicPaymentController;
@@ -104,6 +105,8 @@ use App\Services\PublicActivityService;
 use App\Services\PublicActivityServiceProvider;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
+use App\Services\PublicGalleryService;
+use App\Services\PublicGalleryServiceProvider;
 use App\Services\PublicBookingRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
@@ -111,6 +114,7 @@ use App\Services\PublicPaymentRateLimiter;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
+use App\Storage\LazyGalleryImageReader;
 use App\Storage\LazyGalleryImageStorage;
 
 /**
@@ -412,6 +416,15 @@ final class Bootstrap
                 ),
             ),
         );
+        $publicGalleryController = new PublicGalleryController(
+            $viewRenderer,
+            new PublicGalleryServiceProvider(
+                static fn (): PublicGalleryService => new PublicGalleryService(
+                    new GalleryRepository($catalogConnectionProvider()),
+                    new LazyGalleryImageReader($galleryImageStorage->reader(...)),
+                ),
+            ),
+        );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
             new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
@@ -597,6 +610,7 @@ final class Bootstrap
             $administratorActivityController,
             $administratorGalleryController,
             $publicActivityController,
+            $publicGalleryController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -654,6 +668,7 @@ final class Bootstrap
         AdministratorActivityController $administratorActivityController,
         AdministratorGalleryController $administratorGalleryController,
         PublicActivityController $publicActivityController,
+        PublicGalleryController $publicGalleryController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -696,6 +711,7 @@ final class Bootstrap
                 $administratorActivityController,
                 $administratorGalleryController,
                 $publicActivityController,
+                $publicGalleryController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,

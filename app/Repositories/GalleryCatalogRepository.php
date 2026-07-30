@@ -32,6 +32,8 @@ interface GalleryCatalogRepository
 
     public function findItemById(int $id): ?GalleryItem;
 
+    public function findPublicItemById(int $id): ?GalleryItem;
+
     public function lockItemById(int $id): ?GalleryItem;
 
     /** @return list<GalleryItem> */
