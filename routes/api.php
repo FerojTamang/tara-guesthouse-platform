@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorPaymentController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicPaymentController;
@@ -23,6 +24,7 @@ return static function (
 ): void {
     $controller = null;
     $administratorBooking = null;
+    $administratorPayment = null;
     $guestOnly = null;
     $requireAdministrator = null;
     $csrf = null;
@@ -38,6 +40,8 @@ return static function (
             $controller ??= $dependency;
         } elseif ($dependency instanceof AdministratorBookingController) {
             $administratorBooking ??= $dependency;
+        } elseif ($dependency instanceof AdministratorPaymentController) {
+            $administratorPayment ??= $dependency;
         } elseif ($dependency instanceof GuestOnlyMiddleware) {
             $guestOnly ??= $dependency;
         } elseif ($dependency instanceof RequireAdministratorMiddleware) {
@@ -87,6 +91,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator booking JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorPayment !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator payment JSON routes require complete security dependencies.',
         );
     }
 
@@ -151,6 +164,14 @@ return static function (
         $router->patch(
             '/api/v1/admin/bookings/{id}/status',
             [$administratorBooking, 'updateStatus'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
+
+    if ($administratorPayment !== null) {
+        $router->patch(
+            '/api/v1/admin/payments/{id}/status',
+            [$administratorPayment, 'updateStatus'],
             [$requireAdministrator->forJson(), $csrf->forJson()],
         );
     }

@@ -27,6 +27,7 @@ use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
 use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
+use App\Services\AdministratorPaymentStatusServiceProvider;
 use App\Services\BookingTransaction;
 use App\Storage\PaymentProofReader;
 use App\Storage\RetrievedPaymentProof;
@@ -104,6 +105,9 @@ final class AdministratorPaymentReadPagesTest extends TestCase
                         '2026-07-29 12:00:00 UTC',
                     ),
                 ),
+            ),
+            new AdministratorPaymentStatusServiceProvider(
+                static fn (): mixed => null,
             ),
             $this->administratorSession,
             $csrfTokens,
@@ -229,8 +233,27 @@ final class AdministratorPaymentReadPagesTest extends TestCase
         self::assertStringContainsString('Account 123', $response->body());
         self::assertStringContainsString('2026-07-29 17:45', $response->body());
         self::assertStringNotContainsString('payment-proofs/', $response->body());
+        self::assertStringContainsString('Verify payment', $response->body());
+        self::assertStringContainsString('Reject payment', $response->body());
+        self::assertStringContainsString('verification_note', $response->body());
+        self::assertStringContainsString('/api/v1/admin/payments/44/status', $response->body());
+    }
+
+    public function testReviewedDetailDoesNotRenderReviewControls(): void
+    {
+        $this->repository->method('findById')->willReturn(
+            self::record(status: Payment::STATUS_REJECTED),
+        );
+        $this->administratorSession->establish(new AdministratorIdentity(91));
+
+        $response = $this->router->dispatch(
+            Request::create('GET', '/admin/payments/44'),
+        );
+
+        self::assertSame(200, $response->statusCode());
         self::assertStringNotContainsString('Verify payment', $response->body());
         self::assertStringNotContainsString('Reject payment', $response->body());
+        self::assertStringNotContainsString('data-payment-status-form', $response->body());
     }
 
     public function testProofReturnsValidatedBytesWithSafeHeadersAndAudit(): void
@@ -309,7 +332,8 @@ final class AdministratorPaymentReadPagesTest extends TestCase
     }
 
     private static function record(
-        ?string $proofPath = 'payment-proofs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf',
+    ?string $proofPath = 'payment-proofs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf',
+    string $status = Payment::STATUS_SUBMITTED,
     ): AdministratorPaymentRecord
     {
         $createdAt = new DateTimeImmutable('2026-07-29 06:00:00 UTC');
@@ -322,13 +346,19 @@ final class AdministratorPaymentReadPagesTest extends TestCase
             'BANK-<REFERENCE>',
             $proofPath,
             'Guest note.',
-            Payment::STATUS_SUBMITTED,
+            $status,
             new DateTimeImmutable('2026-07-29 06:05:00 UTC'),
-            null,
-            null,
-            null,
-            null,
-            null,
+            $status === Payment::STATUS_VERIFIED
+                ? new DateTimeImmutable('2026-07-29 06:30:00 UTC')
+                : null,
+            $status === Payment::STATUS_VERIFIED ? 91 : null,
+            $status === Payment::STATUS_REJECTED
+                ? new DateTimeImmutable('2026-07-29 06:30:00 UTC')
+                : null,
+            $status === Payment::STATUS_REJECTED ? 91 : null,
+            in_array($status, [Payment::STATUS_VERIFIED, Payment::STATUS_REJECTED], true)
+                ? 'Reviewed payment.'
+                : null,
             $createdAt,
             $createdAt,
         );

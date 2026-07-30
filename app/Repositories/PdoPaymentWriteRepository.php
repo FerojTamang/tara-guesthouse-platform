@@ -65,6 +65,37 @@ final readonly class PdoPaymentWriteRepository implements PaymentWriteRepository
         }
     }
 
+    public function lockBookingById(int $bookingId): ?Booking
+    {
+        if ($bookingId <= 0 || !$this->connection->inTransaction()) {
+            throw new DatabaseException('The booking payment lock failed.');
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT id FROM bookings '
+                . 'WHERE id = :booking_id AND deleted_at IS NULL '
+                . 'LIMIT 1 FOR UPDATE',
+            );
+            $statement->bindValue('booking_id', $bookingId, PDO::PARAM_INT);
+            $statement->execute();
+
+            if ($statement->fetchColumn() === false) {
+                return null;
+            }
+
+            $booking = (new BookingRepository($this->connection))->findById($bookingId);
+
+            if (!$booking instanceof Booking) {
+                throw new RuntimeException('The locked booking could not be loaded.');
+            }
+
+            return $booking;
+        } catch (Throwable) {
+            throw new DatabaseException('The booking payment lock failed.');
+        }
+    }
+
     public function lockPaymentMethodById(int $paymentMethodId): ?PaymentMethod
     {
         if ($paymentMethodId <= 0 || !$this->connection->inTransaction()) {

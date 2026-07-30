@@ -16,6 +16,8 @@ interface PaymentWriteRepository
 {
     public function lockBookingByReference(string $bookingReference): ?Booking;
 
+    public function lockBookingById(int $bookingId): ?Booking;
+
     public function lockPaymentMethodById(int $paymentMethodId): ?PaymentMethod;
 
     public function lockCurrent(int $paymentId): ?Payment;

@@ -409,6 +409,15 @@ final class GuestPaymentWriteRepositoryFake implements PaymentWriteRepository
         return $this->booking;
     }
 
+    public function lockBookingById(int $bookingId): ?Booking
+    {
+        if ($this->booking instanceof Booking && $this->booking->id() === $bookingId) {
+            return $this->booking;
+        }
+
+        return null;
+    }
+
     public function lockPaymentMethodById(int $paymentMethodId): ?PaymentMethod
     {
         $this->events[] = 'lock-method';

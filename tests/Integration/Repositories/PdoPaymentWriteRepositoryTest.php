@@ -75,6 +75,7 @@ final class PdoPaymentWriteRepositoryTest extends DatabaseTestCase
     {
         foreach ([
             fn () => $this->writer->lockBookingByReference('TGH-PAY-WRITE-001'),
+            fn () => $this->writer->lockBookingById($this->bookingId),
             fn () => $this->writer->lockPaymentMethodById($this->methodId),
         ] as $operation) {
             try {
@@ -89,11 +90,15 @@ final class PdoPaymentWriteRepositoryTest extends DatabaseTestCase
 
         try {
             $booking = $this->writer->lockBookingByReference('TGH-PAY-WRITE-001');
+            $bookingById = $this->writer->lockBookingById($this->bookingId);
             $method = $this->writer->lockPaymentMethodById($this->methodId);
 
             self::assertInstanceOf(Booking::class, $booking);
             self::assertSame($this->bookingId, $booking->id());
             self::assertSame(Booking::STATUS_PENDING, $booking->bookingStatus());
+            self::assertInstanceOf(Booking::class, $bookingById);
+            self::assertSame($this->bookingId, $bookingById->id());
+            self::assertNull($this->writer->lockBookingById(999999));
             self::assertInstanceOf(PaymentMethod::class, $method);
             self::assertSame($this->methodId, $method->id());
             self::assertTrue($method->isActive());

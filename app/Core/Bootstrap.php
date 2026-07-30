@@ -65,6 +65,8 @@ use App\Services\GuestPaymentSuccessFlash;
 use App\Services\AdministratorLogoutService;
 use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
+use App\Services\AdministratorPaymentStatusService;
+use App\Services\AdministratorPaymentStatusServiceProvider;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoBookingTransaction;
@@ -285,6 +287,17 @@ final class Bootstrap
                     return new AdministratorPaymentService(
                         new PdoAdministratorPaymentRepository($connection),
                         $paymentProofServices->reader(),
+                        new PdoAuditLogRepository($connection),
+                        new PdoBookingTransaction($connection),
+                    );
+                },
+            ),
+            new AdministratorPaymentStatusServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorPaymentStatusService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorPaymentStatusService(
+                        new PdoPaymentWriteRepository($connection),
                         new PdoAuditLogRepository($connection),
                         new PdoBookingTransaction($connection),
                     );

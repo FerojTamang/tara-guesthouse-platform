@@ -8,7 +8,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Represents a safe Administrator payment-read or proof-access failure.
+ * Represents a safe Administrator payment read, review, or proof-access failure.
  */
 final class AdministratorPaymentException extends RuntimeException
 {
@@ -25,6 +25,19 @@ final class AdministratorPaymentException extends RuntimeException
         return new self($message, 'validation');
     }
 
+    public static function paymentNotFound(): self
+    {
+        return new self('The payment was not found.', 'not_found');
+    }
+
+    public static function transitionConflict(): self
+    {
+        return new self(
+            'The payment is no longer eligible for this action.',
+            'conflict',
+        );
+    }
+
     public static function failure(?Throwable $previous = null): self
     {
         return new self('Administrator payment operation failed.', 'system', $previous);
@@ -33,6 +46,16 @@ final class AdministratorPaymentException extends RuntimeException
     public function isValidationFailure(): bool
     {
         return $this->category === 'validation';
+    }
+
+    public function isNotFound(): bool
+    {
+        return $this->category === 'not_found';
+    }
+
+    public function isConflict(): bool
+    {
+        return $this->category === 'conflict';
     }
 
     public function isSystemFailure(): bool
