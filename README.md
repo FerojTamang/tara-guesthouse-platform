@@ -257,7 +257,9 @@ Sprint 2 automated baseline: **1245 tests, 7597 assertions, 10 skipped, 0 failur
 
 Sprint 3 local automated baseline: **1558 tests, 9631 assertions, 11 skipped, 0 failures** with **16 applied migrations and 0 pending**. See [Sprint 3 QA Closure Report](docs/43_Sprint_3_QA_Closure_Report.md).
 
-**Later phases** — Remaining operations/content modules, notification delivery, dashboard completion, browser/UAT evidence, hardening, cPanel verification, and production deployment remain unimplemented or externally gated.
+**Sprint 4 Phase 5 plan** — Operations and Content is approved for incremental implementation on `feat/s4-operations-content`. The plan covers activities, gallery, settings/CMS pages, contact messages, verified-stay reviews, Administrator notifications, and transactional SMTP email. Every ticket is committed and pushed after tests pass, with an early Draft PR targeting `develop`. See [Sprint 4 Operations and Content Implementation Plan](docs/44_Sprint_4_Operations_Content_Implementation_Plan.md).
+
+**Later phases** — Dashboard completion, browser/UAT evidence, hardening, cPanel verification, and production deployment remain unimplemented or externally gated.
 
 ## Ownership
 

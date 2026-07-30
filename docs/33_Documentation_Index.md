@@ -76,7 +76,8 @@ These files support, but do not alter, the preserved 38-document numbering:
 | `40_Sprint_1_QA_Closure_Report.md` | Executed Sprint 1 Phase 2 QA evidence and closure verdict | Ready for Technical Architect approval |
 | `41_Sprint_2_QA_Closure_Report.md` | Executed Sprint 2 Availability and Booking QA evidence and closure verdict | Ready for Technical Architect approval |
 | `42_Sprint_3_Payments_Invoices_Implementation_Plan.md` | Approved Sprint 3 scope, policy, tickets, and completion rule | Executed locally; closure recorded in document 43 |
-| `43_Sprint_3_QA_Closure_Report.md` | Executed Sprint 3 Payments and Invoices QA evidence and closure verdict | Ready for pull-request review |
+| `43_Sprint_3_QA_Closure_Report.md` | Executed Sprint 3 Payments and Invoices QA evidence and closure verdict | Approved and merged |
+| `44_Sprint_4_Operations_Content_Implementation_Plan.md` | Approved Sprint 4 Operations and Content scope, ticket sequence, decision gates, and incremental GitHub delivery workflow | Ready for implementation |
 | `archive/22_PreDecision_State_Machine_Proposals.md` | Historical pre-decision state proposals | Archived; not an implementation source |
 
 # 5. Recommended Reading Order
@@ -93,7 +94,7 @@ These files support, but do not alter, the preserved 38-document numbering:
 
 # 6. Documentation Status
 
-The suite has been synchronized to the approved Version 1 decisions. Sprint 0 foundation is approved and merged, recorded in `39_Sprint_0_QA_Closure_Report.md`. Sprint 1 Administrator authentication and Rooms is implemented and tested in `40_Sprint_1_QA_Closure_Report.md`. Sprint 2 Availability and Booking is implemented and tested in `41_Sprint_2_QA_Closure_Report.md`. Sprint 3 Manual Payments and Invoices is implemented and locally regression-tested in `43_Sprint_3_QA_Closure_Report.md`. Remaining operations/content modules, notification delivery, dashboard completion, hardening, UAT, cPanel verification, and production deployment remain later approved work.
+The suite has been synchronized to the approved Version 1 decisions. Sprint 0 foundation is approved and merged, recorded in `39_Sprint_0_QA_Closure_Report.md`. Sprint 1 Administrator authentication and Rooms is implemented and tested in `40_Sprint_1_QA_Closure_Report.md`. Sprint 2 Availability and Booking is implemented and tested in `41_Sprint_2_QA_Closure_Report.md`. Sprint 3 Manual Payments and Invoices is implemented, merged, and post-merge regression-tested in `43_Sprint_3_QA_Closure_Report.md`. Sprint 4 Operations and Content is planned in `44_Sprint_4_Operations_Content_Implementation_Plan.md`. Dashboard completion, hardening, UAT, cPanel verification, and production deployment remain later approved work.
 
 # 7. Future Documentation
 
