@@ -446,6 +446,7 @@ final class BookingStatusApiRepositoryFake implements BookingStatusWriteReposito
         int $performedBy,
         ?string $reason,
         DateTimeImmutable $createdAt,
+        ?string $metadataJson = null,
     ): void {
     }
 }

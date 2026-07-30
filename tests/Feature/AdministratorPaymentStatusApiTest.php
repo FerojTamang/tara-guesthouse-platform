@@ -18,6 +18,7 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
+use App\Models\BookingStatusTransitionResult;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Repositories\AuditLogWriteRepository;
@@ -29,6 +30,7 @@ use App\Services\AdministratorPaymentServiceProvider;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\AdministratorPaymentStatusServiceProvider;
 use App\Services\BookingTransaction;
+use App\Services\VerifiedPaymentBookingConfirmer;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
@@ -47,6 +49,7 @@ final class AdministratorPaymentStatusApiTest extends TestCase
     private AdministratorSession $administratorSession;
     private PaymentStatusApiWriterFake $payments;
     private PaymentStatusApiAuditFake $audit;
+    private PaymentStatusApiBookingConfirmerFake $bookingConfirmer;
     private Router $router;
 
     protected function setUp(): void
@@ -88,6 +91,7 @@ final class AdministratorPaymentStatusApiTest extends TestCase
         $this->payments->payment = self::payment();
         $this->payments->booking = self::booking();
         $this->audit = new PaymentStatusApiAuditFake();
+        $this->bookingConfirmer = new PaymentStatusApiBookingConfirmerFake();
         $transaction = new PaymentStatusApiTransactionFake();
         $paymentController = new AdministratorPaymentController(
             $renderer,
@@ -98,6 +102,7 @@ final class AdministratorPaymentStatusApiTest extends TestCase
                 fn (): AdministratorPaymentStatusService => new AdministratorPaymentStatusService(
                     $this->payments,
                     $this->audit,
+                    $this->bookingConfirmer,
                     $transaction,
                     static fn (): DateTimeImmutable => new DateTimeImmutable(
                         '2026-07-30 04:00:00 UTC',
@@ -214,6 +219,8 @@ final class AdministratorPaymentStatusApiTest extends TestCase
             JSON_THROW_ON_ERROR,
         ));
         self::assertSame(Payment::STATUS_VERIFIED, $this->payments->reviewedStatus);
+        self::assertCount(1, $this->bookingConfirmer->calls);
+        self::assertSame(44, $this->bookingConfirmer->calls[0]['payment_id']);
         self::assertCount(1, $this->audit->entries);
         self::assertSame('payment_verified', $this->audit->entries[0]->eventType());
         self::assertSame('203.0.113.60', $this->audit->entries[0]->ipAddress());
@@ -288,6 +295,7 @@ final class AdministratorPaymentStatusApiTest extends TestCase
         self::assertSame(200, $response->statusCode());
         self::assertSame(Payment::STATUS_REJECTED, $this->payments->reviewedStatus);
         self::assertSame(['payment:44'], $this->payments->operations);
+        self::assertSame([], $this->bookingConfirmer->calls);
         self::assertSame('payment_rejected', $this->audit->entries[0]->eventType());
     }
 
@@ -549,6 +557,34 @@ final class PaymentStatusApiWriterFake implements PaymentWriteRepository
             $note,
             $current->createdAt(),
             $changedAt,
+        );
+    }
+}
+
+final class PaymentStatusApiBookingConfirmerFake implements VerifiedPaymentBookingConfirmer
+{
+    /** @var list<array{booking_id: int, payment_id: int}> */
+    public array $calls = [];
+
+    public function confirm(
+        Booking $booking,
+        Payment $verifiedPayment,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+        DateTimeImmutable $confirmedAt,
+    ): BookingStatusTransitionResult {
+        $this->calls[] = [
+            'booking_id' => $booking->id(),
+            'payment_id' => $verifiedPayment->id(),
+        ];
+
+        return new BookingStatusTransitionResult(
+            $booking->id(),
+            $booking->bookingReference(),
+            Booking::STATUS_PENDING,
+            Booking::STATUS_CONFIRMED,
+            $confirmedAt,
         );
     }
 }

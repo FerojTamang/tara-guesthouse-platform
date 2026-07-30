@@ -11,10 +11,12 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\PdoAuditLogRepository;
+use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoPaymentWriteRepository;
 use App\Requests\AdministratorPaymentStatusRequest;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\PdoBookingTransaction;
+use App\Services\VerifiedPaymentBookingConfirmationService;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
@@ -41,7 +43,7 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
         $this->methodId = $this->insertMethod();
     }
 
-    public function testVerificationCommitsOneAttemptAndAuditWithoutChangingBooking(): void
+    public function testVerificationCommitsPaymentBookingEventAndBothAudits(): void
     {
         $bookingId = $this->insertBooking('TGH-PAY-STATUS-VERIFY-001');
         $paymentId = $this->insertSubmittedPayment($bookingId, 'VERIFY-001');
@@ -66,17 +68,18 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
         self::assertNull($payment['rejected_by']);
         self::assertSame('Transfer and proof confirmed.', $payment['verification_note']);
 
+        $booking = $this->bookingRow($bookingId);
+        self::assertSame(Booking::STATUS_CONFIRMED, $booking['booking_status']);
+        self::assertSame('2026-07-30 04:00:00', $booking['confirmed_at']);
+
+        $event = $this->bookingEventRow($bookingId);
+        self::assertSame('booking_confirmed', $event['event_type']);
+        self::assertSame(Booking::STATUS_PENDING, $event['from_status']);
+        self::assertSame(Booking::STATUS_CONFIRMED, $event['to_status']);
+        self::assertSame((string) $this->administratorId, (string) $event['performed_by']);
         self::assertSame(
-            Booking::STATUS_PENDING,
-            $this->connection->query(
-                'SELECT booking_status FROM bookings WHERE id = ' . $bookingId,
-            )->fetchColumn(),
-        );
-        self::assertSame(
-            0,
-            (int) $this->connection->query(
-                'SELECT COUNT(*) FROM booking_events WHERE booking_id = ' . $bookingId,
-            )->fetchColumn(),
+            ['payment_id' => $paymentId],
+            json_decode((string) $event['metadata_json'], true, 16, JSON_THROW_ON_ERROR),
         );
 
         $audit = $this->auditRow($paymentId);
@@ -98,6 +101,19 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
             'Transfer and proof confirmed.',
             (string) $audit['metadata_json'],
         );
+
+        $bookingAudit = $this->bookingAuditRow($bookingId);
+        self::assertSame('booking_confirmed_from_payment', $bookingAudit['event_type']);
+        self::assertSame([
+            'payment_id' => $paymentId,
+            'from_status' => Booking::STATUS_PENDING,
+            'to_status' => Booking::STATUS_CONFIRMED,
+        ], json_decode(
+            (string) $bookingAudit['metadata_json'],
+            true,
+            16,
+            JSON_THROW_ON_ERROR,
+        ));
     }
 
     public function testDuplicateVerificationIsPreventedTransactionally(): void
@@ -150,6 +166,18 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
                 "SELECT COUNT(*) FROM audit_logs WHERE event_type = 'payment_verified'",
             )->fetchColumn(),
         );
+        self::assertSame(
+            1,
+            (int) $this->connection->query(
+                "SELECT COUNT(*) FROM audit_logs WHERE event_type = 'booking_confirmed_from_payment'",
+            )->fetchColumn(),
+        );
+        self::assertSame(
+            1,
+            (int) $this->connection->query(
+                "SELECT COUNT(*) FROM booking_events WHERE event_type = 'booking_confirmed'",
+            )->fetchColumn(),
+        );
     }
 
     public function testRejectionChangesOnlyAttemptAndAuditFailureRollsBack(): void
@@ -176,15 +204,33 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
             )->fetchColumn(),
         );
         self::assertSame('payment_rejected', $this->auditRow($rejectedId)['event_type']);
+        self::assertSame(
+            0,
+            (int) $this->connection->query(
+                'SELECT COUNT(*) FROM booking_events WHERE booking_id = ' . $bookingId,
+            )->fetchColumn(),
+        );
+        self::assertSame(
+            0,
+            (int) $this->connection->query(
+                "SELECT COUNT(*) FROM audit_logs WHERE entity_type = 'booking' "
+                . 'AND entity_id = ' . $bookingId,
+            )->fetchColumn(),
+        );
 
         $rollbackBookingId = $this->insertBooking('TGH-PAY-STATUS-ROLLBACK-01');
         $rollbackPaymentId = $this->insertSubmittedPayment(
             $rollbackBookingId,
             'ROLLBACK-001',
         );
+        $failingAudit = new FailingPaymentStatusAuditRepository();
         $service = new AdministratorPaymentStatusService(
             new PdoPaymentWriteRepository($this->connection),
-            new FailingPaymentStatusAuditRepository(),
+            $failingAudit,
+            new VerifiedPaymentBookingConfirmationService(
+                new PdoBookingStatusWriteRepository($this->connection),
+                $failingAudit,
+            ),
             new PdoBookingTransaction($this->connection),
             self::clock(...),
         );
@@ -211,11 +257,64 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
         self::assertNull($rolledBack['verification_note']);
     }
 
+    public function testBookingAuditFailureRollsBackPaymentBookingAndEvent(): void
+    {
+        $bookingId = $this->insertBooking('TGH-PAY-STATUS-ATOMIC-001');
+        $paymentId = $this->insertSubmittedPayment($bookingId, 'ATOMIC-001');
+        $failingAudit = new FailingPaymentStatusAuditRepository();
+        $service = new AdministratorPaymentStatusService(
+            new PdoPaymentWriteRepository($this->connection),
+            $failingAudit,
+            new VerifiedPaymentBookingConfirmationService(
+                new PdoBookingStatusWriteRepository($this->connection),
+                $failingAudit,
+            ),
+            new PdoBookingTransaction($this->connection),
+            self::clock(...),
+        );
+
+        try {
+            $service->transition(
+                $paymentId,
+                $this->request(Payment::STATUS_VERIFIED, 'Atomic verification.'),
+                $this->administratorId,
+                null,
+                null,
+            );
+            self::fail('Expected booking audit failure.');
+        } catch (AdministratorPaymentException $exception) {
+            self::assertTrue($exception->isSystemFailure());
+        }
+
+        self::assertSame(
+            Payment::STATUS_SUBMITTED,
+            $this->paymentRow($paymentId)['payment_status'],
+        );
+        $booking = $this->bookingRow($bookingId);
+        self::assertSame(Booking::STATUS_PENDING, $booking['booking_status']);
+        self::assertNull($booking['confirmed_at']);
+        self::assertSame(
+            0,
+            (int) $this->connection->query(
+                'SELECT COUNT(*) FROM booking_events WHERE booking_id = ' . $bookingId,
+            )->fetchColumn(),
+        );
+        self::assertSame(0, (int) $this->connection->query(
+            'SELECT COUNT(*) FROM audit_logs',
+        )->fetchColumn());
+    }
+
     private function service(): AdministratorPaymentStatusService
     {
+        $auditLogs = new PdoAuditLogRepository($this->connection);
+
         return new AdministratorPaymentStatusService(
             new PdoPaymentWriteRepository($this->connection),
-            new PdoAuditLogRepository($this->connection),
+            $auditLogs,
+            new VerifiedPaymentBookingConfirmationService(
+                new PdoBookingStatusWriteRepository($this->connection),
+                $auditLogs,
+            ),
             new PdoBookingTransaction($this->connection),
             self::clock(...),
         );
@@ -241,6 +340,48 @@ final class AdministratorPaymentStatusServiceIntegrationTest extends DatabaseTes
             . 'rejected_by, verification_note FROM payments WHERE id = :payment_id',
         );
         $statement->execute(['payment_id' => $paymentId]);
+        $row = $statement->fetch();
+        self::assertIsArray($row);
+
+        return $row;
+    }
+
+    /** @return array<string, mixed> */
+    private function bookingRow(int $bookingId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT booking_status, confirmed_at FROM bookings WHERE id = :booking_id',
+        );
+        $statement->execute(['booking_id' => $bookingId]);
+        $row = $statement->fetch();
+        self::assertIsArray($row);
+
+        return $row;
+    }
+
+    /** @return array<string, mixed> */
+    private function bookingEventRow(int $bookingId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT event_type, from_status, to_status, performed_by, metadata_json '
+            . 'FROM booking_events WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1',
+        );
+        $statement->execute(['booking_id' => $bookingId]);
+        $row = $statement->fetch();
+        self::assertIsArray($row);
+
+        return $row;
+    }
+
+    /** @return array<string, mixed> */
+    private function bookingAuditRow(int $bookingId): array
+    {
+        $statement = $this->connection->prepare(
+            'SELECT event_type, metadata_json FROM audit_logs '
+            . "WHERE entity_type = 'booking' AND entity_id = :booking_id "
+            . 'ORDER BY id DESC LIMIT 1',
+        );
+        $statement->execute(['booking_id' => $bookingId]);
         $row = $statement->fetch();
         self::assertIsArray($row);
 

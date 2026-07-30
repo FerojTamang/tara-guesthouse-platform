@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Exceptions\AdministratorPaymentException;
+use App\Exceptions\BookingException;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
 use App\Models\Payment;
@@ -30,6 +31,7 @@ final readonly class AdministratorPaymentStatusService
     public function __construct(
         private PaymentWriteRepository $payments,
         private AuditLogWriteRepository $auditLogs,
+        private VerifiedPaymentBookingConfirmer $bookingConfirmer,
         private BookingTransaction $transaction,
         ?callable $clock = null,
     ) {
@@ -75,6 +77,8 @@ final readonly class AdministratorPaymentStatusService
                     $current,
                     $administratorId,
                     $request->verificationNote(),
+                    $ipAddress,
+                    $userAgent,
                 ),
                 Payment::STATUS_REJECTED => $this->reject(
                     $current,
@@ -113,9 +117,7 @@ final readonly class AdministratorPaymentStatusService
                 $changedAt,
             );
         } catch (Throwable $failure) {
-            $safeFailure = $failure instanceof AdministratorPaymentException
-                ? $failure
-                : AdministratorPaymentException::failure($failure);
+            $safeFailure = $this->safeFailure($failure);
 
             try {
                 $active = $this->transaction->inProgress();
@@ -144,6 +146,8 @@ final readonly class AdministratorPaymentStatusService
         Payment $current,
         int $administratorId,
         string $note,
+        ?string $ipAddress,
+        ?string $userAgent,
     ): array {
         $booking = $this->payments->lockBookingById($current->bookingId());
         $changedAt = $this->now();
@@ -162,15 +166,22 @@ final readonly class AdministratorPaymentStatusService
             throw AdministratorPaymentException::transitionConflict();
         }
 
-        return [
-            $this->payments->markVerified(
-                $current,
-                $administratorId,
-                $note,
-                $changedAt,
-            ),
+        $reviewed = $this->payments->markVerified(
+            $current,
+            $administratorId,
+            $note,
             $changedAt,
-        ];
+        );
+        $this->bookingConfirmer->confirm(
+            $booking,
+            $reviewed,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+            $changedAt,
+        );
+
+        return [$reviewed, $changedAt];
     }
 
     /** @return array{Payment, DateTimeImmutable} */
@@ -245,6 +256,19 @@ final readonly class AdministratorPaymentStatusService
                 previous: $failure,
             );
         }
+    }
+
+    private function safeFailure(Throwable $failure): AdministratorPaymentException
+    {
+        if ($failure instanceof AdministratorPaymentException) {
+            return $failure;
+        }
+
+        if ($failure instanceof BookingException && $failure->isConflict()) {
+            return AdministratorPaymentException::transitionConflict();
+        }
+
+        return AdministratorPaymentException::failure($failure);
     }
 
     private function rejectExistingTransaction(): void

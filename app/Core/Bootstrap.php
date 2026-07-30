@@ -67,6 +67,7 @@ use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\AdministratorPaymentStatusServiceProvider;
+use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoBookingTransaction;
@@ -296,9 +297,15 @@ final class Bootstrap
                 static function () use ($catalogConnectionProvider): AdministratorPaymentStatusService {
                     $connection = $catalogConnectionProvider();
 
+                    $auditLogs = new PdoAuditLogRepository($connection);
+
                     return new AdministratorPaymentStatusService(
                         new PdoPaymentWriteRepository($connection),
-                        new PdoAuditLogRepository($connection),
+                        $auditLogs,
+                        new VerifiedPaymentBookingConfirmationService(
+                            new PdoBookingStatusWriteRepository($connection),
+                            $auditLogs,
+                        ),
                         new PdoBookingTransaction($connection),
                     );
                 },

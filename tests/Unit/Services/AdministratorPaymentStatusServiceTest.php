@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Exceptions\AdministratorPaymentException;
+use App\Exceptions\BookingException;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
+use App\Models\BookingStatusTransitionResult;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Repositories\AuditLogWriteRepository;
@@ -14,6 +16,7 @@ use App\Repositories\PaymentWriteRepository;
 use App\Requests\AdministratorPaymentStatusRequest;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\BookingTransaction;
+use App\Services\VerifiedPaymentBookingConfirmer;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -22,6 +25,7 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
 {
     private PaymentStatusWriteRepositoryFake $payments;
     private PaymentStatusAuditRepositoryFake $audit;
+    private PaymentStatusBookingConfirmerFake $bookingConfirmer;
     private PaymentStatusTransactionFake $transaction;
     private AdministratorPaymentStatusService $service;
 
@@ -31,10 +35,12 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
 
         $this->payments = new PaymentStatusWriteRepositoryFake();
         $this->audit = new PaymentStatusAuditRepositoryFake();
+        $this->bookingConfirmer = new PaymentStatusBookingConfirmerFake();
         $this->transaction = new PaymentStatusTransactionFake();
         $this->service = new AdministratorPaymentStatusService(
             $this->payments,
             $this->audit,
+            $this->bookingConfirmer,
             $this->transaction,
             static fn (): DateTimeImmutable => new DateTimeImmutable(
                 '2026-07-30 04:00:00 UTC',
@@ -62,6 +68,10 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
         self::assertSame(Payment::STATUS_VERIFIED, $this->payments->reviewedStatus);
         self::assertSame(91, $this->payments->reviewedBy);
         self::assertSame('Reference and proof confirmed.', $this->payments->reviewedNote);
+        self::assertCount(1, $this->bookingConfirmer->calls);
+        self::assertSame(31, $this->bookingConfirmer->calls[0]['booking_id']);
+        self::assertSame(44, $this->bookingConfirmer->calls[0]['payment_id']);
+        self::assertSame(91, $this->bookingConfirmer->calls[0]['administrator_id']);
         self::assertSame(1, $this->transaction->commitCount);
         self::assertSame(0, $this->transaction->rollbackCount);
         self::assertCount(1, $this->audit->entries);
@@ -91,6 +101,7 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
         $service = new AdministratorPaymentStatusService(
             $this->payments,
             $this->audit,
+            $this->bookingConfirmer,
             $this->transaction,
             function (): DateTimeImmutable {
                 self::assertSame(
@@ -129,6 +140,7 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
         self::assertSame(Payment::STATUS_REJECTED, $result->toStatus());
         self::assertSame(['payment:44'], $this->payments->operations);
         self::assertSame(Payment::STATUS_REJECTED, $this->payments->reviewedStatus);
+        self::assertSame([], $this->bookingConfirmer->calls);
         self::assertSame('payment_rejected', $this->audit->entries[0]->eventType());
         self::assertSame(1, $this->transaction->commitCount);
     }
@@ -183,10 +195,12 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
             $payments->booking = self::booking();
             $configure($payments);
             $audit = new PaymentStatusAuditRepositoryFake();
+            $bookingConfirmer = new PaymentStatusBookingConfirmerFake();
             $transaction = new PaymentStatusTransactionFake();
             $service = new AdministratorPaymentStatusService(
                 $payments,
                 $audit,
+                $bookingConfirmer,
                 $transaction,
                 static fn (): DateTimeImmutable => new DateTimeImmutable(
                     '2026-07-30 04:00:00 UTC',
@@ -252,6 +266,28 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
 
         self::assertSame(0, $this->transaction->commitCount);
         self::assertSame(1, $this->transaction->rollbackCount);
+    }
+
+    public function testBookingConfirmationConflictRollsBackVerification(): void
+    {
+        $this->bookingConfirmer->conflict = true;
+
+        try {
+            $this->service->transition(
+                44,
+                self::request(Payment::STATUS_VERIFIED, 'Verify payment.'),
+                91,
+                null,
+                null,
+            );
+            self::fail('Expected booking confirmation conflict.');
+        } catch (AdministratorPaymentException $exception) {
+            self::assertTrue($exception->isConflict());
+        }
+
+        self::assertSame(0, $this->transaction->commitCount);
+        self::assertSame(1, $this->transaction->rollbackCount);
+        self::assertSame([], $this->audit->entries);
     }
 
     public function testItWillNotJoinAnExistingTransaction(): void
@@ -485,6 +521,40 @@ final class PaymentStatusAuditRepositoryFake implements AuditLogWriteRepository
         }
 
         $this->entries[] = $entry;
+    }
+}
+
+final class PaymentStatusBookingConfirmerFake implements VerifiedPaymentBookingConfirmer
+{
+    /** @var list<array{booking_id: int, payment_id: int, administrator_id: int}> */
+    public array $calls = [];
+    public bool $conflict = false;
+
+    public function confirm(
+        Booking $booking,
+        Payment $verifiedPayment,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+        DateTimeImmutable $confirmedAt,
+    ): BookingStatusTransitionResult {
+        $this->calls[] = [
+            'booking_id' => $booking->id(),
+            'payment_id' => $verifiedPayment->id(),
+            'administrator_id' => $administratorId,
+        ];
+
+        if ($this->conflict) {
+            throw BookingException::transitionConflict();
+        }
+
+        return new BookingStatusTransitionResult(
+            $booking->id(),
+            $booking->bookingReference(),
+            Booking::STATUS_PENDING,
+            Booking::STATUS_CONFIRMED,
+            $confirmedAt,
+        );
     }
 }
 
