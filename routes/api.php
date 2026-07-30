@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicBookingController;
@@ -24,6 +25,7 @@ return static function (
 ): void {
     $controller = null;
     $administratorBooking = null;
+    $administratorInvoice = null;
     $administratorPayment = null;
     $guestOnly = null;
     $requireAdministrator = null;
@@ -42,6 +44,8 @@ return static function (
             $administratorBooking ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
             $administratorPayment ??= $dependency;
+        } elseif ($dependency instanceof AdministratorInvoiceController) {
+            $administratorInvoice ??= $dependency;
         } elseif ($dependency instanceof GuestOnlyMiddleware) {
             $guestOnly ??= $dependency;
         } elseif ($dependency instanceof RequireAdministratorMiddleware) {
@@ -100,6 +104,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator payment JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorInvoice !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator invoice JSON routes require complete security dependencies.',
         );
     }
 
@@ -172,6 +185,14 @@ return static function (
         $router->patch(
             '/api/v1/admin/payments/{id}/status',
             [$administratorPayment, 'updateStatus'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
+
+    if ($administratorInvoice !== null) {
+        $router->post(
+            '/api/v1/admin/bookings/{bookingId}/invoice',
+            [$administratorInvoice, 'issue'],
             [$requireAdministrator->forJson(), $csrf->forJson()],
         );
     }

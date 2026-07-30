@@ -90,6 +90,15 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'invoices' ? ' active' : '' ?>"
+                        href="/admin/invoices"
+                        <?= $activeNavigation === 'invoices' ? 'aria-current="page"' : '' ?>
+                    >
+                        Invoices
+                    </a>
+                </li>
+                <li class="nav-item">
                     <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Content</span>
                 </li>
             </ul>

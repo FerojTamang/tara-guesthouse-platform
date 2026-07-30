@@ -9,6 +9,7 @@ use App\Authentication\LoginRateLimiter;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
@@ -34,6 +35,7 @@ use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
+use App\Repositories\PdoInvoiceRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PdoAdministratorPaymentRepository;
 use App\Repositories\PdoPaymentWriteRepository;
@@ -46,6 +48,8 @@ use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
+use App\Services\AdministratorInvoiceService;
+use App\Services\AdministratorInvoiceServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -62,6 +66,8 @@ use App\Services\GuestPaymentPageServiceProvider;
 use App\Services\GuestPaymentSubmissionService;
 use App\Services\GuestPaymentSubmissionServiceProvider;
 use App\Services\GuestPaymentSuccessFlash;
+use App\Services\InvoiceIssueService;
+use App\Services\InvoiceIssueServiceProvider;
 use App\Services\AdministratorLogoutService;
 use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
@@ -244,6 +250,26 @@ final class Bootstrap
             $catalogFlashMessages,
         );
         $paymentProofServices = new PaymentProofStorageProvider($resolvedBasePath);
+        $administratorInvoiceServices = new AdministratorInvoiceServiceProvider(
+            static fn (): AdministratorInvoiceService => new AdministratorInvoiceService(
+                new PdoInvoiceRepository($catalogConnectionProvider()),
+            ),
+        );
+        $invoiceIssueServices = new InvoiceIssueServiceProvider(
+            static function () use (
+                $catalogConnectionProvider,
+                $timezone,
+            ): InvoiceIssueService {
+                $connection = $catalogConnectionProvider();
+
+                return new InvoiceIssueService(
+                    new PdoInvoiceRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoBookingTransaction($connection),
+                    new \DateTimeZone($timezone),
+                );
+            },
+        );
         $administratorBookingController = new AdministratorBookingController(
             $viewRenderer,
             new AdministratorBookingServiceProvider(
@@ -265,6 +291,7 @@ final class Bootstrap
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
+            $administratorInvoiceServices,
         );
         $paymentMethodController = new AdministratorPaymentMethodController(
             $viewRenderer,
@@ -310,6 +337,14 @@ final class Bootstrap
                     );
                 },
             ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $administratorInvoiceController = new AdministratorInvoiceController(
+            $viewRenderer,
+            $administratorInvoiceServices,
+            $invoiceIssueServices,
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
@@ -495,6 +530,7 @@ final class Bootstrap
             $administratorBookingController,
             $paymentMethodController,
             $administratorPaymentController,
+            $administratorInvoiceController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -548,6 +584,7 @@ final class Bootstrap
         AdministratorBookingController $administratorBookingController,
         AdministratorPaymentMethodController $paymentMethodController,
         AdministratorPaymentController $administratorPaymentController,
+        AdministratorInvoiceController $administratorInvoiceController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -586,6 +623,7 @@ final class Bootstrap
                 $administratorBookingController,
                 $paymentMethodController,
                 $administratorPaymentController,
+                $administratorInvoiceController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,
