@@ -332,6 +332,8 @@ PHP);
 
         try {
             foreach ([
+                'gallery',
+                'gallery_categories',
                 'activities',
                 'invoice_items',
                 'invoices',
