@@ -172,9 +172,9 @@ Every JSON endpoint in this table is protected and explicitly uses `/api/v1/admi
 | Rooms | `/admin/rooms` | `/api/v1/admin/rooms...` | room tables |
 | Room types | `/admin/room-types` | `/api/v1/admin/room-types...` | `room_types` |
 | Amenities | `/admin/amenities` | `/api/v1/admin/amenities...` | `amenities`, `room_amenities` |
-| Bookings | `/admin/bookings` | `/api/v1/admin/bookings...` | booking tables |
-| Payments | `/admin/payments` | `/api/v1/admin/payments...` | payment tables |
-| Invoices | `/admin/invoices` | `/api/v1/admin/invoices...` | invoice tables |
+| Bookings | `/admin/bookings` | `PATCH /api/v1/admin/bookings/{id}/status` | booking tables |
+| Payments | `/admin/payments` | `PATCH /api/v1/admin/payments/{id}/status` | payment tables |
+| Invoices | `/admin/invoices` | `POST /api/v1/admin/bookings/{bookingId}/invoice` | invoice tables |
 | Activities | `/admin/activities` | `/api/v1/admin/activities...` | `activities` |
 | Gallery | `/admin/gallery` | `/api/v1/admin/gallery...` | gallery tables |
 | Reviews | `/admin/reviews` | `/api/v1/admin/reviews...` | review tables |
@@ -286,7 +286,7 @@ Full versus partial manual-refund UI is not defined until **Architect/Client Con
 
 # 15. Administrator Invoice Management
 
-Invoice issue action uses `POST /api/v1/admin/bookings/{bookingId}/invoice`. Totals are displayed as derived snapshots and are not editable arbitrary fields. Invoice number remains stable on reprint. Client tax/VAT presentation is **Architect/Client Confirmation Required**.
+Invoice issue action uses `POST /api/v1/admin/bookings/{bookingId}/invoice`. Totals are derived snapshots and are not editable arbitrary fields. One stable invoice number is retained on repeated issue and print. Sprint 3 displays `NPR 0.00` tax, no service charge, and no edit/delete control.
 
 # 16. Administrator Content Screens
 

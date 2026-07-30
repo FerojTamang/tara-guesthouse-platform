@@ -184,11 +184,11 @@ The attempt becomes `rejected`; the booking is not confirmed by that attempt. Do
 
 ### 7.3 Refunds
 
-The system can record a `refunded` payment status, but the full-versus-partial refund policy, approval authority and accounting treatment require Architect/Client Confirmation. Administrators must follow an approved operational policy and must not infer an unapproved refund workflow from this manual.
+`refunded` remains a canonical data status, but Sprint 3 provides no refund button, payload, endpoint, or repository transition. Administrators must not infer or perform a refund workflow until a separate approved policy defines amount, authority, accounting, and audit behavior.
 
 ## 8. Invoice Management
 
-Invoices preserve fixed-precision NPR snapshots and line items. Administrators may view and generate invoices only through the documented booking/invoice workflow. Later room-rate changes must not change an existing booking or invoice snapshot. Tax, service-charge and rounding policy require approval before final financial behavior is implemented.
+Invoices preserve fixed-precision NPR booking/payment snapshots and immutable accommodation line items. An Administrator issues at most one stable invoice for an eligible confirmed booking, then may view or print it through protected routes. Later room-rate changes do not change the invoice. Sprint 3 invoices use `NPR 0.00` tax, no service charge, and no edit/delete action.
 
 ## 9. Activities and Gallery
 

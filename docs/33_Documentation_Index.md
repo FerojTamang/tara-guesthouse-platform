@@ -6,10 +6,10 @@
 |---|---|
 | Project | Tara Guest House Management System |
 | Document number | 33 |
-| Version | 1.1 |
+| Version | 1.2 |
 | Status | Synchronized — Project Manager review required |
 | Authority | `00_V1_ARCHITECT_DECISIONS.md` |
-| Date | 20 July 2026 |
+| Date | 30 July 2026 |
 
 # 1. Purpose
 
@@ -30,9 +30,9 @@ When documents conflict, follow the authority order in `00_V1_ARCHITECT_DECISION
 | 05 | `05_Folder_Structure.md` | Folder Structure & Development Standards | Synchronized; review required |
 | 06 | `06_Coding_Standards.md` | Coding Standards & Best Practices | Synchronized; review required |
 | 07 | `07_Git_Workflow.md` | Git Workflow & Version Control | Synchronized; review required |
-| 08 | `08_Database_Design.md` | Database Design | Synchronized; review required |
-| 09 | `09_ER_Diagram.md` | Entity Relationship Diagram | Synchronized; review required |
-| 10 | `10_Database_Dictionary.md` | Database Dictionary | Synchronized; migration verification required |
+| 08 | `08_Database_Design.md` | Database Design | Synchronized through Sprint 3 payment/invoice migrations |
+| 09 | `09_ER_Diagram.md` | Entity Relationship Diagram | Synchronized through Sprint 3 payment/invoice relationships |
+| 10 | `10_Database_Dictionary.md` | Database Dictionary | Synchronized to 16 executable migrations |
 | 11 | `11_Booking_System_Specification.md` | Booking System Specification | Synchronized; Sprint 2 implementation and test evidence recorded |
 | 12 | `12_Room_Management_Specification.md` | Room Management Specification | Synchronized; review required |
 | 13 | `13_Activity_Management_Specification.md` | Activity Management Specification | Synchronized; review required |
@@ -41,23 +41,23 @@ When documents conflict, follow the authority order in `00_V1_ARCHITECT_DECISION
 | 16 | `16_Authentication_Authorization_System.md` | Authentication & Authorization System Specification | Synchronized; review required |
 | 17 | `17_Admin_Dashboard_Specification.md` | Admin Dashboard Specification | Synchronized; review required |
 | 18 | `18_Review_Rating_System.md` | Review & Rating System Specification | Synchronized; review required |
-| 19 | `19_Payment_Management_System.md` | Payment Management System Specification | Synchronized; review required |
+| 19 | `19_Payment_Management_System.md` | Payment Management System Specification | Implemented and QA synchronized in Sprint 3 |
 | 20 | `20_Notification_System.md` | Notification System Specification | Synchronized; review required |
-| 21 | `21_Business_Process_Flow.md` | Business Process Flow | Synchronized; review required |
-| 22 | `22_System_State_Machine.md` | System State Machine | Canonical V1 model; Sprint 2 booking transitions verified |
-| 23 | `23_REST_API_Specification.md` | REST API Specification | Synchronized; implemented Sprint 2 route contracts verified |
+| 21 | `21_Business_Process_Flow.md` | Business Process Flow | Synchronized to implemented payment and invoice transactions |
+| 22 | `22_System_State_Machine.md` | System State Machine | Canonical V1 model; Sprint 3 payment-driven confirmation verified |
+| 23 | `23_REST_API_Specification.md` | REST API Specification | Synchronized to implemented Sprint 3 JSON/page route boundaries |
 | 24 | `24_Frontend_Architecture.md` | Frontend Architecture | Synchronized; review required |
 | 25 | `25_Backend_Architecture.md` | Backend Architecture | Synchronized; review required |
 | 26 | `26_Deployment_Guide.md` | Deployment Guide | Synchronized to cPanel; host verification required |
-| 27 | `27_Testing_Strategy.md` | Testing Strategy | Synchronized; Sprint 2 automated evidence recorded in closure report |
-| 28 | `28_User_Manual.md` | User Manual | Synchronized; implementation screenshots pending |
+| 27 | `27_Testing_Strategy.md` | Testing Strategy | Sprint 3 automated evidence recorded in closure report |
+| 28 | `28_User_Manual.md` | User Manual | Synchronized through Sprint 3; implementation screenshots pending |
 | 29 | `29_Developer_Guide.md` | Developer Guide | Synchronized; review required |
 | 30 | `30_Maintenance_Manual.md` | Maintenance Manual | Synchronized; hosting verification required |
 | 31 | `31_Framework_Architecture.md` | Framework Architecture | Synchronized; review required |
 | 32 | `32_Project_Implementation_Plan.md` | Project Implementation Plan | Synchronized to approved phase order |
 | 33 | `33_Documentation_Index.md` | Documentation Index | Synchronized |
-| 34 | `34_UI_UX_Screen_Specification.md` | UI/UX Screen Specification | Synchronized; Sprint 2 availability/booking screens verified; deferred portal retained as future |
-| 35 | `35_Requirements_Traceability_Matrix.md` | Requirements Traceability Matrix | Synchronized; Sprint 1 and Sprint 2 implementation/test traceability verified |
+| 34 | `34_UI_UX_Screen_Specification.md` | UI/UX Screen Specification | Synchronized through Sprint 3 payment/invoice screens |
+| 35 | `35_Requirements_Traceability_Matrix.md` | Requirements Traceability Matrix | Synchronized through Sprint 3 implementation/test traceability |
 | 36 | `36_Architecture_Review_Report.md` | Architecture Review Report | Superseded readiness claims corrected |
 | 37 | `37_Sprint_1_Readiness_Report.md` | Sprint 1 Readiness Report | Reassessed after Sprint 1 Phase 2 implementation and QA; ready for pull-request review |
 | 38 | `38_Development_Handbook.md` | Development Handbook | Renamed and synchronized; review required |
@@ -75,6 +75,8 @@ These files support, but do not alter, the preserved 38-document numbering:
 | `39_Sprint_0_QA_Closure_Report.md` | Executed Sprint 0 foundation QA evidence and closure verdict | Approved and merged |
 | `40_Sprint_1_QA_Closure_Report.md` | Executed Sprint 1 Phase 2 QA evidence and closure verdict | Ready for Technical Architect approval |
 | `41_Sprint_2_QA_Closure_Report.md` | Executed Sprint 2 Availability and Booking QA evidence and closure verdict | Ready for Technical Architect approval |
+| `42_Sprint_3_Payments_Invoices_Implementation_Plan.md` | Approved Sprint 3 scope, policy, tickets, and completion rule | Executed locally; closure recorded in document 43 |
+| `43_Sprint_3_QA_Closure_Report.md` | Executed Sprint 3 Payments and Invoices QA evidence and closure verdict | Ready for pull-request review |
 | `archive/22_PreDecision_State_Machine_Proposals.md` | Historical pre-decision state proposals | Archived; not an implementation source |
 
 # 5. Recommended Reading Order
@@ -91,7 +93,7 @@ These files support, but do not alter, the preserved 38-document numbering:
 
 # 6. Documentation Status
 
-The suite has been synchronized to the approved Version 1 decisions. Sprint 0 foundation is approved and merged, recorded in `39_Sprint_0_QA_Closure_Report.md`. Sprint 1 Phase 2 Administrator authentication and Rooms is implemented and tested, recorded in `40_Sprint_1_QA_Closure_Report.md`. Sprint 2 implements the approved Availability and Booking slice and records QA evidence in `41_Sprint_2_QA_Closure_Report.md`. Manual payments, invoices, remaining operations/content, notification delivery, dashboard completion, hardening, UAT, and deployment remain later approved work.
+The suite has been synchronized to the approved Version 1 decisions. Sprint 0 foundation is approved and merged, recorded in `39_Sprint_0_QA_Closure_Report.md`. Sprint 1 Administrator authentication and Rooms is implemented and tested in `40_Sprint_1_QA_Closure_Report.md`. Sprint 2 Availability and Booking is implemented and tested in `41_Sprint_2_QA_Closure_Report.md`. Sprint 3 Manual Payments and Invoices is implemented and locally regression-tested in `43_Sprint_3_QA_Closure_Report.md`. Remaining operations/content modules, notification delivery, dashboard completion, hardening, UAT, cPanel verification, and production deployment remain later approved work.
 
 # 7. Future Documentation
 

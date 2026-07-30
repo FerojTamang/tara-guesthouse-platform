@@ -79,7 +79,7 @@ Copy-Item .env.example .env
 
 Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
 
-Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The suite covers the foundation, Administrator authentication, room management, public room pages, date-range availability, transactional one-room Guest booking, concurrency protection, secure booking references and follow-up tokens, public rate limiting, Administrator booking reads, booking status actions, booking events, and booking-status audit records.
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The suite covers the foundation, Administrator authentication, room management, public room pages, date-range availability, transactional one-room Guest booking, concurrency protection, secure booking references and follow-up tokens, public rate limiting, configurable payment methods, private proof storage, retained Guest payment attempts, Administrator payment review and decisions, payment-driven booking confirmation, invoice issue/detail/print workflows, and append-only audit evidence.
 
 The core HTTP bootstrap is executable. After configuring the required local environment values, start PHP's development server from the repository root:
 
@@ -95,7 +95,7 @@ The application includes a secure PHP view renderer for trusted project template
 
 Templates must escape HTML text and quoted attribute values through the provided `$e` helper. There is no raw HTML helper; renderer-owned layout content is the only approved unescaped composition value. The HTML helper is not a JavaScript, CSS, JSON, URL, or URL-scheme sanitizer. Templates must not access PDO, repositories, services, sessions, environment values, or configuration, and must not send headers, terminate execution, query data, or contain business logic.
 
-The current `/` page remains infrastructure-only. The secure view foundation now also renders the Administrator layout, room-management pages, public room pages, public availability and booking pages, and Administrator booking list/detail pages. Final homepage/content design and later Version 1 modules remain deferred to their approved tickets.
+The current `/` page remains infrastructure-only. The secure view foundation now also renders the Administrator layout, room-management pages, public room, availability, booking and payment pages, Administrator booking/payment/invoice pages, protected proof responses, and authenticated invoice printing. Final homepage/content design and later Version 1 modules remain deferred to their approved tickets.
 
 Run the genuine core test suite with:
 
@@ -105,11 +105,11 @@ composer test
 
 Version 1 uses hardened native PHP sessions. The approved local settings use a 30-minute inactivity timeout, a 12-hour absolute lifetime, `SameSite=Lax`, `HttpOnly`, `Path=/`, and a non-Secure cookie only for local HTTP development. Staging and production require HTTPS with `SESSION_SECURE_COOKIE=true`. Private session files are stored in `storage/sessions/`, outside the public document root.
 
-The session-backed CSRF token system is enforced through narrowly scoped middleware on implemented state-changing HTML and JSON routes, including Administrator authentication, room management, public booking submission, and Administrator booking-status actions. Session identifiers, cookie contents, session values, and CSRF tokens must never be logged.
+The session-backed CSRF token system is enforced through narrowly scoped middleware on implemented state-changing HTML and JSON routes, including Administrator authentication, room and payment-method management, public booking/payment submission, Administrator booking/payment decisions, and invoice issue. Session identifiers, cookie contents, session values, signed booking-access values, and CSRF tokens must never be logged.
 
 ## Database Foundation
 
-S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. Applied domain migrations now include Administrator authentication, rooms, amenities, room images, bookings, one-room snapshots, booking events, and the audit-log foundation. Migrations remain the executable schema source of truth.
+S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. Applied domain migrations now include Administrator authentication, rooms, amenities, room images, bookings, one-room snapshots, booking events, audit logs, payment methods, retained payment attempts, invoices, and invoice items. The Sprint 3 local database baseline is 16 applied migrations with zero pending. Migrations remain the executable schema source of truth.
 
 MariaDB 11.8 is the primary tested database engine. Connections use `utf8mb4`, `utf8mb4_unicode_ci`, UTC session time, native prepared statements, and a five-second timeout. Application display dates remain configured through `APP_TIMEZONE=Asia/Kathmandu`. HTTP bootstrap validates database settings but does not eagerly connect.
 
@@ -246,7 +246,18 @@ Sprint 1 automated baseline: **970 tests, 6088 assertions, 10 skipped, 0 failure
 
 Sprint 2 automated baseline: **1245 tests, 7597 assertions, 10 skipped, 0 failures**. See [Sprint 2 QA Closure Report](docs/41_Sprint_2_QA_Closure_Report.md).
 
-**Later phases** — Manual payments and invoices, remaining operations/content modules, notification delivery, dashboard completion, hardening, UAT, and production deployment remain unimplemented. Booking confirmation through verified payment is intentionally reserved for the later Payment Service slice.
+**Sprint 3 Phase 4 slice** — Manual Payments and Invoices is implemented and locally regression-tested:
+- Administrator-configured active/inactive manual payment methods
+- Public active-method reads and secure PHP/JSON Guest payment submission
+- Private JPEG/PNG/PDF proof storage with protected audited Administrator retrieval
+- Retained payment attempts, submitted-only verify/reject decisions, and duplicate-verification prevention
+- One coordinated transaction for payment verification and `pending -> confirmed` booking confirmation
+- Stable one-per-booking `TGH-INV-YYYY-NNNNNN` invoices with immutable NPR snapshots, `NPR 0.00` tax, no service charge, authenticated detail, and protected printing
+- Append-only payment, booking-confirmation, proof-access, and invoice-issue audit evidence
+
+Sprint 3 local automated baseline: **1558 tests, 9631 assertions, 11 skipped, 0 failures** with **16 applied migrations and 0 pending**. See [Sprint 3 QA Closure Report](docs/43_Sprint_3_QA_Closure_Report.md).
+
+**Later phases** — Remaining operations/content modules, notification delivery, dashboard completion, browser/UAT evidence, hardening, cPanel verification, and production deployment remain unimplemented or externally gated.
 
 ## Ownership
 
