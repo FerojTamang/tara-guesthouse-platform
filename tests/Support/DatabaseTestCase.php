@@ -69,6 +69,8 @@ abstract class DatabaseTestCase extends TestCase
     protected function cleanupApplicationTables(): void
     {
         $this->dropTables([
+            'pages',
+            'settings',
             'gallery',
             'gallery_categories',
             'activities',
