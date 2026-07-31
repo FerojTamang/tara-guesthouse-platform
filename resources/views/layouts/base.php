@@ -55,6 +55,7 @@
                         <li class="nav-item"><a class="nav-link" href="/activities">Activities</a></li>
                         <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="/availability">Availability</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/contact">Contact</a></li>
                         <?php foreach (($navigationPages ?? []) as $navigationPage): ?>
                             <li class="nav-item">
                                 <a class="nav-link" href="/<?= $e($navigationPage['slug']) ?>"><?= $e($navigationPage['title']) ?></a>

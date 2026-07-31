@@ -127,6 +127,15 @@
                 </li>
                 <li class="nav-item">
                     <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'contact-messages' ? ' active' : '' ?>"
+                        href="/admin/contact-messages"
+                        <?= $activeNavigation === 'contact-messages' ? 'aria-current="page"' : '' ?>
+                    >
+                        Contact messages
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
                         class="nav-link admin-navigation-link<?= $activeNavigation === 'settings' ? ' active' : '' ?>"
                         href="/admin/settings"
                         <?= $activeNavigation === 'settings' ? 'aria-current="page"' : '' ?>

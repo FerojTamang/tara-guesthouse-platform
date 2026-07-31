@@ -7,6 +7,7 @@ use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicCmsController;
+use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicRoomController;
 use App\Core\Request;
@@ -15,11 +16,13 @@ use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
 
 return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$dependencies): void {
     $publicActivities = null;
     $publicCms = null;
+    $publicContact = null;
     $publicGallery = null;
     $publicRooms = null;
     $publicAvailability = null;
@@ -28,12 +31,15 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
     $csrf = null;
     $publicBookingRateLimit = null;
     $publicPaymentRateLimit = null;
+    $publicContactRateLimit = null;
 
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof PublicActivityController) {
             $publicActivities ??= $dependency;
         } elseif ($dependency instanceof PublicCmsController) {
             $publicCms ??= $dependency;
+        } elseif ($dependency instanceof PublicContactController) {
+            $publicContact ??= $dependency;
         } elseif ($dependency instanceof PublicGalleryController) {
             $publicGallery ??= $dependency;
         } elseif ($dependency instanceof PublicRoomController) {
@@ -50,6 +56,8 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
             $publicBookingRateLimit ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentRateLimitMiddleware) {
             $publicPaymentRateLimit ??= $dependency;
+        } elseif ($dependency instanceof PublicContactRateLimitMiddleware) {
+            $publicContactRateLimit ??= $dependency;
         }
     }
 
@@ -114,6 +122,21 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
             [$csrf, $publicPaymentRateLimit->forWeb()],
         );
         $router->get('/booking/payment/success', $publicPayment->success(...));
+    }
+
+    if ($publicContact !== null) {
+        if ($csrf === null || $publicContactRateLimit === null) {
+            throw new \LogicException(
+                'Public contact pages require complete security dependencies.',
+            );
+        }
+
+        $router->get('/contact', $publicContact->page(...));
+        $router->post(
+            '/contact',
+            $publicContact->submit(...),
+            [$csrf, $publicContactRateLimit->forWeb()],
+        );
     }
 
     if ($publicCms !== null) {

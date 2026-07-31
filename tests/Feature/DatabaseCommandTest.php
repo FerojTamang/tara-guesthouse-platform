@@ -332,6 +332,7 @@ PHP);
 
         try {
             foreach ([
+                'contact_messages',
                 'pages',
                 'settings',
                 'gallery',

@@ -11,6 +11,7 @@ use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorCmsController;
+use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
@@ -25,6 +26,7 @@ use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
 use App\Controllers\PublicCmsController;
+use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicPaymentMethodController;
@@ -33,6 +35,7 @@ use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\ActivityRepository;
@@ -43,6 +46,7 @@ use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
+use App\Repositories\PdoContactMessageRepository;
 use App\Repositories\PdoInvoiceRepository;
 use App\Repositories\PdoPageRepository;
 use App\Repositories\PdoSettingRepository;
@@ -78,6 +82,9 @@ use App\Services\CmsPageContentPolicyProvider;
 use App\Services\CmsPageService;
 use App\Services\CmsSettingsService;
 use App\Services\CmsSettingsServiceProvider;
+use App\Services\ContactMessageService;
+use App\Services\ContactMessageServiceProvider;
+use App\Services\ContactSubmissionFlash;
 use App\Services\GuestPaymentAccessValidator;
 use App\Services\GuestPaymentContinuation;
 use App\Services\GuestPaymentPageService;
@@ -101,6 +108,7 @@ use App\Services\LazyCmsPageContentSanitizer;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoActivityTransaction;
 use App\Services\PdoCmsTransaction;
+use App\Services\PdoContactTransaction;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
 use App\Services\PaymentMethodFlashMessages;
@@ -123,6 +131,7 @@ use App\Services\PublicGalleryServiceProvider;
 use App\Services\PublicBookingRateLimiter;
 use App\Services\PublicCmsService;
 use App\Services\PublicCmsServiceProvider;
+use App\Services\PublicContactRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
 use App\Services\PublicPaymentRateLimiter;
@@ -190,6 +199,7 @@ final class Bootstrap
         $loginPolicy = $config->require('security.administrator_login');
         $publicBookingPolicy = $config->require('security.public_booking');
         $publicPaymentPolicy = $config->require('security.public_payment');
+        $publicContactPolicy = $config->require('security.public_contact');
         $bookingConfiguration = $config->require('booking');
 
         if (
@@ -197,6 +207,7 @@ final class Bootstrap
             || !is_array($loginPolicy)
             || !is_array($publicBookingPolicy)
             || !is_array($publicPaymentPolicy)
+            || !is_array($publicContactPolicy)
             || !is_array($bookingConfiguration)
         ) {
             throw new ConfigurationException('Application service configuration is invalid.');
@@ -405,6 +416,29 @@ final class Bootstrap
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
+        );
+        $contactServices = new ContactMessageServiceProvider(
+            static function () use ($catalogConnectionProvider): ContactMessageService {
+                $connection = $catalogConnectionProvider();
+
+                return new ContactMessageService(
+                    new PdoContactMessageRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoContactTransaction($connection),
+                );
+            },
+        );
+        $administratorContactController = new AdministratorContactController(
+            $viewRenderer,
+            $contactServices,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $publicContactController = new PublicContactController(
+            $viewRenderer,
+            $contactServices,
+            new ContactSubmissionFlash($session),
+            $csrfTokens,
         );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
@@ -662,6 +696,18 @@ final class Bootstrap
                 $publicPaymentPolicy,
             ),
         );
+        $publicContactRateLimit = new PublicContactRateLimitMiddleware(
+            new PublicContactRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'contact-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicContactPolicy,
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -682,9 +728,11 @@ final class Bootstrap
             $administratorActivityController,
             $administratorGalleryController,
             $administratorCmsController,
+            $administratorContactController,
             $publicActivityController,
             $publicGalleryController,
             $publicCmsController,
+            $publicContactController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -694,6 +742,7 @@ final class Bootstrap
             $publicPaymentController,
             $publicPaymentPageController,
             $publicPaymentRateLimit,
+            $publicContactRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -742,9 +791,11 @@ final class Bootstrap
         AdministratorActivityController $administratorActivityController,
         AdministratorGalleryController $administratorGalleryController,
         AdministratorCmsController $administratorCmsController,
+        AdministratorContactController $administratorContactController,
         PublicActivityController $publicActivityController,
         PublicGalleryController $publicGalleryController,
         PublicCmsController $publicCmsController,
+        PublicContactController $publicContactController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -754,6 +805,7 @@ final class Bootstrap
         PublicPaymentController $publicPaymentController,
         PublicPaymentPageController $publicPaymentPageController,
         PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
+        PublicContactRateLimitMiddleware $publicContactRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -787,9 +839,11 @@ final class Bootstrap
                 $administratorActivityController,
                 $administratorGalleryController,
                 $administratorCmsController,
+                $administratorContactController,
                 $publicActivityController,
                 $publicGalleryController,
                 $publicCmsController,
+                $publicContactController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,
@@ -799,6 +853,7 @@ final class Bootstrap
                 $publicPaymentController,
                 $publicPaymentPageController,
                 $publicPaymentRateLimit,
+                $publicContactRateLimit,
             );
         }
     }

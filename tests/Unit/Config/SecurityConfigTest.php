@@ -46,6 +46,10 @@ final class SecurityConfigTest extends TestCase
         unset($missingPublicPaymentKey['public_payment']['block_duration_seconds']);
         yield 'missing public payment key' => [$missingPublicPaymentKey];
 
+        $missingPublicContactKey = $valid;
+        unset($missingPublicContactKey['public_contact']['block_duration_seconds']);
+        yield 'missing public contact key' => [$missingPublicContactKey];
+
         $wrongBootstrapType = $valid;
         $wrongBootstrapType['administrator_bootstrap']['password_min_characters'] = '15';
         yield 'bootstrap numeric string' => [$wrongBootstrapType];
@@ -61,6 +65,10 @@ final class SecurityConfigTest extends TestCase
         $wrongPublicPaymentType = $valid;
         $wrongPublicPaymentType['public_payment']['max_attempts'] = '5';
         yield 'public payment numeric string' => [$wrongPublicPaymentType];
+
+        $wrongPublicContactType = $valid;
+        $wrongPublicContactType['public_contact']['max_attempts'] = '5';
+        yield 'public contact numeric string' => [$wrongPublicContactType];
 
         $invalidBootstrapRange = $valid;
         $invalidBootstrapRange['administrator_bootstrap']['full_name_min_characters'] = 101;
@@ -110,6 +118,16 @@ final class SecurityConfigTest extends TestCase
             $changedPublicPayment = $valid;
             $changedPublicPayment['public_payment'][$key] = $value;
             yield 'changed public payment ' . $key => [$changedPublicPayment];
+        }
+
+        foreach ([
+            'max_attempts' => 6,
+            'attempt_window_seconds' => 901,
+            'block_duration_seconds' => 899,
+        ] as $key => $value) {
+            $changedPublicContact = $valid;
+            $changedPublicContact['public_contact'][$key] = $value;
+            yield 'changed public contact ' . $key => [$changedPublicContact];
         }
     }
 
@@ -171,6 +189,11 @@ final class SecurityConfigTest extends TestCase
                 'block_duration_seconds' => 900,
             ],
             'public_payment' => [
+                'max_attempts' => 5,
+                'attempt_window_seconds' => 900,
+                'block_duration_seconds' => 900,
+            ],
+            'public_contact' => [
                 'max_attempts' => 5,
                 'attempt_window_seconds' => 900,
                 'block_duration_seconds' => 900,

@@ -410,6 +410,7 @@ final class AdministratorBootstrapCommandTest extends TestCase
 
         try {
             foreach ([
+                'contact_messages',
                 'pages',
                 'settings',
                 'gallery',

@@ -34,4 +34,9 @@ return [
         'attempt_window_seconds' => 900,
         'block_duration_seconds' => 900,
     ],
+    'public_contact' => [
+        'max_attempts' => 5,
+        'attempt_window_seconds' => 900,
+        'block_duration_seconds' => 900,
+    ],
 ];

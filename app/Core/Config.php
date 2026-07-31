@@ -156,6 +156,7 @@ final class Config
                 'administrator_login',
                 'public_booking',
                 'public_payment',
+                'public_contact',
             ]
         ) {
             throw new ConfigurationException('Security configuration is invalid.');
@@ -165,6 +166,7 @@ final class Config
         self::validateAdministratorLoginPolicy($configuration['administrator_login']);
         self::validatePublicBookingPolicy($configuration['public_booking']);
         self::validatePublicPaymentPolicy($configuration['public_payment']);
+        self::validatePublicContactPolicy($configuration['public_contact']);
 
         return $configuration;
     }
@@ -295,6 +297,19 @@ final class Config
     }
 
     private static function validatePublicPaymentPolicy(mixed $policy): void
+    {
+        $approved = [
+            'max_attempts' => 5,
+            'attempt_window_seconds' => 900,
+            'block_duration_seconds' => 900,
+        ];
+
+        if (!is_array($policy) || $policy !== $approved) {
+            throw new ConfigurationException('Security configuration is invalid.');
+        }
+    }
+
+    private static function validatePublicContactPolicy(mixed $policy): void
     {
         $approved = [
             'max_attempts' => 5,

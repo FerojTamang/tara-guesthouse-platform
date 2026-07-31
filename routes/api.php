@@ -6,6 +6,7 @@ use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorCmsController;
+use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
@@ -14,6 +15,7 @@ use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicCmsController;
+use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
 use App\Core\Router;
@@ -21,6 +23,7 @@ use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 
@@ -33,6 +36,7 @@ return static function (
     $administratorActivity = null;
     $administratorBooking = null;
     $administratorCms = null;
+    $administratorContact = null;
     $administratorGallery = null;
     $administratorInvoice = null;
     $administratorPayment = null;
@@ -44,10 +48,12 @@ return static function (
     $publicGallery = null;
     $publicBooking = null;
     $publicCms = null;
+    $publicContact = null;
     $publicPayment = null;
     $publicPaymentMethods = null;
     $publicBookingRateLimit = null;
     $publicPaymentRateLimit = null;
+    $publicContactRateLimit = null;
 
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof AdministratorActivityController) {
@@ -58,6 +64,8 @@ return static function (
             $administratorBooking ??= $dependency;
         } elseif ($dependency instanceof AdministratorCmsController) {
             $administratorCms ??= $dependency;
+        } elseif ($dependency instanceof AdministratorContactController) {
+            $administratorContact ??= $dependency;
         } elseif ($dependency instanceof AdministratorGalleryController) {
             $administratorGallery ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
@@ -80,6 +88,8 @@ return static function (
             $publicBooking ??= $dependency;
         } elseif ($dependency instanceof PublicCmsController) {
             $publicCms ??= $dependency;
+        } elseif ($dependency instanceof PublicContactController) {
+            $publicContact ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentController) {
             $publicPayment ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentMethodController) {
@@ -88,6 +98,8 @@ return static function (
             $publicBookingRateLimit ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentRateLimitMiddleware) {
             $publicPaymentRateLimit ??= $dependency;
+        } elseif ($dependency instanceof PublicContactRateLimitMiddleware) {
+            $publicContactRateLimit ??= $dependency;
         }
     }
 
@@ -101,6 +113,10 @@ return static function (
     ));
     $paymentDependencyCount = count(array_filter(
         [$publicPayment, $publicPaymentRateLimit],
+        static fn (object|null $dependency): bool => $dependency !== null,
+    ));
+    $contactDependencyCount = count(array_filter(
+        [$publicContact, $publicContactRateLimit],
         static fn (object|null $dependency): bool => $dependency !== null,
     ));
 
@@ -137,6 +153,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator CMS JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorContact !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator contact JSON routes require complete security dependencies.',
         );
     }
 
@@ -185,6 +210,15 @@ return static function (
         );
     }
 
+    if (
+        $contactDependencyCount !== 0
+        && ($contactDependencyCount !== 2 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Public contact routes require complete security dependencies.',
+        );
+    }
+
     if ($publicActivities !== null) {
         $router->get('/api/v1/activities', $publicActivities->index(...));
     }
@@ -214,6 +248,14 @@ return static function (
             '/api/v1/payments',
             $publicPayment->create(...),
             [$csrf->forJson(), $publicPaymentRateLimit],
+        );
+    }
+
+    if ($contactDependencyCount === 2) {
+        $router->post(
+            '/api/v1/contact',
+            [$publicContact, 'apiCreate'],
+            [$csrf->forJson(), $publicContactRateLimit],
         );
     }
 
@@ -336,6 +378,19 @@ return static function (
         $router->get('/api/v1/admin/pages/{id}', [$administratorCms, 'apiShowPage'], [$requireAdministrator->forJson()]);
         $router->put('/api/v1/admin/pages/{id}', [$administratorCms, 'apiUpdatePage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
         $router->patch('/api/v1/admin/pages/{id}/status', [$administratorCms, 'apiTransitionPage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+    }
+
+    if ($administratorContact !== null) {
+        $router->get(
+            '/api/v1/admin/contact-messages',
+            [$administratorContact, 'apiIndex'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->get(
+            '/api/v1/admin/contact-messages/{id}',
+            [$administratorContact, 'apiShow'],
+            [$requireAdministrator->forJson()],
+        );
     }
 
     if ($administratorBooking !== null) {
