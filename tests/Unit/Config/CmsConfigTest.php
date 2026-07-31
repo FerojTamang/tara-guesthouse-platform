@@ -22,5 +22,14 @@ final class CmsConfigTest extends TestCase
         self::assertStringContainsString('CMS_SETTING_DEFINITIONS_JSON=', (string) file_get_contents(
             dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . '.env.example',
         ));
+        self::assertSame(
+            ['policy_environment_key', 'supported_formats'],
+            array_keys($configuration['page_content']),
+        );
+        self::assertSame('CMS_PAGE_CONTENT_POLICY_JSON', $configuration['page_content']['policy_environment_key']);
+        self::assertSame(['plain_text'], $configuration['page_content']['supported_formats']);
+        self::assertStringContainsString('CMS_PAGE_CONTENT_POLICY_JSON=', (string) file_get_contents(
+            dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . '.env.example',
+        ));
     }
 }

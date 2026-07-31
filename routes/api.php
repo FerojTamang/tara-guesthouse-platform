@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
@@ -30,6 +31,7 @@ return static function (
     $controller = null;
     $administratorActivity = null;
     $administratorBooking = null;
+    $administratorCms = null;
     $administratorGallery = null;
     $administratorInvoice = null;
     $administratorPayment = null;
@@ -52,6 +54,8 @@ return static function (
             $controller ??= $dependency;
         } elseif ($dependency instanceof AdministratorBookingController) {
             $administratorBooking ??= $dependency;
+        } elseif ($dependency instanceof AdministratorCmsController) {
+            $administratorCms ??= $dependency;
         } elseif ($dependency instanceof AdministratorGalleryController) {
             $administratorGallery ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
@@ -120,6 +124,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator gallery JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorCms !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator CMS JSON routes require complete security dependencies.',
         );
     }
 
@@ -304,6 +317,16 @@ return static function (
             [$administratorGallery, 'apiDelete'],
             [$requireAdministrator->forJson(), $csrf->forJson()],
         );
+    }
+
+    if ($administratorCms !== null) {
+        $router->get('/api/v1/admin/settings', [$administratorCms, 'apiSettings'], [$requireAdministrator->forJson()]);
+        $router->put('/api/v1/admin/settings', [$administratorCms, 'apiUpdateSettings'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->get('/api/v1/admin/pages', [$administratorCms, 'apiPages'], [$requireAdministrator->forJson()]);
+        $router->post('/api/v1/admin/pages', [$administratorCms, 'apiCreatePage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->get('/api/v1/admin/pages/{id}', [$administratorCms, 'apiShowPage'], [$requireAdministrator->forJson()]);
+        $router->put('/api/v1/admin/pages/{id}', [$administratorCms, 'apiUpdatePage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->patch('/api/v1/admin/pages/{id}/status', [$administratorCms, 'apiTransitionPage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
     }
 
     if ($administratorBooking !== null) {

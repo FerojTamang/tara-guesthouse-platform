@@ -15,4 +15,10 @@ return [
             'json',
         ],
     ],
+    'page_content' => [
+        'policy_environment_key' => 'CMS_PAGE_CONTENT_POLICY_JSON',
+        'supported_formats' => [
+            'plain_text',
+        ],
+    ],
 ];

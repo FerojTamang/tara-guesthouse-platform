@@ -10,6 +10,7 @@ use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
@@ -42,6 +43,8 @@ use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\PdoInvoiceRepository;
+use App\Repositories\PdoPageRepository;
+use App\Repositories\PdoSettingRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PdoAdministratorPaymentRepository;
 use App\Repositories\PdoPaymentWriteRepository;
@@ -49,6 +52,7 @@ use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorActivityService;
+use App\Services\AdministratorCmsService;
 use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\ActivityManagementServiceProvider;
@@ -68,6 +72,11 @@ use App\Services\BookingSubmissionService;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
+use App\Services\CmsManagementServiceProvider;
+use App\Services\CmsPageContentPolicyProvider;
+use App\Services\CmsPageService;
+use App\Services\CmsSettingsService;
+use App\Services\CmsSettingsServiceProvider;
 use App\Services\GuestPaymentAccessValidator;
 use App\Services\GuestPaymentContinuation;
 use App\Services\GuestPaymentPageService;
@@ -87,8 +96,10 @@ use App\Services\AdministratorPaymentStatusService;
 use App\Services\AdministratorPaymentStatusServiceProvider;
 use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
+use App\Services\LazyCmsPageContentSanitizer;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoActivityTransaction;
+use App\Services\PdoCmsTransaction;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
 use App\Services\PaymentMethodFlashMessages;
@@ -101,6 +112,7 @@ use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
 use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
+use App\Services\SettingDefinitionRegistryProvider;
 use App\Services\PublicActivityService;
 use App\Services\PublicActivityServiceProvider;
 use App\Services\PublicAvailabilityService;
@@ -362,6 +374,35 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $settingDefinitions = new SettingDefinitionRegistryProvider($resolvedBasePath);
+        $pageContentPolicy = new CmsPageContentPolicyProvider($resolvedBasePath);
+        $administratorCmsController = new AdministratorCmsController(
+            $viewRenderer,
+            new CmsManagementServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $settingDefinitions,
+                    $pageContentPolicy,
+                ): AdministratorCmsService {
+                    $connection = $catalogConnectionProvider();
+                    return new AdministratorCmsService(
+                        new CmsSettingsServiceProvider(
+                            static fn (): CmsSettingsService => new CmsSettingsService(
+                                new PdoSettingRepository($connection),
+                                $settingDefinitions->registry(),
+                            ),
+                        ),
+                        new CmsPageService(new PdoPageRepository($connection)),
+                        new LazyCmsPageContentSanitizer($pageContentPolicy->sanitizer(...)),
+                        new PdoAuditLogRepository($connection),
+                        new PdoCmsTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
             new AdministratorPaymentServiceProvider(
@@ -609,6 +650,7 @@ final class Bootstrap
             $administratorInvoiceController,
             $administratorActivityController,
             $administratorGalleryController,
+            $administratorCmsController,
             $publicActivityController,
             $publicGalleryController,
             $publicRoomController,
@@ -667,6 +709,7 @@ final class Bootstrap
         AdministratorInvoiceController $administratorInvoiceController,
         AdministratorActivityController $administratorActivityController,
         AdministratorGalleryController $administratorGalleryController,
+        AdministratorCmsController $administratorCmsController,
         PublicActivityController $publicActivityController,
         PublicGalleryController $publicGalleryController,
         PublicRoomController $publicRoomController,
@@ -710,6 +753,7 @@ final class Bootstrap
                 $administratorInvoiceController,
                 $administratorActivityController,
                 $administratorGalleryController,
+                $administratorCmsController,
                 $publicActivityController,
                 $publicGalleryController,
                 $publicRoomController,

@@ -116,6 +116,24 @@
                         Gallery
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'pages' ? ' active' : '' ?>"
+                        href="/admin/pages"
+                        <?= $activeNavigation === 'pages' ? 'aria-current="page"' : '' ?>
+                    >
+                        Pages
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'settings' ? ' active' : '' ?>"
+                        href="/admin/settings"
+                        <?= $activeNavigation === 'settings' ? 'aria-current="page"' : '' ?>
+                    >
+                        Settings
+                    </a>
+                </li>
             </ul>
         </nav>
 
