@@ -332,6 +332,8 @@ PHP);
 
         try {
             foreach ([
+                'reviews',
+                'review_invitations',
                 'contact_messages',
                 'pages',
                 'settings',
