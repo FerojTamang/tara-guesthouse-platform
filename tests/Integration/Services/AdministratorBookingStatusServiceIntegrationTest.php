@@ -8,13 +8,25 @@ use App\Core\MigrationRunner;
 use App\Exceptions\BookingException;
 use App\Models\Booking;
 use App\Repositories\PdoAuditLogRepository;
+use App\Repositories\BookingRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
+use App\Repositories\PdoReviewInvitationRepository;
+use App\Repositories\PdoReviewRepository;
 use App\Requests\AdministratorBookingStatusRequest;
 use App\Services\AdministratorBookingStatusService;
+use App\Services\ReviewCheckoutInvitationCoordinator;
+use App\Services\ReviewInvitationDelivery;
+use App\Services\ReviewInvitationService;
+use App\Services\ReviewInvitationServiceProvider;
+use App\Services\ReviewTokenHasher;
 use App\Services\PdoBookingTransaction;
+use App\Services\PdoReviewTransaction;
 use DateTimeImmutable;
+use App\Models\IssuedReviewInvitation;
+use App\Models\ReviewInvitationPolicy;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\DatabaseTestCase;
+use Psr\Log\NullLogger;
 
 #[Group('database')]
 final class AdministratorBookingStatusServiceIntegrationTest extends DatabaseTestCase
@@ -121,6 +133,136 @@ final class AdministratorBookingStatusServiceIntegrationTest extends DatabaseTes
         self::assertSame('2026-08-01 12:30:00', $audit['created_at']);
     }
 
+    public function testCheckoutAndInvitationCommitTogetherBeforeDelivery(): void
+    {
+        $this->markBookingCheckedIn($this->bookingId);
+        $delivery = new IntegrationReviewInvitationDelivery($this->connection);
+        $service = $this->checkoutService($delivery);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        $result = $service->transition(
+            $this->bookingId,
+            $request,
+            $this->administratorId,
+            '203.0.113.41',
+            'Checkout integration agent',
+        );
+
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $result->toStatus());
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $this->connection->query(
+            'SELECT booking_status FROM bookings WHERE id = ' . $this->bookingId,
+        )->fetchColumn());
+        self::assertSame(1, $this->countRows('review_invitations'));
+        self::assertSame(1, $delivery->calls);
+        self::assertFalse($delivery->transactionWasActive);
+        self::assertInstanceOf(IssuedReviewInvitation::class, $delivery->invitation);
+        self::assertSame($this->bookingId, $delivery->invitation->invitation()->bookingId());
+        self::assertNotSame(
+            $delivery->invitation->token(),
+            $this->connection->query(
+                'SELECT token_hash FROM review_invitations WHERE booking_id = ' . $this->bookingId,
+            )->fetchColumn(),
+        );
+        self::assertSame(1, (int) $this->connection->query(
+            "SELECT COUNT(*) FROM audit_logs WHERE event_type = 'review_invitation_created'",
+        )->fetchColumn());
+    }
+
+    public function testPostCommitDeliveryFailurePreservesCheckoutAndInvitation(): void
+    {
+        $this->markBookingCheckedIn($this->bookingId);
+        $delivery = new IntegrationReviewInvitationDelivery($this->connection);
+        $delivery->failure = new \RuntimeException('private raw token delivery failure');
+        $service = $this->checkoutService($delivery);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        $result = $service->transition(
+            $this->bookingId,
+            $request,
+            $this->administratorId,
+            null,
+            null,
+        );
+
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $result->toStatus());
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $this->connection->query(
+            'SELECT booking_status FROM bookings WHERE id = ' . $this->bookingId,
+        )->fetchColumn());
+        self::assertSame(1, $this->countRows('review_invitations'));
+        self::assertSame(1, $delivery->calls);
+        self::assertFalse($delivery->transactionWasActive);
+    }
+
+    public function testExistingInvitationMakesCheckoutIdempotentWithoutSecondDelivery(): void
+    {
+        $this->markBookingCheckedIn($this->bookingId);
+        \Tests\Support\ReviewFixture::insertInvitation($this->connection, $this->bookingId);
+        $delivery = new IntegrationReviewInvitationDelivery($this->connection);
+        $service = $this->checkoutService($delivery);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        $result = $service->transition(
+            $this->bookingId,
+            $request,
+            $this->administratorId,
+            null,
+            null,
+        );
+
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $result->toStatus());
+        self::assertSame(1, $this->countRows('review_invitations'));
+        self::assertSame(0, $delivery->calls);
+    }
+
+    public function testInvitationPersistenceFailureRollsBackCheckout(): void
+    {
+        $this->markBookingCheckedIn($this->bookingId);
+        $otherBookingId = \Tests\Support\ReviewFixture::insertBooking($this->connection);
+        \Tests\Support\ReviewFixture::insertInvitation(
+            $this->connection,
+            $otherBookingId,
+            ['token_hash' => hash('sha256', str_repeat('ab', 32))],
+        );
+        $service = $this->checkoutService(new IntegrationReviewInvitationDelivery($this->connection));
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        try {
+            $service->transition(
+                $this->bookingId,
+                $request,
+                $this->administratorId,
+                null,
+                null,
+            );
+            self::fail('Invitation persistence failure did not roll back checkout.');
+        } catch (BookingException $exception) {
+            self::assertTrue($exception->isSystemFailure());
+        }
+
+        self::assertSame(Booking::STATUS_CHECKED_IN, $this->connection->query(
+            'SELECT booking_status FROM bookings WHERE id = ' . $this->bookingId,
+        )->fetchColumn());
+        self::assertNull($this->connection->query(
+            'SELECT checked_out_at FROM bookings WHERE id = ' . $this->bookingId,
+        )->fetchColumn());
+    }
+
     public function testForbiddenTransitionDoesNotMutateOrAppendHistory(): void
     {
         $request = AdministratorBookingStatusRequest::fromInput(
@@ -185,6 +327,45 @@ final class AdministratorBookingStatusServiceIntegrationTest extends DatabaseTes
             'SELECT rejected_at FROM bookings WHERE id = ' . $this->bookingId,
         )->fetchColumn());
         self::assertSame(1, $this->countRows('booking_events'));
+    }
+
+    private function checkoutService(ReviewInvitationDelivery $delivery): AdministratorBookingStatusService
+    {
+        $reviewServices = new ReviewInvitationServiceProvider(
+            fn (): ReviewInvitationService => new ReviewInvitationService(
+                new BookingRepository($this->connection),
+                new PdoReviewInvitationRepository($this->connection),
+                new PdoReviewRepository($this->connection),
+                new PdoAuditLogRepository($this->connection),
+                new PdoReviewTransaction($this->connection),
+                new ReviewTokenHasher(static fn (int $length): string => str_repeat("\xAB", $length)),
+                new ReviewInvitationPolicy(3600),
+                static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-01 12:30:00 UTC'),
+            ),
+        );
+
+        return new AdministratorBookingStatusService(
+            new PdoBookingStatusWriteRepository($this->connection),
+            new PdoAuditLogRepository($this->connection),
+            new PdoBookingTransaction($this->connection),
+            static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-01 12:30:00 UTC'),
+            new ReviewCheckoutInvitationCoordinator(
+                $reviewServices,
+                $delivery,
+                new NullLogger(),
+            ),
+        );
+    }
+
+    private function markBookingCheckedIn(int $bookingId): void
+    {
+        $this->connection->exec(
+            "UPDATE bookings SET booking_status = 'checked_in', "
+            . "confirmed_at = '2026-08-01 10:30:00', "
+            . "checked_in_at = '2026-08-01 11:00:00', "
+            . "checked_out_at = NULL, updated_at = '2026-08-01 11:00:00' "
+            . 'WHERE id = ' . $bookingId,
+        );
     }
 
     private function countRows(string $table): int
@@ -346,5 +527,28 @@ final class AdministratorBookingStatusServiceIntegrationTest extends DatabaseTes
             'to_status' => Booking::STATUS_PENDING,
             'created_at' => '2026-08-01 10:00:00',
         ]);
+    }
+}
+
+final class IntegrationReviewInvitationDelivery implements ReviewInvitationDelivery
+{
+    public int $calls = 0;
+    public bool $transactionWasActive = true;
+    public ?IssuedReviewInvitation $invitation = null;
+    public ?\RuntimeException $failure = null;
+
+    public function __construct(private readonly \PDO $connection)
+    {
+    }
+
+    public function deliver(IssuedReviewInvitation $invitation): void
+    {
+        $this->calls++;
+        $this->transactionWasActive = $this->connection->inTransaction();
+        $this->invitation = $invitation;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
     }
 }

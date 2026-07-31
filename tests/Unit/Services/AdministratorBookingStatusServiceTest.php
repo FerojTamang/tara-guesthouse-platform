@@ -8,11 +8,14 @@ use App\Exceptions\BookingException;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
 use App\Models\BookingStatusSnapshot;
+use App\Models\IssuedReviewInvitation;
+use App\Models\ReviewInvitation;
 use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\BookingStatusWriteRepository;
 use App\Requests\AdministratorBookingStatusRequest;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\BookingTransaction;
+use App\Services\CheckoutReviewInvitationCoordinator;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -117,6 +120,95 @@ final class AdministratorBookingStatusServiceTest extends TestCase
             null,
             'booking_checked_out',
         ];
+    }
+
+    public function testCheckoutCreatesInvitationBeforeCommitAndDeliversAfterCommit(): void
+    {
+        $bookings = new BookingStatusWriteRepositoryFake();
+        $bookings->current = new BookingStatusSnapshot(
+            31,
+            'TGH-2026-STATUS000000000001',
+            Booking::STATUS_CHECKED_IN,
+        );
+        $audit = new AuditLogWriteRepositoryFake();
+        $transaction = new BookingStatusTransactionFake();
+        $coordinator = new CheckoutReviewInvitationCoordinatorFake($transaction);
+        $coordinator->issued = self::issuedInvitation();
+        $service = self::service($bookings, $audit, $transaction, $coordinator);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        $result = $service->transition(31, $request, 91, '203.0.113.40', 'Checkout agent');
+
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $result->toStatus());
+        self::assertTrue($coordinator->transactionWasActiveDuringCreate);
+        self::assertFalse($coordinator->transactionWasActiveDuringDelivery);
+        self::assertSame(1, $coordinator->createCalls);
+        self::assertSame(1, $coordinator->deliveryCalls);
+        self::assertSame(1, $transaction->commitCalls);
+    }
+
+    public function testInvitationCreationFailureRollsBackCheckout(): void
+    {
+        $bookings = new BookingStatusWriteRepositoryFake();
+        $bookings->current = new BookingStatusSnapshot(
+            31,
+            'TGH-2026-STATUS000000000001',
+            Booking::STATUS_CHECKED_IN,
+        );
+        $audit = new AuditLogWriteRepositoryFake();
+        $transaction = new BookingStatusTransactionFake();
+        $coordinator = new CheckoutReviewInvitationCoordinatorFake($transaction);
+        $coordinator->createFailure = new RuntimeException('private invitation failure');
+        $service = self::service($bookings, $audit, $transaction, $coordinator);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        try {
+            $service->transition(31, $request, 91, null, null);
+            self::fail('Invitation failure did not fail checkout.');
+        } catch (BookingException $exception) {
+            self::assertTrue($exception->isSystemFailure());
+            self::assertStringNotContainsString('private', $exception->getMessage());
+        }
+
+        self::assertSame(0, $transaction->commitCalls);
+        self::assertSame(1, $transaction->rollBackCalls);
+        self::assertSame(0, $coordinator->deliveryCalls);
+    }
+
+    public function testPostCommitDeliveryFailurePreservesCheckout(): void
+    {
+        $bookings = new BookingStatusWriteRepositoryFake();
+        $bookings->current = new BookingStatusSnapshot(
+            31,
+            'TGH-2026-STATUS000000000001',
+            Booking::STATUS_CHECKED_IN,
+        );
+        $audit = new AuditLogWriteRepositoryFake();
+        $transaction = new BookingStatusTransactionFake();
+        $coordinator = new CheckoutReviewInvitationCoordinatorFake($transaction);
+        $coordinator->issued = self::issuedInvitation();
+        $coordinator->deliveryFailure = new RuntimeException('private raw token delivery failure');
+        $service = self::service($bookings, $audit, $transaction, $coordinator);
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CHECKED_OUT,
+            null,
+            false,
+        );
+
+        $result = $service->transition(31, $request, 91, null, null);
+
+        self::assertSame(Booking::STATUS_CHECKED_OUT, $result->toStatus());
+        self::assertSame(1, $transaction->commitCalls);
+        self::assertSame(0, $transaction->rollBackCalls);
+        self::assertSame(1, $coordinator->deliveryCalls);
     }
 
     #[DataProvider('forbiddenTransitions')]
@@ -276,6 +368,7 @@ final class AdministratorBookingStatusServiceTest extends TestCase
         BookingStatusWriteRepositoryFake $bookings,
         AuditLogWriteRepositoryFake $audit,
         BookingStatusTransactionFake $transaction,
+        ?CheckoutReviewInvitationCoordinator $reviewInvitations = null,
     ): AdministratorBookingStatusService {
         return new AdministratorBookingStatusService(
             $bookings,
@@ -284,7 +377,64 @@ final class AdministratorBookingStatusServiceTest extends TestCase
             static fn (): DateTimeImmutable => new DateTimeImmutable(
                 '2026-08-01 12:00:00 UTC',
             ),
+            $reviewInvitations,
         );
+    }
+
+    private static function issuedInvitation(): IssuedReviewInvitation
+    {
+        return new IssuedReviewInvitation(
+            new ReviewInvitation(
+                77,
+                31,
+                hash('sha256', str_repeat('ab', 32)),
+                new DateTimeImmutable('2026-08-08 12:00:00 UTC'),
+                null,
+                new DateTimeImmutable('2026-08-01 12:00:00 UTC'),
+            ),
+            str_repeat('ab', 32),
+        );
+    }
+}
+
+final class CheckoutReviewInvitationCoordinatorFake implements CheckoutReviewInvitationCoordinator
+{
+    public ?IssuedReviewInvitation $issued = null;
+    public ?RuntimeException $createFailure = null;
+    public ?RuntimeException $deliveryFailure = null;
+    public int $createCalls = 0;
+    public int $deliveryCalls = 0;
+    public bool $transactionWasActiveDuringCreate = false;
+    public bool $transactionWasActiveDuringDelivery = true;
+
+    public function __construct(private readonly BookingStatusTransactionFake $transaction)
+    {
+    }
+
+    public function createDuringCheckout(
+        int $bookingId,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ?IssuedReviewInvitation {
+        $this->createCalls++;
+        $this->transactionWasActiveDuringCreate = $this->transaction->active;
+
+        if ($this->createFailure !== null) {
+            throw $this->createFailure;
+        }
+
+        return $this->issued;
+    }
+
+    public function deliverAfterCommit(IssuedReviewInvitation $invitation): void
+    {
+        $this->deliveryCalls++;
+        $this->transactionWasActiveDuringDelivery = $this->transaction->active;
+
+        if ($this->deliveryFailure !== null) {
+            throw $this->deliveryFailure;
+        }
     }
 }
 

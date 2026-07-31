@@ -53,6 +53,8 @@ use App\Repositories\PdoSettingRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PdoAdministratorPaymentRepository;
 use App\Repositories\PdoPaymentWriteRepository;
+use App\Repositories\PdoReviewInvitationRepository;
+use App\Repositories\PdoReviewRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
@@ -66,6 +68,7 @@ use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
+use App\Services\NullReviewInvitationDelivery;
 use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
 use App\Services\BookingAccessToken;
@@ -111,6 +114,7 @@ use App\Services\PdoCmsTransaction;
 use App\Services\PdoContactTransaction;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
+use App\Services\PdoReviewTransaction;
 use App\Services\PaymentMethodFlashMessages;
 use App\Services\PaymentMethodManagementService;
 use App\Services\PaymentMethodManagementServiceProvider;
@@ -121,6 +125,11 @@ use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
 use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
+use App\Services\ReviewCheckoutInvitationCoordinator;
+use App\Services\ReviewInvitationPolicyProvider;
+use App\Services\ReviewInvitationService;
+use App\Services\ReviewInvitationServiceProvider;
+use App\Services\ReviewTokenHasher;
 use App\Services\SettingDefinitionRegistryProvider;
 use App\Services\PublicActivityService;
 use App\Services\PublicActivityServiceProvider;
@@ -323,13 +332,35 @@ final class Bootstrap
                 ),
             ),
             new AdministratorBookingStatusServiceProvider(
-                static function () use ($catalogConnectionProvider): AdministratorBookingStatusService {
+                static function () use (
+                    $catalogConnectionProvider,
+                    $logger,
+                    $resolvedBasePath,
+                ): AdministratorBookingStatusService {
                     $connection = $catalogConnectionProvider();
+                    $reviewPolicy = new ReviewInvitationPolicyProvider($resolvedBasePath);
+                    $reviewServices = new ReviewInvitationServiceProvider(
+                        static fn (): ReviewInvitationService => new ReviewInvitationService(
+                            new BookingRepository($connection),
+                            new PdoReviewInvitationRepository($connection),
+                            new PdoReviewRepository($connection),
+                            new PdoAuditLogRepository($connection),
+                            new PdoReviewTransaction($connection),
+                            new ReviewTokenHasher(),
+                            $reviewPolicy->policy(),
+                        ),
+                    );
 
                     return new AdministratorBookingStatusService(
                         new PdoBookingStatusWriteRepository($connection),
                         new PdoAuditLogRepository($connection),
                         new PdoBookingTransaction($connection),
+                        null,
+                        new ReviewCheckoutInvitationCoordinator(
+                            $reviewServices,
+                            new NullReviewInvitationDelivery(),
+                            $logger,
+                        ),
                     );
                 },
             ),

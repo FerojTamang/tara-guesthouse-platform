@@ -46,57 +46,132 @@ final readonly class ReviewInvitationService
         ?string $ipAddress,
         ?string $userAgent,
     ): IssuedReviewInvitation {
-        if ($bookingId <= 0 || $administratorId <= 0) {
-            throw ReviewException::failure();
-        }
+        $this->assertIdentifiers($bookingId, $administratorId);
 
-        return $this->transact(function () use (
+        $issued = $this->transact(fn (): ?IssuedReviewInvitation => $this->issue(
             $bookingId,
             $administratorId,
             $ipAddress,
             $userAgent,
-        ): IssuedReviewInvitation {
-            $booking = $this->bookings->findById($bookingId);
+            false,
+        ));
 
-            if (
-                !$booking instanceof Booking
-                || $booking->bookingStatus() !== Booking::STATUS_CHECKED_OUT
-                || $booking->isDeleted()
-            ) {
-                throw ReviewException::bookingNotEligible();
+        if (!$issued instanceof IssuedReviewInvitation) {
+            throw ReviewException::failure();
+        }
+
+        return $issued;
+    }
+
+    /**
+     * Creates one invitation within a transaction owned by the checkout workflow.
+     *
+     * A pre-existing invitation is an idempotent no-op because its raw token can
+     * never be reconstructed or exposed.
+     */
+    public function issueForBookingIfAbsentInCurrentTransaction(
+        int $bookingId,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ?IssuedReviewInvitation {
+        $this->assertIdentifiers($bookingId, $administratorId);
+        $this->requireExistingTransaction();
+
+        return $this->issue(
+            $bookingId,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+            true,
+        );
+    }
+
+    private function issue(
+        int $bookingId,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+        bool $allowExistingInvitation,
+    ): ?IssuedReviewInvitation {
+        $booking = $this->bookings->findById($bookingId);
+
+        if (
+            !$booking instanceof Booking
+            || $booking->bookingStatus() !== Booking::STATUS_CHECKED_OUT
+            || $booking->isDeleted()
+        ) {
+            throw ReviewException::bookingNotEligible();
+        }
+
+        if ($this->reviews->findByBookingId($bookingId) !== null) {
+            throw ReviewException::reviewConflict();
+        }
+
+        if ($this->invitations->findByBookingId($bookingId) !== null) {
+            if ($allowExistingInvitation) {
+                return null;
             }
 
-            if ($this->reviews->findByBookingId($bookingId) !== null) {
-                throw ReviewException::reviewConflict();
-            }
+            throw ReviewException::invitationConflict();
+        }
 
-            if ($this->invitations->findByBookingId($bookingId) !== null) {
-                throw ReviewException::invitationConflict();
-            }
+        $createdAt = $this->now();
+        $expiresAt = $this->policy->expiresAt($createdAt);
+        $token = $this->tokens->generate();
 
-            $createdAt = $this->now();
-            $expiresAt = $this->policy->expiresAt($createdAt);
-            $token = $this->tokens->generate();
+        try {
             $invitation = $this->invitations->create(
                 $bookingId,
                 $this->tokens->hash($token),
                 $expiresAt,
                 $createdAt,
             );
-            $this->auditLogs->append(new AuditLogEntry(
-                $administratorId,
-                'review_invitation_created',
-                'review_invitation',
-                $invitation->id(),
-                'Administrator created a verified-stay review invitation.',
-                $this->auditMetadata($bookingId, $invitation->expiresAt()),
-                $this->normalizeIpAddress($ipAddress),
-                $this->normalizeUserAgent($userAgent),
-                $createdAt,
-            ));
+        } catch (ReviewException $exception) {
+            if (
+                $allowExistingInvitation
+                && $exception->isConflict()
+                && $this->invitations->findByBookingId($bookingId) !== null
+            ) {
+                return null;
+            }
 
-            return new IssuedReviewInvitation($invitation, $token);
-        });
+            throw $exception;
+        }
+
+        $this->auditLogs->append(new AuditLogEntry(
+            $administratorId,
+            'review_invitation_created',
+            'review_invitation',
+            $invitation->id(),
+            'Administrator created a verified-stay review invitation.',
+            $this->auditMetadata($bookingId, $invitation->expiresAt()),
+            $this->normalizeIpAddress($ipAddress),
+            $this->normalizeUserAgent($userAgent),
+            $createdAt,
+        ));
+
+        return new IssuedReviewInvitation($invitation, $token);
+    }
+
+    private function assertIdentifiers(int $bookingId, int $administratorId): void
+    {
+        if ($bookingId <= 0 || $administratorId <= 0) {
+            throw ReviewException::failure();
+        }
+    }
+
+    private function requireExistingTransaction(): void
+    {
+        try {
+            if (!$this->transaction->inProgress()) {
+                throw ReviewException::failure();
+            }
+        } catch (ReviewException $exception) {
+            throw $exception;
+        } catch (Throwable $failure) {
+            throw ReviewException::failure($failure);
+        }
     }
 
     private function now(): DateTimeImmutable

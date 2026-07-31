@@ -178,6 +178,119 @@ final class ReviewInvitationServiceTest extends TestCase
         }
     }
 
+    public function testCurrentTransactionCreatesInvitationWithoutNestedTransaction(): void
+    {
+        $booking = $this->booking(Booking::STATUS_CHECKED_OUT);
+        $createdAt = new DateTimeImmutable('2026-08-01 00:00:00 UTC');
+        $rawToken = str_repeat('34', 32);
+        $hash = hash('sha256', $rawToken);
+        $stored = new ReviewInvitation(
+            12,
+            $booking->id(),
+            $hash,
+            new DateTimeImmutable('2026-08-01 01:00:00 UTC'),
+            null,
+            $createdAt,
+        );
+        $bookings = $this->createStub(BookingCatalogRepository::class);
+        $bookings->method('findById')->willReturn($booking);
+        $reviews = $this->createStub(ReviewRepository::class);
+        $reviews->method('findByBookingId')->willReturn(null);
+        $invitations = $this->createMock(ReviewInvitationRepository::class);
+        $invitations->expects(self::once())->method('findByBookingId')->willReturn(null);
+        $invitations->expects(self::once())->method('create')->willReturn($stored);
+        $audit = $this->createMock(AuditLogWriteRepository::class);
+        $audit->expects(self::once())->method('append');
+        $transaction = $this->createMock(ReviewTransaction::class);
+        $transaction->expects(self::once())->method('inProgress')->willReturn(true);
+        $transaction->expects(self::never())->method('begin');
+        $transaction->expects(self::never())->method('commit');
+        $transaction->expects(self::never())->method('rollBack');
+        $service = new ReviewInvitationService(
+            $bookings,
+            $invitations,
+            $reviews,
+            $audit,
+            $transaction,
+            new ReviewTokenHasher(static fn (int $length): string => str_repeat("\x34", $length)),
+            new ReviewInvitationPolicy(3600),
+            static fn (): DateTimeImmutable => $createdAt,
+        );
+
+        $issued = $service->issueForBookingIfAbsentInCurrentTransaction(
+            $booking->id(),
+            9,
+            null,
+            null,
+        );
+
+        self::assertInstanceOf(\App\Models\IssuedReviewInvitation::class, $issued);
+        self::assertSame($rawToken, $issued->token());
+        self::assertSame($stored, $issued->invitation());
+    }
+
+    public function testCurrentTransactionTreatsExistingInvitationAsIdempotentNoOp(): void
+    {
+        $booking = $this->booking(Booking::STATUS_CHECKED_OUT);
+        $existing = new ReviewInvitation(
+            14,
+            $booking->id(),
+            hash('sha256', 'existing'),
+            new DateTimeImmutable('2026-08-08 00:00:00 UTC'),
+            null,
+            new DateTimeImmutable('2026-08-01 00:00:00 UTC'),
+        );
+        $bookings = $this->createStub(BookingCatalogRepository::class);
+        $bookings->method('findById')->willReturn($booking);
+        $reviews = $this->createStub(ReviewRepository::class);
+        $reviews->method('findByBookingId')->willReturn(null);
+        $invitations = $this->createMock(ReviewInvitationRepository::class);
+        $invitations->expects(self::once())->method('findByBookingId')->willReturn($existing);
+        $invitations->expects(self::never())->method('create');
+        $audit = $this->createMock(AuditLogWriteRepository::class);
+        $audit->expects(self::never())->method('append');
+        $transaction = $this->createMock(ReviewTransaction::class);
+        $transaction->expects(self::once())->method('inProgress')->willReturn(true);
+        $service = new ReviewInvitationService(
+            $bookings,
+            $invitations,
+            $reviews,
+            $audit,
+            $transaction,
+            new ReviewTokenHasher(static fn (int $length): never => throw new RuntimeException('token generated')),
+            new ReviewInvitationPolicy(3600),
+        );
+
+        self::assertNull($service->issueForBookingIfAbsentInCurrentTransaction(
+            $booking->id(),
+            9,
+            null,
+            null,
+        ));
+    }
+
+    public function testCurrentTransactionEntryPointFailsClosedWithoutCallerTransaction(): void
+    {
+        $transaction = $this->createMock(ReviewTransaction::class);
+        $transaction->expects(self::once())->method('inProgress')->willReturn(false);
+        $service = new ReviewInvitationService(
+            $this->createStub(BookingCatalogRepository::class),
+            $this->createStub(ReviewInvitationRepository::class),
+            $this->createStub(ReviewRepository::class),
+            $this->createStub(AuditLogWriteRepository::class),
+            $transaction,
+            new ReviewTokenHasher(),
+            new ReviewInvitationPolicy(3600),
+        );
+
+        try {
+            $service->issueForBookingIfAbsentInCurrentTransaction(23, 9, null, null);
+            self::fail('A missing caller transaction was accepted.');
+        } catch (ReviewException $exception) {
+            self::assertTrue($exception->isSystemFailure());
+        }
+    }
+
     public function testAuditFailureRollsBackAndDoesNotExposeRawToken(): void
     {
         $booking = $this->booking(Booking::STATUS_CHECKED_OUT);
