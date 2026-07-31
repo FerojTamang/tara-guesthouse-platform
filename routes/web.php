@@ -6,6 +6,7 @@ use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicCmsController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicRoomController;
 use App\Core\Request;
@@ -18,6 +19,7 @@ use App\Middleware\PublicPaymentRateLimitMiddleware;
 
 return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$dependencies): void {
     $publicActivities = null;
+    $publicCms = null;
     $publicGallery = null;
     $publicRooms = null;
     $publicAvailability = null;
@@ -30,6 +32,8 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof PublicActivityController) {
             $publicActivities ??= $dependency;
+        } elseif ($dependency instanceof PublicCmsController) {
+            $publicCms ??= $dependency;
         } elseif ($dependency instanceof PublicGalleryController) {
             $publicGallery ??= $dependency;
         } elseif ($dependency instanceof PublicRoomController) {
@@ -49,15 +53,19 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
         }
     }
 
-    $router->get('/', static function (Request $request, array $parameters) use ($viewRenderer): Response {
-        $html = $viewRenderer->render(
-            'infrastructure.welcome',
-            ['title' => 'Tara Guest House Application'],
-            'layouts.base',
-        );
+    if ($publicCms !== null) {
+        $router->get('/', $publicCms->home(...));
+    } else {
+        $router->get('/', static function (Request $request, array $parameters) use ($viewRenderer): Response {
+            $html = $viewRenderer->render(
+                'infrastructure.welcome',
+                ['title' => 'Tara Guest House Application'],
+                'layouts.base',
+            );
 
-        return Response::html($html);
-    });
+            return Response::html($html);
+        });
+    }
 
     if ($publicActivities !== null) {
         $router->get('/activities', $publicActivities->page(...));
@@ -106,5 +114,9 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
             [$csrf, $publicPaymentRateLimit->forWeb()],
         );
         $router->get('/booking/payment/success', $publicPayment->success(...));
+    }
+
+    if ($publicCms !== null) {
+        $router->get('/{slug}', $publicCms->page(...));
     }
 };

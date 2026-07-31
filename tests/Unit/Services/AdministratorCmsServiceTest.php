@@ -191,6 +191,7 @@ final class CmsPageRepositoryFake implements PageRepository
     public function findBySlug(string $slug): ?CmsPage { foreach ($this->pages as $page) if ($page->slug() === $slug) return $page; return null; }
     public function findPublishedBySlug(string $slug): ?CmsPage { $page = $this->findBySlug($slug); return $page?->isPublished() ? $page : null; }
     public function findAll(): array { return array_values($this->pages); }
+    public function findAllPublished(): array { return array_values(array_filter($this->pages, static fn (CmsPage $page): bool => $page->isPublished())); }
 
     public function createDraft(string $title, string $slug, string $content, ?string $metaTitle, ?string $metaDescription, int $actorId): CmsPage
     {

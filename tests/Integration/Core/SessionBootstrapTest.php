@@ -154,9 +154,9 @@ final class SessionBootstrapTest extends TestCase
         self::assertSame('/', $cookie['path']);
         self::assertSame('', $cookie['domain']);
 
-        $response = $application->handle(Request::create('GET', '/'));
+        $response = $application->handle(Request::create('GET', '/__session-bootstrap/close'));
 
-        self::assertSame(200, $response->statusCode());
+        self::assertSame(404, $response->statusCode());
         self::assertSame(PHP_SESSION_NONE, session_status());
 
         $configuration = Config::load(CONFIG_PATH, \App\Core\Environment::load($this->basePath));
@@ -193,7 +193,7 @@ final class SessionBootstrapTest extends TestCase
 
         self::assertTrue(session_get_cookie_params()['secure']);
 
-        $application->handle(Request::create('GET', '/'));
+        $application->handle(Request::create('GET', '/__session-bootstrap/close'));
         self::assertSame(PHP_SESSION_NONE, session_status());
     }
 

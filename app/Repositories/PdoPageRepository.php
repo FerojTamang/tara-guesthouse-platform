@@ -49,27 +49,14 @@ final class PdoPageRepository implements PageRepository
 
     public function findAll(): array
     {
-        try {
-            $statement = $this->connection->prepare(self::SELECT . ' ORDER BY title ASC, id ASC');
-            $statement->execute();
-            $rows = $statement->fetchAll();
+        return $this->listing(self::SELECT . ' ORDER BY title ASC, id ASC');
+    }
 
-            if (!is_array($rows)) {
-                throw new RuntimeException('The page records could not be mapped.');
-            }
-
-            $pages = [];
-            foreach ($rows as $row) {
-                if (!is_array($row)) {
-                    throw new RuntimeException('The page records could not be mapped.');
-                }
-                $pages[] = $this->map($row);
-            }
-
-            return $pages;
-        } catch (Throwable) {
-            throw new DatabaseException('The page listing failed.');
-        }
+    public function findAllPublished(): array
+    {
+        return $this->listing(
+            self::SELECT . " WHERE status = 'published' ORDER BY title ASC, id ASC",
+        );
     }
 
     public function createDraft(
@@ -182,6 +169,32 @@ final class PdoPageRepository implements PageRepository
             return $this->findById($id);
         } catch (Throwable) {
             throw new DatabaseException('The page status update failed.');
+        }
+    }
+
+    /** @return list<CmsPage> */
+    private function listing(string $sql): array
+    {
+        try {
+            $statement = $this->connection->prepare($sql);
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The page records could not be mapped.');
+            }
+
+            $pages = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The page records could not be mapped.');
+                }
+                $pages[] = $this->map($row);
+            }
+
+            return $pages;
+        } catch (Throwable) {
+            throw new DatabaseException('The page listing failed.');
         }
     }
 

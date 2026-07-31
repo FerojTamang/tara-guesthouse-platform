@@ -17,6 +17,9 @@ interface PageRepository
     /** @return list<CmsPage> */
     public function findAll(): array;
 
+    /** @return list<CmsPage> */
+    public function findAllPublished(): array;
+
     public function createDraft(
         string $title,
         string $slug,

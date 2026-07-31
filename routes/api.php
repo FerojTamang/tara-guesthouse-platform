@@ -13,6 +13,7 @@ use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
+use App\Controllers\PublicCmsController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
 use App\Core\Router;
@@ -42,6 +43,7 @@ return static function (
     $publicAvailability = null;
     $publicGallery = null;
     $publicBooking = null;
+    $publicCms = null;
     $publicPayment = null;
     $publicPaymentMethods = null;
     $publicBookingRateLimit = null;
@@ -76,6 +78,8 @@ return static function (
             $publicGallery ??= $dependency;
         } elseif ($dependency instanceof PublicBookingController) {
             $publicBooking ??= $dependency;
+        } elseif ($dependency instanceof PublicCmsController) {
+            $publicCms ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentController) {
             $publicPayment ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentMethodController) {
@@ -211,6 +215,11 @@ return static function (
             $publicPayment->create(...),
             [$csrf->forJson(), $publicPaymentRateLimit],
         );
+    }
+
+    if ($publicCms !== null) {
+        $router->get('/api/v1/pages/{slug}', [$publicCms, 'apiPage']);
+        $router->get('/api/v1/settings/public', [$publicCms, 'apiSettings']);
     }
 
     if ($administratorDependencyCount === 0) {

@@ -104,6 +104,38 @@ final class PageRepositoryTest extends DatabaseTestCase
         self::assertSame(1, (int) $this->connection->query('SELECT COUNT(*) FROM pages')->fetchColumn());
     }
 
+    public function testPublishedListingExcludesDraftAndArchivedPagesInStableOrder(): void
+    {
+        CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Zulu Published',
+            'slug' => 'zulu-published',
+            'status' => CmsPage::PUBLISHED,
+            'published_at' => '2026-07-31 01:00:00',
+        ]);
+        CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Alpha Published',
+            'slug' => 'alpha-published',
+            'status' => CmsPage::PUBLISHED,
+            'published_at' => '2026-07-31 01:00:00',
+        ]);
+        CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Draft Page',
+            'slug' => 'draft-page',
+            'status' => CmsPage::DRAFT,
+        ]);
+        CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Archived Page',
+            'slug' => 'archived-page',
+            'status' => CmsPage::ARCHIVED,
+            'published_at' => '2026-07-31 01:00:00',
+        ]);
+
+        self::assertSame(
+            ['alpha-published', 'zulu-published'],
+            array_map(static fn (CmsPage $page): string => $page->slug(), $this->repository->findAllPublished()),
+        );
+    }
+
     public function testDuplicateSlugsReturnSafeConflict(): void
     {
         $this->repository->createDraft('About', 'about', 'Body.', null, null, $this->actorId);

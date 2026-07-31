@@ -24,6 +24,7 @@ use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicCmsController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicPaymentMethodController;
@@ -120,6 +121,8 @@ use App\Services\PublicAvailabilityServiceProvider;
 use App\Services\PublicGalleryService;
 use App\Services\PublicGalleryServiceProvider;
 use App\Services\PublicBookingRateLimiter;
+use App\Services\PublicCmsService;
+use App\Services\PublicCmsServiceProvider;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
 use App\Services\PublicPaymentRateLimiter;
@@ -449,28 +452,56 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $publicActivityServices = new PublicActivityServiceProvider(
+            static fn (): PublicActivityService => new PublicActivityService(
+                new ActivityRepository($catalogConnectionProvider()),
+            ),
+        );
         $publicActivityController = new PublicActivityController(
             $viewRenderer,
-            new PublicActivityServiceProvider(
-                static fn (): PublicActivityService => new PublicActivityService(
-                    new ActivityRepository($catalogConnectionProvider()),
-                ),
+            $publicActivityServices,
+        );
+        $publicGalleryServices = new PublicGalleryServiceProvider(
+            static fn (): PublicGalleryService => new PublicGalleryService(
+                new GalleryRepository($catalogConnectionProvider()),
+                new LazyGalleryImageReader($galleryImageStorage->reader(...)),
             ),
         );
         $publicGalleryController = new PublicGalleryController(
             $viewRenderer,
-            new PublicGalleryServiceProvider(
-                static fn (): PublicGalleryService => new PublicGalleryService(
-                    new GalleryRepository($catalogConnectionProvider()),
-                    new LazyGalleryImageReader($galleryImageStorage->reader(...)),
-                ),
+            $publicGalleryServices,
+        );
+        $publicRoomServices = new PublicRoomCatalogServiceProvider(
+            static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()),
+                new RoomImageRepository($catalogConnectionProvider()),
+                new RoomImageUrl(),
             ),
         );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
-            new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
-                new RoomRepository($catalogConnectionProvider()), new RoomImageRepository($catalogConnectionProvider()), new RoomImageUrl(),
-            ),
+            $publicRoomServices,
+        );
+        $applicationName = $config->require('app.name');
+        $applicationUrl = $config->get('app.url');
+
+        if (!is_string($applicationName) || ($applicationUrl !== null && !is_string($applicationUrl))) {
+            throw new ConfigurationException('Public content configuration is invalid.');
+        }
+
+        $publicCmsController = new PublicCmsController(
+            $viewRenderer,
+            new PublicCmsServiceProvider(
+                static fn (): PublicCmsService => new PublicCmsService(
+                    new PdoPageRepository($catalogConnectionProvider()),
+                    new PdoSettingRepository($catalogConnectionProvider()),
+                    $settingDefinitions->registry(...),
+                    $publicRoomServices->service(),
+                    $publicActivityServices->service(),
+                    $publicGalleryServices->service(),
+                    $applicationName,
+                    $applicationUrl,
+                ),
             ),
         );
         $publicAvailabilityController = new PublicAvailabilityController(
@@ -653,6 +684,7 @@ final class Bootstrap
             $administratorCmsController,
             $publicActivityController,
             $publicGalleryController,
+            $publicCmsController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -712,6 +744,7 @@ final class Bootstrap
         AdministratorCmsController $administratorCmsController,
         PublicActivityController $publicActivityController,
         PublicGalleryController $publicGalleryController,
+        PublicCmsController $publicCmsController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -756,6 +789,7 @@ final class Bootstrap
                 $administratorCmsController,
                 $publicActivityController,
                 $publicGalleryController,
+                $publicCmsController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,
