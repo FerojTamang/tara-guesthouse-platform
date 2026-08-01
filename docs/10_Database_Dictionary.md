@@ -6,8 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.2 |
-| Status | Synchronized — Review Required |
+| Version | 1.3 |
+| Status | Implemented through Sprint 4 — Review Required |
 | Authority | `00_V1_ARCHITECT_DECISIONS.md` |
 | Executable source of truth | Database migrations |
 
@@ -36,7 +36,7 @@ Available, reserved, and occupied are calculated room conditions. They are not s
 
 | Module | Tables |
 |---|---|
-| Authentication | `roles`, `users`, `password_resets` |
+| Authentication | `roles`, `users` |
 | Rooms | `room_types`, `rooms`, `room_images`, `amenities`, `room_amenities` |
 | Bookings | `bookings`, `booking_rooms`, `booking_events` |
 | Payments/invoices | `payment_methods`, `payments`, `invoices`, `invoice_items` |
@@ -79,16 +79,9 @@ Stores authenticated Administrator staff accounts. It does not store public Gues
 | `updated_at` | DATETIME | No | Updated timestamp |
 | `deleted_at` | DATETIME | Yes | Soft-delete timestamp |
 
-## 4.3 `password_resets`
+## 4.3 Deferred staff password-reset storage
 
-| Column | Type | Null | Description |
-|---|---|---|---|
-| `id` | BIGINT UNSIGNED | No | Primary key |
-| `user_id` | BIGINT UNSIGNED | No | FK to Administrator `users` record |
-| `token_hash` | VARCHAR(255) | No | Unique reset-token hash; raw token is never stored |
-| `expires_at` | DATETIME | No | Expiry timestamp |
-| `used_at` | DATETIME | Yes | Single-use marker |
-| `created_at` | DATETIME | No | Created timestamp |
+No `password_resets` table exists in the 25 executable migrations. Any later Administrator password-reset workflow requires a separately approved migration and route contract and must store only a token hash, expiry, and single-use evidence.
 
 # 5. Room Tables
 
@@ -283,7 +276,7 @@ A booking has zero or more payment rows.
 | `invoice_number` | VARCHAR(50) | No | Unique stable number |
 | `currency` | CHAR(3) | No | `NPR` |
 | `subtotal` | DECIMAL(12,2) | No | Snapshot |
-| `tax_amount` | DECIMAL(12,2) | No | Exactly `0.00` in Sprint 3 |
+| `tax_amount` | DECIMAL(12,2) | No | Exactly `0.00` in the implemented Version 1 invoice contract |
 | `total_amount` | DECIMAL(12,2) | No | `subtotal + tax_amount`; no service charge |
 | `issued_at` | DATETIME | No | Issue timestamp |
 | `created_by` | BIGINT UNSIGNED | No | FK to Administrator `users` |
@@ -305,23 +298,64 @@ A booking has zero or more payment rows.
 
 ## 8.1 `activities`
 
-Required fields include `id`, `title`, unique `slug`, `description`, fixed-precision `price` where applicable, `is_active`, `is_published`, `sort_order`, `created_at`, and `updated_at`.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `title` | VARCHAR(200) | No | Trimmed display title |
+| `slug` | VARCHAR(200) | No | Unique lowercase slug |
+| `description` | TEXT | No | Trimmed public description |
+| `price` | DECIMAL(12,2) | No | Non-negative NPR amount |
+| `is_active` | TINYINT(1) | No | Operational control |
+| `is_published` | TINYINT(1) | No | Public visibility control |
+| `sort_order` | INT UNSIGNED | No | Deterministic order; default 0 |
+| `created_at` | DATETIME | No | Created timestamp |
+| `updated_at` | DATETIME | No | Updated timestamp |
 
-Activity categories, images, featured flag, duration, meeting point and maximum participants are not Version 1 fields/tables. They require a future synchronized decision.
+Activity categories, images, featured flag, duration, meeting point and maximum participants are not Version 1 fields/tables.
 
 ## 8.2 `gallery_categories`
 
-Required fields include `id`, unique `name`, unique `slug`, `is_active`, `created_at`, and `updated_at`.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `name` | VARCHAR(150) | No | Unique trimmed category name |
+| `slug` | VARCHAR(200) | No | Unique lowercase slug |
+| `is_active` | TINYINT(1) | No | Category eligibility control |
+| `created_at` | DATETIME | No | Created timestamp |
+| `updated_at` | DATETIME | No | Updated timestamp |
 
 ## 8.3 `gallery`
 
-Required fields include `id`, nullable `gallery_category_id`, `title`, `caption`, `file_path`, `alt_text`, `sort_order`, `is_active`, `is_published`, `created_at`, and `updated_at`.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `gallery_category_id` | BIGINT UNSIGNED | Yes | Nullable FK; category deletion sets null |
+| `title` | VARCHAR(200) | No | Trimmed display title |
+| `caption` | TEXT | Yes | Optional trimmed caption |
+| `file_path` | VARCHAR(500) | No | Server-controlled safe relative private path |
+| `alt_text` | VARCHAR(500) | No | Accessible alternative text |
+| `sort_order` | INT UNSIGNED | No | Deterministic order; default 0 |
+| `is_active` | TINYINT(1) | No | Operational control |
+| `is_published` | TINYINT(1) | No | Public visibility control |
+| `created_at` | DATETIME | No | Created timestamp |
+| `updated_at` | DATETIME | No | Updated timestamp |
 
 There is no `media_files` dependency. Featured, uploaded-by, soft-delete and generated-image fields are not part of Version 1; removal uses active/publication controls and audit history.
 
 ## 8.4 `settings`
 
-Required fields include `id`, unique `setting_key`, `setting_value`, `value_type`, `is_public`, `updated_by`, `created_at`, and `updated_at`. Settings store site-wide configuration, not structured pages.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `setting_key` | VARCHAR(150) | No | Unique dotted lower-case key; application allowlist required |
+| `setting_value` | LONGTEXT | No | Typed value stored after validation |
+| `value_type` | VARCHAR(30) | No | `string`, `integer`, `boolean`, `email`, `url`, `relative_path`, or `json` |
+| `is_public` | TINYINT(1) | No | Public API eligibility |
+| `updated_by` | BIGINT UNSIGNED | No | FK to Administrator `users` |
+| `created_at` | DATETIME | No | Created timestamp |
+| `updated_at` | DATETIME | No | Updated timestamp |
+
+Settings store allowlisted site-wide configuration, not arbitrary secrets or structured pages.
 
 ## 8.5 `pages`
 
@@ -330,17 +364,17 @@ Required fields include `id`, unique `setting_key`, `setting_value`, `value_type
 | `id` | BIGINT UNSIGNED | No | Primary key |
 | `title` | VARCHAR(200) | No | Page title |
 | `slug` | VARCHAR(200) | No | Unique public slug |
-| `content` | LONGTEXT | No | Structured page body |
+| `content` | LONGTEXT | No | Policy-validated page body |
 | `meta_title` | VARCHAR(255) | Yes | SEO title |
 | `meta_description` | VARCHAR(500) | Yes | SEO description |
 | `status` | VARCHAR(20) | No | `draft`, `published`, `archived` |
-| `published_at` | DATETIME | Yes | Publication timestamp |
+| `published_at` | DATETIME | Yes | Required when published |
 | `created_by` | BIGINT UNSIGNED | No | FK to Administrator `users` |
 | `updated_by` | BIGINT UNSIGNED | No | FK to Administrator `users` |
 | `created_at` | DATETIME | No | Created timestamp |
 | `updated_at` | DATETIME | No | Updated timestamp |
 
-Full page version history and rollback are future enhancements.
+Full page version history, scheduling, deletion and rollback are future enhancements.
 
 # 9. Review Tables
 
@@ -350,7 +384,7 @@ Full page version history and rollback are future enhancements.
 |---|---|---|---|
 | `id` | BIGINT UNSIGNED | No | Primary key |
 | `booking_id` | BIGINT UNSIGNED | No | Unique FK to a `checked_out` booking |
-| `token_hash` | VARCHAR(255) | No | Unique secure token hash |
+| `token_hash` | VARCHAR(255) | No | Unique 64-character lowercase SHA-256 token hash |
 | `expires_at` | DATETIME | No | Expiry; value requires approved policy |
 | `used_at` | DATETIME | Yes | Single-use marker |
 | `created_at` | DATETIME | No | Created timestamp |
@@ -379,11 +413,35 @@ Service validation requires `bookings.booking_status = checked_out` and one revi
 
 ## 10.1 `contact_messages`
 
-Required fields include `id`, `name`, `email`, `phone`, `subject`, `message`, `status`, `created_at`, and `updated_at`. Retention, assignment, and SLA values remain **Architect/Client Confirmation Required**.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `name` | VARCHAR(100) | No | Trimmed sender name |
+| `email` | VARCHAR(150) | No | Validated sender email |
+| `phone` | VARCHAR(20) | Yes | Optional sender phone |
+| `subject` | VARCHAR(200) | No | Trimmed subject |
+| `message` | TEXT | No | Retained message body |
+| `status` | VARCHAR(40) | Yes | Null until an approved workflow vocabulary exists |
+| `created_at` | DATETIME | No | Submission timestamp |
+| `updated_at` | DATETIME | No | Updated timestamp |
+
+Sprint 4 provides public create and Administrator read-only list/detail. Retention, assignment, SLA and status mutation remain **Architect/Client Confirmation Required**.
 
 ## 10.2 `notifications`
 
-Stores in-app Administrator notifications with `id`, `user_id`, `type`, `title`, `message`, optional `related_type`/`related_id`, `read_at`, and `created_at`. Guest transactional communication is SMTP email, not a customer notification inbox in Version 1.
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `id` | BIGINT UNSIGNED | No | Primary key |
+| `user_id` | BIGINT UNSIGNED | No | Owning Administrator FK to `users` |
+| `type` | VARCHAR(50) | No | Lowercase event type |
+| `title` | VARCHAR(150) | No | Trimmed display title |
+| `message` | TEXT | No | Trimmed display message |
+| `related_type` | VARCHAR(50) | Yes | Optional lowercase related entity type |
+| `related_id` | BIGINT UNSIGNED | Yes | Optional positive related entity identifier |
+| `read_at` | DATETIME | Yes | Owner-scoped read timestamp |
+| `created_at` | DATETIME | No | Creation timestamp |
+
+Guests have no notification ownership or inbox in Version 1. Records are retained; no delete/archive route is registered.
 
 ## 10.3 `audit_logs`
 

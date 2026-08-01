@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Implemented and QA synchronized in Sprint 4 — Review Required
 * Scope: Version 1 gallery categories, images and publication
 
 ## 1. Purpose and Actors

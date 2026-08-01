@@ -9,11 +9,11 @@
 | **Project** | Tara Guest House Management System |
 | **Document** | Developer Guide |
 | **Document No.** | 29 |
-| **Version** | 1.0 |
-| **Status** | Synchronized — Review Required |
+| **Version** | 1.1 |
+| **Status** | Sprint 4 synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
-| **Date** | July 2026 |
+| **Date** | 1 August 2026 |
 
 ---
 
@@ -46,11 +46,12 @@ The application provides:
 - Booking Management
 - Payment Management
 - Invoice Management
-- Gallery Management
-- Review Management
-- Notification Management
-- Reporting
-- CMS Management
+- Activities and Gallery Management
+- Contact and CMS Management
+- Verified-Stay Review Management
+- Administrator Notification Management
+- Transactional SMTP Email
+- Audit Evidence
 
 The system is designed to be maintainable, scalable, secure, and reusable for future hospitality projects.
 
@@ -360,14 +361,15 @@ updated_at
 
 # 12. API Development Standards
 
-All APIs must follow REST principles.
+All registered JSON routes are same-origin `/api/v1/...` contracts. Page/form routes remain PHP-rendered and must not be invented as JSON APIs.
 
 ## Example
 
 ```http
-GET    /api/v1/rooms
+GET    /api/v1/availability
+GET    /api/v1/activities
 POST   /api/v1/bookings
-GET    /api/v1/admin/bookings/{id}
+GET    /api/v1/admin/notifications
 PATCH  /api/v1/admin/bookings/{id}/status
 ```
 
@@ -478,21 +480,24 @@ The backend is developed using PHP 8.3 and MariaDB.
 ## Request Flow
 
 ```text
-Request
-   │
-   ▼
+Route
+  │
+  ▼
+Middleware
+  │
+  ▼
 Controller
-   │
-   ▼
+  │
+  ▼
+Request Validation
+  │
+  ▼
 Service
-   │
-   ▼
+  │
+  ▼
 Repository
-   │
-   ▼
-Model
-   │
-   ▼
+  │
+  ▼
 Database
 ```
 
@@ -560,8 +565,8 @@ storage/logs/
 
 ## Logging Rules
 
-- Never log passwords.
-- Never log sensitive information.
+- Never log passwords, SMTP credentials, session identifiers, CSRF values, signed booking tokens, raw review tokens, private upload paths, or message payloads.
+- Log fixed event/entity identifiers and generic failure context only.
 - Include timestamps.
 - Include severity levels.
 
@@ -670,6 +675,19 @@ Deployment
 - Verify documentation.
 - Verify migrations.
 - Verify deployment scripts.
+
+## Sprint 4 local setup and policy gates
+
+1. Install Composer dependencies and copy `.env.example` to `.env`.
+2. Configure distinct development and `_test`/`_testing` databases.
+3. Generate private `APP_KEY` and `BOOKING_ACCESS_TOKEN_KEY` values; never commit them.
+4. Run `composer database:migrate` and confirm 25 applied migrations with 0 pending.
+5. Leave `MAIL_HOST` blank only in local/testing when email delivery is intentionally disabled. Staging/production require complete TLS/SSL SMTP configuration.
+6. Supply gallery upload, CMS setting/page, review invitation lifetime, and moderation-note values only from approved policy; blank decision gates fail closed.
+7. Start the local server with `php -S 127.0.0.1:8080 -t public public/index.php`.
+8. Run the smallest affected PHPUnit test first, then the focused suite, then `composer test` once before commit.
+
+The Sprint 4 implementation baseline is 2,118 tests, 13,044 assertions, 14 skipped, 25 applied migrations, and 0 pending. See `45_Sprint_4_QA_Closure_Report.md` for the evidence and external gates.
 
 ---
 

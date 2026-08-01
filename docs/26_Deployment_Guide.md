@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Host verification required
+* Status: Sprint 4 synchronized — Host verification required
 * Target: cPanel/shared hosting with Apache, PHP 8.x and MariaDB/MySQL
 * Scope: Documentation procedure only; exact host capabilities must be confirmed before deployment
 
@@ -10,13 +10,13 @@
 
 Confirm the selected cPanel plan supports:
 
-* the project-approved PHP 8.x version and required extensions;
+* PHP 8.3 or newer and the Composer-required extensions;
 * MariaDB/MySQL databases and users;
 * HTTPS certificates;
 * a supported document-root/subdomain arrangement that can point to `public/` or an approved safe equivalent;
 * Composer through cPanel Terminal/SSH, or deployment of locally built `vendor/` files;
 * writable non-executable storage/upload directories;
-* cron jobs where retry/scheduled booking processes require them;
+* cron jobs if a later approved scheduled process requires them;
 * backup/export and restore mechanisms;
 * SMTP connectivity and application logs.
 
@@ -104,8 +104,8 @@ Migrations are the executable schema source of truth.
 1. Back up the current production database using the supported mechanism.
 2. Put the site into the approved maintenance mode if required.
 3. Run the application migration command through cPanel Terminal/approved deployment hook, or use an architect-approved one-time deployment mechanism with authentication and immediate removal.
-4. Verify each migration and migration-history record.
-5. Run only approved production seeders (Administrator/configuration data); never seed Guest/future roles or sample data.
+4. Verify `composer database:status` reports exactly 25 applied migrations and 0 pending for the Sprint 4 release.
+5. Run only the approved production seeder (currently the non-secret `Administrator` role prerequisite); create the initial account through the protected CLI bootstrap command, and never seed Guest/future roles or sample data.
 6. On failure, stop and follow the migration-specific rollback/recovery plan.
 
 Directly importing an informal `schema.sql` over production migrations is not the standard deployment procedure.
@@ -122,7 +122,7 @@ Enable/verify the cPanel-provided certificate (for example AutoSSL where availab
 
 ## 12. Cron Jobs
 
-Where supported, use cPanel Cron Jobs for approved scheduled tasks such as pending-booking deadline processing, retryable email and backup housekeeping. Use absolute host paths supplied by cPanel, minimal frequency, locking/idempotency and private log output. Exact schedules require approved configuration.
+Where supported, use cPanel Cron Jobs only for separately approved scheduled tasks. Sprint 4 does not implement email retry or a booking-deadline cron. Use absolute host paths supplied by cPanel, minimal frequency, locking/idempotency and private log output; every schedule requires approved configuration and tests.
 
 ## 13. Backups and Restore Readiness
 
@@ -132,14 +132,14 @@ Use supported cPanel account/database backup tools and/or approved application b
 
 Verify:
 
-* public pages, assets and PHP page routes;
+* public homepage, rooms, activities, gallery, contact, reviews, review invitation, CMS pages, assets, and PHP routes;
 * Administrator login/session/logout and CSRF;
 * public `/api/v1/...` and protected `/api/v1/admin/...` behavior;
 * database migration version;
 * one-room booking, availability overlap and zero-payment booking creation;
 * manual payment submission/verification and booking confirmation;
 * check-in/check-out and verified-stay review;
-* uploads, SMTP delivery/failure logging, cron and audit logs;
+* room/gallery/payment-proof uploads, review token expiry/single use, Administrator notifications, SMTP delivery/failure logging, and audit logs;
 * HTTPS, error privacy, file permissions and inaccessible private paths;
 * backup creation and documented restore readiness.
 
@@ -167,9 +167,8 @@ Such a deployment requires a separately approved infrastructure architecture, se
 ## 17. Decisions/Configuration Still Required
 
 * Exact hosting provider/plan and capability evidence;
-* session inactivity/absolute-lifetime values;
-* upload MIME/extension/size values and image extension capability;
-* cron schedules and locking mechanism;
+* production gallery upload MIME/extension/size/dimension values and image-decoding capability;
+* cron schedules and locking mechanism for any later approved scheduled work;
 * SMTP provider/sender credentials and outbound-connectivity evidence;
 * SMTP retry count, backoff, retention and cron schedule;
 * backup frequency/retention/off-host requirements;

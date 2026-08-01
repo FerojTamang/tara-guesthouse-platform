@@ -9,11 +9,11 @@
 | **Project** | Tara Guest House Management System |
 | **Document** | Testing Strategy |
 | **Document No.** | 27 |
-| **Version** | 1.0 |
-| **Status** | Synchronized — Review Required |
+| **Version** | 1.1 |
+| **Status** | Sprint 4 synchronized — Review Required |
 | **Prepared By** | fero.dev |
 | **Project Owner** | Feroj |
-| **Date** | July 2026 |
+| **Date** | 1 August 2026 |
 
 ---
 
@@ -639,6 +639,27 @@ Project Manager Approval
       ▼
 Production Deployment
 ```
+
+## Sprint 4 executed regression evidence
+
+The Operations and Content implementation baseline at `cdff525` completed the full local PHPUnit suite with **2,118 tests, 13,044 assertions, 14 skipped, and zero failures/errors**. The development database reported **25 applied migrations and 0 pending**.
+
+Sprint 4 closure additionally requires:
+
+- exact route inventory review against `routes/web.php`, `routes/admin.php`, and `routes/api.php`;
+- isolated migration apply/rollback/reapply coverage for all nine Sprint 4 migrations;
+- public active/published/public/approved eligibility tests;
+- Administrator authorization and CSRF tests for every mutation;
+- gallery upload path/MIME/extension/size/dimension/decodability tests;
+- review-token hash, expiry, single-use, checked-out eligibility, and no-store tests;
+- notification ownership and absent delete/archive route tests;
+- SMTP TLS/configuration/template/post-commit/failure-isolation tests;
+- static scans for secrets, raw tokens, private paths, and unapproved future routes;
+- `git diff --check`, PHP syntax, Markdown link, database status, and full-suite gates before the S4-019 commit.
+
+Manual browser/device, formal accessibility, SMTP-provider, remote CI, UAT, cPanel, performance, penetration, and production checks remain separate evidence and must not be inferred from local PHPUnit success.
+
+See `45_Sprint_4_QA_Closure_Report.md` for the formal evidence inventory and remaining gates.
 
 ---
 

@@ -2,10 +2,10 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Implemented through Sprint 4 — Review Required
 * Source: `10_Database_Dictionary.md`
 * Database authority: Executed migrations
-* Scope: Version 1 entities and approved future-ready relationships
+* Scope: Version 1 entities represented by the 25 executable migrations
 
 ## 1. Relationship Diagram
 
@@ -24,7 +24,6 @@ erDiagram
     }
 
     roles ||--o{ users : assigns
-    users ||--o{ password_resets : requests
 
     room_types ||--o{ rooms : classifies
     rooms ||--o{ room_images : has
@@ -65,7 +64,7 @@ erDiagram
 
 | Area | Tables |
 |---|---|
-| Administrator identity | `roles`, `users`, `password_resets` |
+| Administrator identity | `roles`, `users` |
 | Rooms | `room_types`, `rooms`, `room_images`, `amenities`, `room_amenities` |
 | Bookings | `bookings`, `booking_rooms`, `booking_events` |
 | Payments and invoices | `payment_methods`, `payments`, `invoices`, `invoice_items` |
@@ -79,7 +78,7 @@ erDiagram
 * Each user has one role.
 * Version 1 seeds and authenticates only the Administrator role.
 * Guest is an unauthenticated actor, not a stored role.
-* Password resets belong only to Administrator user records in Version 1.
+* No password-reset table or route is present in the executable Sprint 4 schema; any later staff-reset workflow requires a separate approved migration and route contract.
 * `bookings.user_id` is nullable and reserved for the future customer-account enhancement. Version 1 booking creation does not populate or require it.
 
 ## 4. Room Relationships
@@ -127,7 +126,7 @@ erDiagram
 ## 9. Operational Relationships
 
 * An Administrator user may receive many in-app `notifications`. Guests have no notification-centre relationship in Version 1.
-* Guests receive transactional SMTP email using booking/contact data rather than a customer notification inbox.
+* Guests receive transactional SMTP email using committed booking/payment/review data rather than a customer notification inbox; SMTP attempts are not stored as a queue table.
 * An Administrator may create many `audit_logs`; the actor is nullable for system events.
 * `contact_messages` stores public submissions independently until an approved assignment/status policy adds further relationships.
 
@@ -147,6 +146,7 @@ erDiagram
 | Room to images | 1:0..N |
 | Room to amenities | M:N through `room_amenities` |
 | Gallery category to gallery | 1:0..N; category link nullable |
+| Administrator user to notifications | 1:0..N; every notification has exactly one owner |
 
 ## 11. Integrity Rules
 

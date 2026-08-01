@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Implemented and QA synchronized in Sprint 4 — Review Required
 * Scope: Version 1 verified-stay review invitation, submission, moderation and public display
 
 ## 1. Version 1 Contract
