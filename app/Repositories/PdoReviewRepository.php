@@ -14,7 +14,7 @@ use RuntimeException;
 use Throwable;
 
 /** Provides PDO persistence for verified-stay reviews. */
-final class PdoReviewRepository implements ReviewRepository
+final class PdoReviewRepository implements ReviewRepository, AdministratorReviewRepository
 {
     use MapsRepositoryRows;
 
@@ -41,6 +41,41 @@ final class PdoReviewRepository implements ReviewRepository
     }
 
     /** @return list<Review> */
+    public function findAll(?string $status = null): array
+    {
+        try {
+            if ($status === null) {
+                $statement = $this->connection->query(
+                    self::SELECT . ' ORDER BY created_at DESC, id DESC',
+                );
+            } else {
+                $statement = $this->connection->prepare(
+                    self::SELECT
+                    . ' WHERE review_status = :review_status'
+                    . ' ORDER BY created_at DESC, id DESC',
+                );
+                $statement->bindValue('review_status', $status, PDO::PARAM_STR);
+                $statement->execute();
+            }
+
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The Administrator review records could not be loaded.');
+            }
+
+            return array_map(function (mixed $row): Review {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The Administrator review record could not be mapped.');
+                }
+
+                return $this->map($row);
+            }, $rows);
+        } catch (Throwable) {
+            throw new DatabaseException('The Administrator review lookup failed.');
+        }
+    }
+
     public function findAllApproved(): array
     {
         try {
@@ -143,6 +178,74 @@ final class PdoReviewRepository implements ReviewRepository
                 PDO::PARAM_INT,
             )
             : null;
+    }
+
+    public function lockById(int $id): ?Review
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        if (!$this->connection->inTransaction()) {
+            throw new DatabaseException('The review lock failed.');
+        }
+
+        return $this->lookup(
+            self::SELECT . ' WHERE id = :lookup LIMIT 1 FOR UPDATE',
+            $id,
+            PDO::PARAM_INT,
+        );
+    }
+
+    public function transitionPending(
+        int $reviewId,
+        string $targetStatus,
+        int $administratorId,
+        ?string $moderationNote,
+        DateTimeImmutable $moderatedAt,
+    ): ?Review {
+        if (!$this->connection->inTransaction()) {
+            throw new DatabaseException('The review moderation write failed.');
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'UPDATE reviews SET '
+                . 'review_status = :target_status, '
+                . 'moderated_by = :moderated_by, '
+                . 'moderated_at = :moderated_at, '
+                . 'moderation_note = :moderation_note, '
+                . 'updated_at = :updated_at '
+                . "WHERE id = :review_id AND review_status = 'pending' "
+                . 'AND moderated_by IS NULL AND moderated_at IS NULL AND moderation_note IS NULL'
+            );
+            $timestamp = $moderatedAt->format('Y-m-d H:i:s');
+            $statement->bindValue('target_status', $targetStatus, PDO::PARAM_STR);
+            $statement->bindValue('moderated_by', $administratorId, PDO::PARAM_INT);
+            $statement->bindValue('moderated_at', $timestamp, PDO::PARAM_STR);
+            $statement->bindValue(
+                'moderation_note',
+                $moderationNote,
+                $moderationNote === null ? PDO::PARAM_NULL : PDO::PARAM_STR,
+            );
+            $statement->bindValue('updated_at', $timestamp, PDO::PARAM_STR);
+            $statement->bindValue('review_id', $reviewId, PDO::PARAM_INT);
+            $statement->execute();
+
+            if ($statement->rowCount() !== 1) {
+                return null;
+            }
+
+            $review = $this->findById($reviewId);
+
+            if (!$review instanceof Review) {
+                throw new RuntimeException('The moderated review could not be loaded.');
+            }
+
+            return $review;
+        } catch (Throwable) {
+            throw new DatabaseException('The review moderation write failed.');
+        }
     }
 
     private function lookup(string $sql, int $value, int $type): ?Review

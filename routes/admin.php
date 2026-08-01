@@ -12,6 +12,7 @@ use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
+use App\Controllers\AdministratorReviewController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -42,6 +43,7 @@ return static function (
     ?AdministratorGalleryController $galleryController = null,
     ?AdministratorCmsController $cmsController = null,
     ?AdministratorContactController $contactController = null,
+    ?AdministratorReviewController $reviewController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -63,6 +65,7 @@ return static function (
         && $galleryController === null
         && $cmsController === null
         && $contactController === null
+        && $reviewController === null
     ) {
         return;
     }
@@ -188,6 +191,19 @@ return static function (
         $router->get('/admin/pages/create', [$cmsController, 'createPageForm'], [$requireAdministrator]);
         $router->get('/admin/pages/{id}/edit', [$cmsController, 'editPageForm'], [$requireAdministrator]);
         $router->get('/admin/pages/{id}', [$cmsController, 'showPage'], [$requireAdministrator]);
+    }
+
+    if ($reviewController !== null) {
+        $router->get(
+            '/admin/reviews',
+            [$reviewController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/reviews/{id}',
+            [$reviewController, 'show'],
+            [$requireAdministrator],
+        );
     }
 
     if ($contactController !== null) {

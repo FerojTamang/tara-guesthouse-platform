@@ -38,6 +38,16 @@ final class ReviewException extends RuntimeException
         return new self('A review already exists for this booking.', 'conflict', $previous);
     }
 
+    public static function reviewNotFound(): self
+    {
+        return new self('The requested review was not found.', 'not_found');
+    }
+
+    public static function moderationConflict(): self
+    {
+        return new self('This review can no longer be moderated.', 'conflict');
+    }
+
     public static function invitationUnavailable(?Throwable $previous = null): self
     {
         return new self('This review invitation is unavailable.', 'unavailable', $previous);
@@ -52,5 +62,6 @@ final class ReviewException extends RuntimeException
     public function isEligibilityFailure(): bool { return $this->category === 'eligibility'; }
     public function isConflict(): bool { return $this->category === 'conflict'; }
     public function isUnavailable(): bool { return $this->category === 'unavailable'; }
+    public function isNotFound(): bool { return $this->category === 'not_found'; }
     public function isSystemFailure(): bool { return $this->category === 'system'; }
 }

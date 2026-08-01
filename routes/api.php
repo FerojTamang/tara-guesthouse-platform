@@ -10,6 +10,7 @@ use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
+use App\Controllers\AdministratorReviewController;
 use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
 use App\Controllers\PublicGalleryController;
@@ -42,6 +43,7 @@ return static function (
     $administratorGallery = null;
     $administratorInvoice = null;
     $administratorPayment = null;
+    $administratorReview = null;
     $guestOnly = null;
     $requireAdministrator = null;
     $csrf = null;
@@ -74,6 +76,8 @@ return static function (
             $administratorGallery ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
             $administratorPayment ??= $dependency;
+        } elseif ($dependency instanceof AdministratorReviewController) {
+            $administratorReview ??= $dependency;
         } elseif ($dependency instanceof AdministratorInvoiceController) {
             $administratorInvoice ??= $dependency;
         } elseif ($dependency instanceof GuestOnlyMiddleware) {
@@ -161,6 +165,15 @@ return static function (
     ) {
         throw new \LogicException(
             'Administrator CMS JSON routes require complete security dependencies.',
+        );
+    }
+
+    if (
+        $administratorReview !== null
+        && ($administratorDependencyCount !== 3 || $csrf === null)
+    ) {
+        throw new \LogicException(
+            'Administrator review JSON routes require complete security dependencies.',
         );
     }
 
@@ -404,6 +417,24 @@ return static function (
         $router->get('/api/v1/admin/pages/{id}', [$administratorCms, 'apiShowPage'], [$requireAdministrator->forJson()]);
         $router->put('/api/v1/admin/pages/{id}', [$administratorCms, 'apiUpdatePage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
         $router->patch('/api/v1/admin/pages/{id}/status', [$administratorCms, 'apiTransitionPage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+    }
+
+    if ($administratorReview !== null) {
+        $router->get(
+            '/api/v1/admin/reviews',
+            [$administratorReview, 'apiIndex'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->get(
+            '/api/v1/admin/reviews/{id}',
+            [$administratorReview, 'apiShow'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/reviews/{id}/status',
+            [$administratorReview, 'apiTransition'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
     }
 
     if ($administratorContact !== null) {

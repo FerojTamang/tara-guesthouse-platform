@@ -15,6 +15,7 @@ use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorPaymentController;
+use App\Controllers\AdministratorReviewController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
@@ -107,6 +108,8 @@ use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\AdministratorPaymentStatusServiceProvider;
+use App\Services\AdministratorReviewService;
+use App\Services\AdministratorReviewServiceProvider;
 use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\LazyCmsPageContentSanitizer;
@@ -129,6 +132,7 @@ use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
 use App\Services\ReviewCheckoutInvitationCoordinator;
 use App\Services\ReviewInvitationPolicyProvider;
+use App\Services\ReviewModerationPolicyProvider;
 use App\Services\ReviewInvitationService;
 use App\Services\ReviewInvitationServiceProvider;
 use App\Services\ReviewTokenHasher;
@@ -479,6 +483,27 @@ final class Bootstrap
             new ContactSubmissionFlash($session),
             $csrfTokens,
         );
+        $reviewModerationPolicy = new ReviewModerationPolicyProvider($resolvedBasePath);
+        $administratorReviewController = new AdministratorReviewController(
+            $viewRenderer,
+            new AdministratorReviewServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorReviewService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorReviewService(
+                        new PdoReviewRepository($connection),
+                        new BookingRepository($connection),
+                        new PdoReviewInvitationRepository($connection),
+                        new PdoAuditLogRepository($connection),
+                        new PdoReviewTransaction($connection),
+                    );
+                },
+            ),
+            $reviewModerationPolicy,
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
             new AdministratorPaymentServiceProvider(
@@ -801,6 +826,7 @@ final class Bootstrap
             $administratorGalleryController,
             $administratorCmsController,
             $administratorContactController,
+            $administratorReviewController,
             $publicActivityController,
             $publicGalleryController,
             $publicCmsController,
@@ -866,6 +892,7 @@ final class Bootstrap
         AdministratorGalleryController $administratorGalleryController,
         AdministratorCmsController $administratorCmsController,
         AdministratorContactController $administratorContactController,
+        AdministratorReviewController $administratorReviewController,
         PublicActivityController $publicActivityController,
         PublicGalleryController $publicGalleryController,
         PublicCmsController $publicCmsController,
@@ -916,6 +943,7 @@ final class Bootstrap
                 $administratorGalleryController,
                 $administratorCmsController,
                 $administratorContactController,
+                $administratorReviewController,
                 $publicActivityController,
                 $publicGalleryController,
                 $publicCmsController,
