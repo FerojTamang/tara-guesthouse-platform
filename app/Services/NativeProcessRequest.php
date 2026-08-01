@@ -1,0 +1,2 @@
+<?php declare(strict_types=1); namespace App\Services; use InvalidArgumentException;
+final readonly class NativeProcessRequest { public function __construct(public string $executable, public array $arguments=[], public ?string $stdin=null, public ?string $stdout=null){if($executable===''||preg_match('/[\0\r\n]/',$executable)||array_filter($arguments,fn($v)=>!is_string($v)||preg_match('/\0/',$v)))throw new InvalidArgumentException('Native process could not be started.');}}

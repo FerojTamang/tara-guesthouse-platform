@@ -137,7 +137,9 @@ Network Latency
 
 Regular backups are mandatory.
 
-## Backup Types
+> **Implementation status:** The application provides the manual logical-database backup command `php bin/backup-database.php` and the guarded restore command `php bin/restore-database.php`. Backup writes an integrity manifest beside the private SQL file in `storage/backups/`; restore defaults to non-importing preflight. The frequencies, additional copies, encryption, offsite/cloud storage, retention automation, and scheduling below are operational policy targets, not implemented application automation. No real restore or production/cPanel validation has been completed; those exercises remain deferred to the approved Sprint 5 operations gates.
+
+## Backup Policy Targets
 
 | Backup Type | Frequency |
 |------------|-----------|
@@ -171,14 +173,14 @@ Archive Backup
 ## Backup Storage Locations
 
 ```text
-storage/backups/
-external_storage/
-cloud_backup/
+storage/backups/    # implemented private local backup location
+external_storage/   # operator-managed target; not implemented
+cloud_backup/       # future/offsite target; not implemented
 ```
 
 ---
 
-## Backup Rules
+## Operator Backup Requirements
 
 - Verify backups after creation.
 - Encrypt sensitive backups.
@@ -191,6 +193,32 @@ cloud_backup/
 # 7. Restore Procedures
 
 Restoration procedures must be documented and tested.
+
+## Implemented Restore Command
+
+Use only a generated SQL basename from private `storage/backups/`; never pass an absolute or relative path:
+
+```text
+php bin/restore-database.php tara-guest-house-YYYYMMDDTHHMMSSZ-<12-hex>.sql
+```
+
+This default preflight verifies the versioned manifest, logical SQL, exact byte count, lowercase SHA-256, configured-database existence, zero base tables, zero views, and restore-client availability. It does not import SQL and reports `Restore not executed.` The configured application database is the only target, and it must already exist and be empty.
+
+Execution uses exact confirmation:
+
+```text
+php bin/restore-database.php <generated-basename.sql> --execute --confirm-database=<exact-configured-name>
+```
+
+Staging and production additionally require the exact validated environment:
+
+```text
+php bin/restore-database.php <generated-basename.sql> --execute --confirm-database=<exact-configured-name> --confirm-environment=<exact-environment>
+```
+
+Execution reruns the complete preflight immediately before import. Credentials are carried in a temporary private native-client option file that is always cleaned; they are not command-line arguments. The SQL file is opened directly as native-process stdin with no shell redirection. The SQL backup and matching manifest are retained after success or failure.
+
+There is no arbitrary target, force mode, skip-checksum/empty-target override, automatic replacement, `DROP DATABASE`, `CREATE DATABASE`, or `TRUNCATE` behavior. There is no web/API restore trigger. Scheduling, retention automation, encryption, and offsite/cloud replication are not implemented. Do not perform a real restoration against development or production data; the later operations rehearsal must use a disposable, empty test database. Production and cPanel validation remain deferred.
 
 ---
 
