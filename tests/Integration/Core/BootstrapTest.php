@@ -137,11 +137,11 @@ final class BootstrapTest extends TestCase
         $this->handlersRegistered = true;
         self::assertSame(PHP_SESSION_ACTIVE, session_status());
         $this->sessionIds[] = session_id();
-        $response = $application->handle(Request::create('GET', '/'));
+        $response = $application->handle(Request::create('GET', '/admin/login'));
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
-        self::assertStringContainsString('The PHP view renderer is operational.', $response->body());
+        self::assertStringContainsString('Administrator login', $response->body());
         self::assertSame('Asia/Kathmandu', date_default_timezone_get());
         self::assertSame($sessionStatus, session_status());
         self::assertFileExists(dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $this->logPath));
@@ -168,7 +168,8 @@ final class BootstrapTest extends TestCase
         self::assertSame(360, $config->get('booking.pending_deadline_minutes'));
         self::assertTrue($config->has('logging'));
         self::assertTrue($config->has('database'));
-        self::assertFalse($config->has('mail'));
+        self::assertTrue($config->has('mail'));
+        self::assertFalse($config->require('mail.enabled'));
         self::assertTrue($config->has('session'));
         self::assertFalse($config->has('upload'));
     }

@@ -6,43 +6,68 @@ namespace App\Core;
 
 use App\Authentication\AdministratorSession;
 use App\Authentication\LoginRateLimiter;
+use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAmenityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorCmsController;
+use App\Controllers\AdministratorContactController;
+use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorNotificationController;
 use App\Controllers\AdministratorPaymentController;
+use App\Controllers\AdministratorReviewController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
 use App\Controllers\AdministratorRoomTypeController;
+use App\Controllers\PublicActivityController;
 use App\Controllers\PublicAvailabilityController;
+use App\Controllers\PublicGalleryController;
 use App\Controllers\PublicBookingController;
 use App\Controllers\PublicBookingPageController;
+use App\Controllers\PublicCmsController;
+use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicPaymentMethodController;
+use App\Controllers\PublicReviewController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
+use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
+use App\Middleware\PublicReviewRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
+use App\Repositories\ActivityRepository;
 use App\Repositories\AmenityRepository;
 use App\Repositories\BookingRepository;
+use App\Repositories\GalleryRepository;
 use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
+use App\Repositories\PdoContactMessageRepository;
 use App\Repositories\PdoInvoiceRepository;
+use App\Repositories\PdoNotificationRepository;
+use App\Repositories\PdoPageRepository;
+use App\Repositories\PdoSettingRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PdoAdministratorPaymentRepository;
 use App\Repositories\PdoPaymentWriteRepository;
+use App\Repositories\PdoReviewInvitationRepository;
+use App\Repositories\PdoReviewRepository;
 use App\Repositories\RoomRepository;
 use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
+use App\Services\AdministratorActivityService;
+use App\Services\AdministratorCmsService;
+use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
+use App\Services\ActivityManagementServiceProvider;
 use App\Services\AvailabilityService;
 use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
@@ -50,6 +75,8 @@ use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
+use App\Services\AdministratorNotificationService;
+use App\Services\AdministratorNotificationServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -59,6 +86,14 @@ use App\Services\BookingSubmissionService;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
+use App\Services\CmsManagementServiceProvider;
+use App\Services\CmsPageContentPolicyProvider;
+use App\Services\CmsPageService;
+use App\Services\CmsSettingsService;
+use App\Services\CmsSettingsServiceProvider;
+use App\Services\ContactMessageService;
+use App\Services\ContactMessageServiceProvider;
+use App\Services\ContactSubmissionFlash;
 use App\Services\GuestPaymentAccessValidator;
 use App\Services\GuestPaymentContinuation;
 use App\Services\GuestPaymentPageService;
@@ -66,6 +101,9 @@ use App\Services\GuestPaymentPageServiceProvider;
 use App\Services\GuestPaymentSubmissionService;
 use App\Services\GuestPaymentSubmissionServiceProvider;
 use App\Services\GuestPaymentSuccessFlash;
+use App\Services\GalleryImageStorageProvider;
+use App\Services\GalleryManagementServiceProvider;
+use App\Services\PdoGalleryTransaction;
 use App\Services\InvoiceIssueService;
 use App\Services\InvoiceIssueServiceProvider;
 use App\Services\AdministratorLogoutService;
@@ -73,11 +111,26 @@ use App\Services\AdministratorPaymentService;
 use App\Services\AdministratorPaymentServiceProvider;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\AdministratorPaymentStatusServiceProvider;
+use App\Services\AdministratorReviewService;
+use App\Services\AdministratorReviewServiceProvider;
 use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
+use App\Services\LazyCmsPageContentSanitizer;
+use App\Services\LoggingTransactionalMailDispatcher;
+use App\Services\MailTemplateRenderer;
+use App\Services\NullTransactionalMailDispatcher;
+use App\Services\ReviewInvitationMailDelivery;
+use App\Services\SmtpMailTransport;
+use App\Services\TransactionalMailDispatcher;
+use App\Services\TransactionalMailService;
+use App\Services\TransactionalMailServiceProvider;
 use App\Services\AmenityCatalogService;
+use App\Services\PdoActivityTransaction;
+use App\Services\PdoCmsTransaction;
+use App\Services\PdoContactTransaction;
 use App\Services\PdoBookingTransaction;
 use App\Services\PdoRoomCatalogTransaction;
+use App\Services\PdoReviewTransaction;
 use App\Services\PaymentMethodFlashMessages;
 use App\Services\PaymentMethodManagementService;
 use App\Services\PaymentMethodManagementServiceProvider;
@@ -88,15 +141,36 @@ use App\Services\RoomCatalogServiceProvider;
 use App\Services\RoomImageServiceProvider;
 use App\Presentation\RoomImageUrl;
 use App\Services\RoomTypeCatalogService;
+use App\Services\ReviewCheckoutInvitationCoordinator;
+use App\Services\ReviewInvitationPolicyProvider;
+use App\Services\ReviewModerationPolicyProvider;
+use App\Services\ReviewInvitationService;
+use App\Services\ReviewInvitationServiceProvider;
+use App\Services\ReviewTokenHasher;
+use App\Services\ReviewSubmissionFlash;
+use App\Services\SettingDefinitionRegistryProvider;
+use App\Services\PublicActivityService;
+use App\Services\PublicActivityServiceProvider;
 use App\Services\PublicAvailabilityService;
 use App\Services\PublicAvailabilityServiceProvider;
+use App\Services\PublicGalleryService;
+use App\Services\PublicGalleryServiceProvider;
 use App\Services\PublicBookingRateLimiter;
+use App\Services\PublicCmsService;
+use App\Services\PublicCmsServiceProvider;
+use App\Services\PublicContactRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
 use App\Services\PublicPaymentRateLimiter;
+use App\Services\PublicReviewRateLimiter;
+use App\Services\PublicReviewService;
+use App\Services\PublicReviewServiceProvider;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
+use App\Storage\LazyGalleryImageReader;
+use App\Storage\LazyGalleryImageStorage;
+use SensitiveParameter;
 
 /**
  * Builds the approved core application runtime.
@@ -150,12 +224,34 @@ final class Bootstrap
         $viewRenderer = new ViewRenderer(
             $resolvedBasePath . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
         );
+        $applicationName = $config->require('app.name');
+        $applicationUrl = $config->get('app.url');
+        $mailConfiguration = $config->require('mail');
+
+        if (
+            !is_string($applicationName)
+            || ($applicationUrl !== null && !is_string($applicationUrl))
+            || !is_array($mailConfiguration)
+        ) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        $mail = self::mailDispatcher(
+            $mailConfiguration,
+            $applicationName,
+            $applicationUrl,
+            $timezone,
+            $viewRenderer,
+            $logger,
+        );
         $csrfTokens = new CsrfTokenManager($session);
         $administratorSession = new AdministratorSession($session, $csrfTokens);
         $databaseConfiguration = $config->require('database');
         $loginPolicy = $config->require('security.administrator_login');
         $publicBookingPolicy = $config->require('security.public_booking');
         $publicPaymentPolicy = $config->require('security.public_payment');
+        $publicContactPolicy = $config->require('security.public_contact');
+        $publicReviewPolicy = $config->require('security.public_review');
         $bookingConfiguration = $config->require('booking');
 
         if (
@@ -163,6 +259,8 @@ final class Bootstrap
             || !is_array($loginPolicy)
             || !is_array($publicBookingPolicy)
             || !is_array($publicPaymentPolicy)
+            || !is_array($publicContactPolicy)
+            || !is_array($publicReviewPolicy)
             || !is_array($bookingConfiguration)
         ) {
             throw new ConfigurationException('Application service configuration is invalid.');
@@ -278,13 +376,40 @@ final class Bootstrap
                 ),
             ),
             new AdministratorBookingStatusServiceProvider(
-                static function () use ($catalogConnectionProvider): AdministratorBookingStatusService {
+                static function () use (
+                    $catalogConnectionProvider,
+                    $logger,
+                    $mail,
+                    $resolvedBasePath,
+                ): AdministratorBookingStatusService {
                     $connection = $catalogConnectionProvider();
+                    $reviewPolicy = new ReviewInvitationPolicyProvider($resolvedBasePath);
+                    $reviewServices = new ReviewInvitationServiceProvider(
+                        static fn (): ReviewInvitationService => new ReviewInvitationService(
+                            new BookingRepository($connection),
+                            new PdoReviewInvitationRepository($connection),
+                            new PdoReviewRepository($connection),
+                            new PdoAuditLogRepository($connection),
+                            new PdoReviewTransaction($connection),
+                            new ReviewTokenHasher(),
+                            $reviewPolicy->policy(),
+                        ),
+                    );
+
+                    $bookingCatalog = new BookingRepository($connection);
 
                     return new AdministratorBookingStatusService(
                         new PdoBookingStatusWriteRepository($connection),
                         new PdoAuditLogRepository($connection),
                         new PdoBookingTransaction($connection),
+                        null,
+                        new ReviewCheckoutInvitationCoordinator(
+                            $reviewServices,
+                            new ReviewInvitationMailDelivery($bookingCatalog, $mail),
+                            $logger,
+                        ),
+                        $bookingCatalog,
+                        $mail,
                     );
                 },
             ),
@@ -302,6 +427,130 @@ final class Bootstrap
             ),
             $csrfTokens,
             new PaymentMethodFlashMessages($session),
+        );
+        $administratorActivityController = new AdministratorActivityController(
+            $viewRenderer,
+            new ActivityManagementServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorActivityService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorActivityService(
+                        new ActivityRepository($connection),
+                        new PdoAuditLogRepository($connection),
+                        new PdoActivityTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $galleryImageStorage = new GalleryImageStorageProvider($resolvedBasePath);
+        $administratorGalleryController = new AdministratorGalleryController(
+            $viewRenderer,
+            new GalleryManagementServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $galleryImageStorage,
+                ): AdministratorGalleryService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorGalleryService(
+                        new GalleryRepository($connection),
+                        new LazyGalleryImageStorage($galleryImageStorage->storage(...)),
+                        new PdoAuditLogRepository($connection),
+                        new PdoGalleryTransaction($connection),
+                    );
+                },
+            ),
+            $galleryImageStorage,
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $settingDefinitions = new SettingDefinitionRegistryProvider($resolvedBasePath);
+        $pageContentPolicy = new CmsPageContentPolicyProvider($resolvedBasePath);
+        $administratorCmsController = new AdministratorCmsController(
+            $viewRenderer,
+            new CmsManagementServiceProvider(
+                static function () use (
+                    $catalogConnectionProvider,
+                    $settingDefinitions,
+                    $pageContentPolicy,
+                ): AdministratorCmsService {
+                    $connection = $catalogConnectionProvider();
+                    return new AdministratorCmsService(
+                        new CmsSettingsServiceProvider(
+                            static fn (): CmsSettingsService => new CmsSettingsService(
+                                new PdoSettingRepository($connection),
+                                $settingDefinitions->registry(),
+                            ),
+                        ),
+                        new CmsPageService(new PdoPageRepository($connection)),
+                        new LazyCmsPageContentSanitizer($pageContentPolicy->sanitizer(...)),
+                        new PdoAuditLogRepository($connection),
+                        new PdoCmsTransaction($connection),
+                    );
+                },
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $contactServices = new ContactMessageServiceProvider(
+            static function () use ($catalogConnectionProvider): ContactMessageService {
+                $connection = $catalogConnectionProvider();
+
+                return new ContactMessageService(
+                    new PdoContactMessageRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoContactTransaction($connection),
+                );
+            },
+        );
+        $administratorContactController = new AdministratorContactController(
+            $viewRenderer,
+            $contactServices,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $publicContactController = new PublicContactController(
+            $viewRenderer,
+            $contactServices,
+            new ContactSubmissionFlash($session),
+            $csrfTokens,
+        );
+        $reviewModerationPolicy = new ReviewModerationPolicyProvider($resolvedBasePath);
+        $administratorReviewController = new AdministratorReviewController(
+            $viewRenderer,
+            new AdministratorReviewServiceProvider(
+                static function () use ($catalogConnectionProvider): AdministratorReviewService {
+                    $connection = $catalogConnectionProvider();
+
+                    return new AdministratorReviewService(
+                        new PdoReviewRepository($connection),
+                        new BookingRepository($connection),
+                        new PdoReviewInvitationRepository($connection),
+                        new PdoAuditLogRepository($connection),
+                        new PdoReviewTransaction($connection),
+                    );
+                },
+            ),
+            $reviewModerationPolicy,
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
+        $administratorNotificationController = new AdministratorNotificationController(
+            $viewRenderer,
+            new AdministratorNotificationServiceProvider(
+                static fn (): AdministratorNotificationService => new AdministratorNotificationService(
+                    new PdoNotificationRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
         );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
@@ -321,7 +570,10 @@ final class Bootstrap
                 },
             ),
             new AdministratorPaymentStatusServiceProvider(
-                static function () use ($catalogConnectionProvider): AdministratorPaymentStatusService {
+                static function () use (
+                    $catalogConnectionProvider,
+                    $mail,
+                ): AdministratorPaymentStatusService {
                     $connection = $catalogConnectionProvider();
 
                     $auditLogs = new PdoAuditLogRepository($connection);
@@ -334,6 +586,9 @@ final class Bootstrap
                             $auditLogs,
                         ),
                         new PdoBookingTransaction($connection),
+                        null,
+                        new BookingRepository($connection),
+                        $mail,
                     );
                 },
             ),
@@ -349,11 +604,70 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $publicActivityServices = new PublicActivityServiceProvider(
+            static fn (): PublicActivityService => new PublicActivityService(
+                new ActivityRepository($catalogConnectionProvider()),
+            ),
+        );
+        $publicActivityController = new PublicActivityController(
+            $viewRenderer,
+            $publicActivityServices,
+        );
+        $publicGalleryServices = new PublicGalleryServiceProvider(
+            static fn (): PublicGalleryService => new PublicGalleryService(
+                new GalleryRepository($catalogConnectionProvider()),
+                new LazyGalleryImageReader($galleryImageStorage->reader(...)),
+            ),
+        );
+        $publicGalleryController = new PublicGalleryController(
+            $viewRenderer,
+            $publicGalleryServices,
+        );
+        $publicRoomServices = new PublicRoomCatalogServiceProvider(
+            static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                new RoomRepository($catalogConnectionProvider()),
+                new RoomImageRepository($catalogConnectionProvider()),
+                new RoomImageUrl(),
+            ),
+        );
         $publicRoomController = new PublicRoomController(
             $viewRenderer,
-            new PublicRoomCatalogServiceProvider(static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
-                new RoomRepository($catalogConnectionProvider()), new RoomImageRepository($catalogConnectionProvider()), new RoomImageUrl(),
-            ),
+            $publicRoomServices,
+        );
+        $publicReviewServices = new PublicReviewServiceProvider(
+            static function () use ($catalogConnectionProvider): PublicReviewService {
+                $connection = $catalogConnectionProvider();
+
+                return new PublicReviewService(
+                    new BookingRepository($connection),
+                    new PdoReviewInvitationRepository($connection),
+                    new PdoReviewRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoReviewTransaction($connection),
+                    new ReviewTokenHasher(),
+                );
+            },
+        );
+        $publicReviewController = new PublicReviewController(
+            $viewRenderer,
+            $publicReviewServices,
+            new ReviewSubmissionFlash($session),
+            $csrfTokens,
+        );
+        $publicCmsController = new PublicCmsController(
+            $viewRenderer,
+            new PublicCmsServiceProvider(
+                static fn (): PublicCmsService => new PublicCmsService(
+                    new PdoPageRepository($catalogConnectionProvider()),
+                    new PdoSettingRepository($catalogConnectionProvider()),
+                    $settingDefinitions->registry(...),
+                    $publicRoomServices->service(),
+                    $publicActivityServices->service(),
+                    $publicGalleryServices->service(),
+                    $applicationName,
+                    $applicationUrl,
+                    static fn (): array => array_slice($publicReviewServices->service()->approved(), 0, 3),
+                ),
             ),
         );
         $publicAvailabilityController = new PublicAvailabilityController(
@@ -380,6 +694,7 @@ final class Bootstrap
             static function () use (
                 $catalogConnectionProvider,
                 $bookingConfiguration,
+                $mail,
             ): BookingSubmissionWorkflow {
                 $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
                 $deadlineMinutes = $bookingConfiguration['pending_deadline_minutes'] ?? null;
@@ -409,6 +724,7 @@ final class Bootstrap
                         new BookingDeadlinePolicy($deadlineMinutes),
                     ),
                     new BookingAccessToken($accessTokenKey),
+                    $mail,
                 );
             },
         );
@@ -429,6 +745,7 @@ final class Bootstrap
                 $catalogConnectionProvider,
                 $bookingConfiguration,
                 $paymentProofServices,
+                $mail,
             ): GuestPaymentSubmissionService {
                 $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
 
@@ -453,6 +770,8 @@ final class Bootstrap
                     new PdoPaymentWriteRepository($connection),
                     $paymentProofServices->storage(),
                     new PdoBookingTransaction($connection),
+                    null,
+                    $mail,
                 );
             },
         );
@@ -514,6 +833,30 @@ final class Bootstrap
                 $publicPaymentPolicy,
             ),
         );
+        $publicContactRateLimit = new PublicContactRateLimitMiddleware(
+            new PublicContactRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'contact-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicContactPolicy,
+            ),
+        );
+        $publicReviewRateLimit = new PublicReviewRateLimitMiddleware(
+            new PublicReviewRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'review-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicReviewPolicy,
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -531,6 +874,17 @@ final class Bootstrap
             $paymentMethodController,
             $administratorPaymentController,
             $administratorInvoiceController,
+            $administratorActivityController,
+            $administratorGalleryController,
+            $administratorCmsController,
+            $administratorContactController,
+            $administratorReviewController,
+            $administratorNotificationController,
+            $publicActivityController,
+            $publicGalleryController,
+            $publicCmsController,
+            $publicContactController,
+            $publicReviewController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -540,9 +894,114 @@ final class Bootstrap
             $publicPaymentController,
             $publicPaymentPageController,
             $publicPaymentRateLimit,
+            $publicContactRateLimit,
+            $publicReviewRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailDispatcher(
+        #[SensitiveParameter] array $configuration,
+        string $applicationName,
+        ?string $applicationUrl,
+        string $timezone,
+        ViewRenderer $views,
+        \Psr\Log\LoggerInterface $logger,
+    ): TransactionalMailDispatcher {
+        $expectedKeys = [
+            'enabled',
+            'host',
+            'port',
+            'encryption',
+            'username',
+            'password',
+            'from_address',
+            'from_name',
+            'reply_to_address',
+            'reply_to_name',
+            'timeout_seconds',
+        ];
+
+        if (array_keys($configuration) !== $expectedKeys || !is_bool($configuration['enabled'])) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        if ($configuration['enabled'] === false) {
+            return new NullTransactionalMailDispatcher();
+        }
+
+        if (!is_string($applicationUrl) || $applicationUrl === '') {
+            throw new ConfigurationException('APP_URL is required when SMTP is enabled.');
+        }
+
+        $provider = new TransactionalMailServiceProvider(
+            static function () use (
+                $configuration,
+                $applicationName,
+                $applicationUrl,
+                $timezone,
+                $views,
+            ): TransactionalMailService {
+                return new TransactionalMailService(
+                    new SmtpMailTransport(
+                        self::mailString($configuration, 'host'),
+                        self::mailInteger($configuration, 'port'),
+                        self::mailString($configuration, 'encryption'),
+                        self::mailNullableString($configuration, 'username'),
+                        self::mailNullableString($configuration, 'password'),
+                        self::mailString($configuration, 'from_address'),
+                        self::mailString($configuration, 'from_name'),
+                        self::mailNullableString($configuration, 'reply_to_address'),
+                        self::mailNullableString($configuration, 'reply_to_name'),
+                        self::mailInteger($configuration, 'timeout_seconds'),
+                    ),
+                    new MailTemplateRenderer($views),
+                    $applicationName,
+                    rtrim($applicationUrl, '/'),
+                    new \DateTimeZone($timezone),
+                );
+            },
+        );
+
+        return new LoggingTransactionalMailDispatcher($provider, $logger);
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailString(#[SensitiveParameter] array $configuration, string $key): string
+    {
+        $value = $configuration[$key] ?? null;
+
+        if (!is_string($value) || $value === '') {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailNullableString(#[SensitiveParameter] array $configuration, string $key): ?string
+    {
+        $value = $configuration[$key] ?? null;
+
+        if ($value !== null && !is_string($value)) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailInteger(#[SensitiveParameter] array $configuration, string $key): int
+    {
+        $value = $configuration[$key] ?? null;
+
+        if (!is_int($value)) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
     }
 
     private static function definePaths(string $basePath): void
@@ -585,6 +1044,17 @@ final class Bootstrap
         AdministratorPaymentMethodController $paymentMethodController,
         AdministratorPaymentController $administratorPaymentController,
         AdministratorInvoiceController $administratorInvoiceController,
+        AdministratorActivityController $administratorActivityController,
+        AdministratorGalleryController $administratorGalleryController,
+        AdministratorCmsController $administratorCmsController,
+        AdministratorContactController $administratorContactController,
+        AdministratorReviewController $administratorReviewController,
+        AdministratorNotificationController $administratorNotificationController,
+        PublicActivityController $publicActivityController,
+        PublicGalleryController $publicGalleryController,
+        PublicCmsController $publicCmsController,
+        PublicContactController $publicContactController,
+        PublicReviewController $publicReviewController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -594,6 +1064,8 @@ final class Bootstrap
         PublicPaymentController $publicPaymentController,
         PublicPaymentPageController $publicPaymentPageController,
         PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
+        PublicContactRateLimitMiddleware $publicContactRateLimit,
+        PublicReviewRateLimitMiddleware $publicReviewRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -624,6 +1096,17 @@ final class Bootstrap
                 $paymentMethodController,
                 $administratorPaymentController,
                 $administratorInvoiceController,
+                $administratorActivityController,
+                $administratorGalleryController,
+                $administratorCmsController,
+                $administratorContactController,
+                $administratorReviewController,
+                $administratorNotificationController,
+                $publicActivityController,
+                $publicGalleryController,
+                $publicCmsController,
+                $publicContactController,
+                $publicReviewController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,
@@ -633,6 +1116,8 @@ final class Bootstrap
                 $publicPaymentController,
                 $publicPaymentPageController,
                 $publicPaymentRateLimit,
+                $publicContactRateLimit,
+                $publicReviewRateLimit,
             );
         }
     }

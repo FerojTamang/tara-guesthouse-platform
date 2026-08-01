@@ -31,6 +31,15 @@
                         Dashboard
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'notifications' ? ' active' : '' ?>"
+                        href="/admin/notifications"
+                        <?= $activeNavigation === 'notifications' ? 'aria-current="page"' : '' ?>
+                    >
+                        Notifications
+                    </a>
+                </li>
             </ul>
 
             <p class="admin-navigation-heading mt-4">Management</p>
@@ -99,7 +108,58 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <span class="nav-link admin-navigation-link disabled" aria-disabled="true">Content</span>
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'activities' ? ' active' : '' ?>"
+                        href="/admin/activities"
+                        <?= $activeNavigation === 'activities' ? 'aria-current="page"' : '' ?>
+                    >
+                        Activities
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'gallery' ? ' active' : '' ?>"
+                        href="/admin/gallery"
+                        <?= $activeNavigation === 'gallery' ? 'aria-current="page"' : '' ?>
+                    >
+                        Gallery
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'pages' ? ' active' : '' ?>"
+                        href="/admin/pages"
+                        <?= $activeNavigation === 'pages' ? 'aria-current="page"' : '' ?>
+                    >
+                        Pages
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'reviews' ? ' active' : '' ?>"
+                        href="/admin/reviews"
+                        <?= $activeNavigation === 'reviews' ? 'aria-current="page"' : '' ?>
+                    >
+                        Reviews
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'contact-messages' ? ' active' : '' ?>"
+                        href="/admin/contact-messages"
+                        <?= $activeNavigation === 'contact-messages' ? 'aria-current="page"' : '' ?>
+                    >
+                        Contact messages
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'settings' ? ' active' : '' ?>"
+                        href="/admin/settings"
+                        <?= $activeNavigation === 'settings' ? 'aria-current="page"' : '' ?>
+                    >
+                        Settings
+                    </a>
                 </li>
             </ul>
         </nav>

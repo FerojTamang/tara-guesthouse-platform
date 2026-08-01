@@ -122,6 +122,7 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
         self::assertMatchesRegularExpression('/name="_csrf" value="[a-f0-9]{64}"/', $response->body());
         self::assertStringContainsString('name="identifier"', $response->body());
         self::assertStringContainsString('name="password"', $response->body());
+        self::assertStringNotContainsString('aria-label="Primary navigation"', $response->body());
         self::assertStringNotContainsString('name="password" value=', $response->body());
         self::assertSame(0, $this->authenticator->calls);
     }

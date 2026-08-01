@@ -6,8 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.2 |
-| Status | Synchronized — Review Required |
+| Version | 1.3 |
+| Status | Implemented route/screen inventory through Sprint 4 — Review Required |
 | Authority | `00_V1_ARCHITECT_DECISIONS.md` |
 | Rendering | PHP-rendered Bootstrap 5 views with vanilla JavaScript |
 
@@ -45,10 +45,10 @@ Guest is not a stored role. Customer accounts/portal and specialized staff roles
 
 | Page | Page route | Selective JSON endpoint(s) | Data tables |
 |---|---|---|---|
-| Home | `/` | `/api/v1/rooms`, `/api/v1/activities`, `/api/v1/gallery`, `/api/v1/reviews` | approved public content tables |
-| About | `/about` | `/api/v1/pages/about` | `pages`, `settings` |
-| Rooms | `/rooms` | `/api/v1/rooms`, `/api/v1/availability` | room and booking tables |
-| Room detail | `/rooms/{slug}` | `/api/v1/rooms/{slug}`, `/api/v1/availability` | room and booking tables |
+| Home | `/` | none required; server-composed | approved public content tables |
+| About/managed page | `/{slug}` when published | optional `/api/v1/pages/{slug}` | `pages`, `settings` |
+| Rooms | `/rooms` | optional `/api/v1/availability` | room and booking tables |
+| Room detail | `/rooms/{slug}` | optional `/api/v1/availability` | room and booking tables |
 | Booking | `/booking` | `POST /api/v1/bookings` | `bookings`, `booking_rooms`, `booking_events` |
 | Booking success | `/booking/success` | none required | no direct table access from view |
 | Payment submission | `/booking/payment` | `/api/v1/payment-methods`, `POST /api/v1/payments` | `payment_methods`, `payments`, `bookings` |
@@ -160,45 +160,35 @@ Fields: username/email, password, CSRF. Success creates a PHP session and redire
 
 ## 9.2 Password Reset
 
-Staff-only routes use `/api/v1/admin/auth/forgot-password` and `/api/v1/admin/auth/reset-password`. Customer password recovery is not a Version 1 screen.
+No staff or customer password-reset screen/API is registered through Sprint 4. Any later Administrator reset workflow requires a separate approved migration, route contract, and security review.
 
 # 10. Administrator Screen Register
 
-Every JSON endpoint in this table is protected and explicitly uses `/api/v1/admin/...`.
+Only the JSON endpoints explicitly listed below are registered. Room, room-type, amenity, payment-method, and authentication forms use protected PHP routes rather than invented JSON equivalents.
 
 | Screen | Page route | JSON endpoint(s) | Tables |
 |---|---|---|---|
-| Dashboard | `/admin/dashboard` | `GET /api/v1/admin/dashboard` | approved module tables |
-| Rooms | `/admin/rooms` | `/api/v1/admin/rooms...` | room tables |
-| Room types | `/admin/room-types` | `/api/v1/admin/room-types...` | `room_types` |
-| Amenities | `/admin/amenities` | `/api/v1/admin/amenities...` | `amenities`, `room_amenities` |
+| Dashboard | `/admin/dashboard` | none | approved module projections |
+| Rooms | `/admin/rooms` | none; protected PHP forms | room tables |
+| Room types | `/admin/room-types` | none; protected PHP forms | `room_types` |
+| Amenities | `/admin/amenities` | none; protected PHP forms | `amenities`, `room_amenities` |
 | Bookings | `/admin/bookings` | `PATCH /api/v1/admin/bookings/{id}/status` | booking tables |
 | Payments | `/admin/payments` | `PATCH /api/v1/admin/payments/{id}/status` | payment tables |
 | Invoices | `/admin/invoices` | `POST /api/v1/admin/bookings/{bookingId}/invoice` | invoice tables |
 | Activities | `/admin/activities` | `/api/v1/admin/activities...` | `activities` |
-| Gallery | `/admin/gallery` | `/api/v1/admin/gallery...` | gallery tables |
+| Gallery | `/admin/gallery` | `/api/v1/admin/gallery...`, `/api/v1/admin/gallery-categories...` | gallery tables |
 | Reviews | `/admin/reviews` | `/api/v1/admin/reviews...` | review tables |
-| Contact messages | `/admin/contact-messages` | `/api/v1/admin/contact-messages...` | `contact_messages` |
+| Contact messages | `/admin/contact-messages` | GET list/detail only | `contact_messages` |
 | CMS pages | `/admin/pages` | `/api/v1/admin/pages...` | `pages` |
-| Settings | `/admin/settings` | `/api/v1/admin/settings` | `settings` |
+| Settings | `/admin/settings` | `GET/PUT /api/v1/admin/settings` | `settings` |
 | Notifications | `/admin/notifications` | `/api/v1/admin/notifications...` | `notifications` |
-| Administrator accounts | `/admin/users` | `/api/v1/admin/users...` | `users`, `roles`, `password_resets` |
-| Audit logs | `/admin/audit-logs` | `GET /api/v1/admin/audit-logs` | `audit_logs` |
-| Backups | `/admin/backups` | `/api/v1/admin/backups...` | hosting/filesystem artifact |
+| Payment methods | `/admin/payment-methods` | none; protected PHP forms | `payment_methods` |
 
-There is no current Customer Management screen or `/api/v1/admin/customers` dependency.
+No Administrator account, password-reset, audit-log browser, backup, or Customer Management screen/API is registered through Sprint 4.
 
 # 11. Administrator Dashboard
 
-Displays canonical counts:
-
-- pending, confirmed, checked-in, checked-out, cancelled, and rejected bookings;
-- submitted, verified, rejected, and refunded payment attempts;
-- active/maintenance/inactive rooms;
-- calculated currently occupied and available-for-dates metrics;
-- pending reviews and unread Administrator notifications.
-
-Dashboard widgets are read-only and link to module screens for action.
+The protected `/admin/dashboard` page is a PHP-rendered landing screen. It has no active dashboard JSON endpoint and must not be documented as proof of completed analytics/reporting widgets. Module pages provide the implemented operational lists and actions.
 
 # 12. Administrator Room Management
 
@@ -230,38 +220,9 @@ Filters use canonical booking statuses only:
 
 Payment information is displayed from payment attempts using canonical payment statuses. No denormalized/arbitrary payment-status edit is offered on the booking form.
 
-## 13.2 Create Booking
+## 13.2 Booking Creation Boundary
 
-Page: `/admin/bookings/create`
-Endpoint: `POST /api/v1/admin/bookings`
-
-### Guest Contact Snapshot
-
-- full name;
-- email;
-- phone.
-
-There is no stored Customer selector, `/api/v1/admin/customers` call, `customer_id`, required `user_id`, or customer-account dependency.
-
-### Room and Stay
-
-- exactly one room selected from calculated available results;
-- check-in/check-out;
-- adults/children;
-- special request;
-- explicit terms/policy acceptance;
-- displayed NPR price/total snapshot.
-
-### State Rules
-
-- no booking-status selector;
-- no payment-status selector;
-- new status is always `pending`;
-- no payment record is automatically required;
-- if payment information is supplied later, Payment Service creates an attempt;
-- Payment Service verification is what allows Booking Service to confirm the booking.
-
-Database tables: `bookings`, `booking_rooms`, `booking_events`, `rooms`. The nonexistent `booking_details` table is not used.
+No `/admin/bookings/create` page or `POST /api/v1/admin/bookings` route is registered through Sprint 4. New Version 1 bookings use the public one-room Guest flow. Administrator booking screens are list/detail plus allowed status actions.
 
 ## 13.3 Booking Detail
 
@@ -286,7 +247,7 @@ Full versus partial manual-refund UI is not defined until **Architect/Client Con
 
 # 15. Administrator Invoice Management
 
-Invoice issue action uses `POST /api/v1/admin/bookings/{bookingId}/invoice`. Totals are derived snapshots and are not editable arbitrary fields. One stable invoice number is retained on repeated issue and print. Sprint 3 displays `NPR 0.00` tax, no service charge, and no edit/delete control.
+Invoice issue action uses `POST /api/v1/admin/bookings/{bookingId}/invoice`. Totals are derived snapshots and are not editable arbitrary fields. One stable invoice number is retained on repeated issue and print. The implemented Version 1 invoice UI displays `NPR 0.00` tax, no service charge, and no edit/delete control.
 
 # 16. Administrator Content Screens
 
@@ -311,9 +272,9 @@ Page editor uses Draft/Published/Archived. Settings screen manages site-wide val
 # 17. Notifications, Users, Audit, and Backups
 
 - Notifications are Administrator-only in-app records with read actions.
-- Users screen manages Administrator accounts only; it does not expose role creation or specialized staff permissions.
-- Audit log is read-only/searchable.
-- Backup screen reflects supported cPanel/application artifacts. Restore UI is not active until a separately reviewed operational procedure exists.
+- Administrator account-management and password-reset screens are not registered through Sprint 4; initial account creation uses the CLI bootstrap command.
+- Audit records are appended internally; no audit-log browser screen is registered through Sprint 4.
+- Backup/restore remains a cPanel/deployment procedure; no backup screen is registered.
 
 # 18. Future Enhancements — Not Version 1 Screens
 
@@ -334,7 +295,7 @@ The following are retained only as future scope and have no active routes, API d
 # 19. Required UI Tests
 
 - Guest booking works without account/customer selection.
-- Admin create booking has snapshot fields, one room, and no arbitrary status controls.
+- No unregistered Administrator booking-create page/API is presented.
 - No booking creation automatically requires a payment record.
 - All current Administrator Fetch calls use `/api/v1/admin/...`.
 - Public Fetch calls use `/api/v1/...`.

@@ -372,6 +372,8 @@ final class AdministratorBootstrapCommandTest extends TestCase
         $environment['APP_ENV'] = $environmentName;
         $environment['APP_URL'] = 'https://example.test';
         $environment['SESSION_SECURE_COOKIE'] = 'true';
+        $environment['MAIL_HOST'] = 'smtp.example.test';
+        $environment['MAIL_FROM_ADDRESS'] = 'stay@example.test';
 
         foreach (['DRIVER', 'HOST', 'PORT', 'DATABASE', 'USERNAME', 'PASSWORD', 'CHARSET', 'COLLATION', 'TIMEZONE', 'CONNECT_TIMEOUT', 'SSL_CA'] as $suffix) {
             $environment['DB_' . $suffix] = $environment['TEST_DB_' . $suffix];
@@ -410,6 +412,15 @@ final class AdministratorBootstrapCommandTest extends TestCase
 
         try {
             foreach ([
+                'notifications',
+                'reviews',
+                'review_invitations',
+                'contact_messages',
+                'pages',
+                'settings',
+                'gallery',
+                'gallery_categories',
+                'activities',
                 'invoice_items',
                 'invoices',
                 'payments',

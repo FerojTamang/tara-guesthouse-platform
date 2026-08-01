@@ -4,7 +4,7 @@ A responsive public website and administration system for Tara Guest House, Saur
 
 ## Documentation Authority
 
-Before implementation, read [Version 1 Architect Decisions](docs/00_V1_ARCHITECT_DECISIONS.md). It overrides conflicting Version 1 statements in other documents. The preserved 38-document suite is indexed in [Documentation Index](docs/33_Documentation_Index.md).
+Before implementation, read [Version 1 Architect Decisions](docs/00_V1_ARCHITECT_DECISIONS.md). It overrides conflicting Version 1 statements in other documents. The numbered project documentation suite and its governance/closure reports are indexed in [Documentation Index](docs/33_Documentation_Index.md).
 
 ## Version 1 Objectives
 
@@ -79,7 +79,7 @@ Copy-Item .env.example .env
 
 Review every local `.env` value before running later application tickets. Never commit `.env`, credentials, logs, sessions, backups, confidential payment proofs, or real uploaded files. Payment proofs belong in approved private runtime storage and must not be directly public.
 
-Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The suite covers the foundation, Administrator authentication, room management, public room pages, date-range availability, transactional one-room Guest booking, concurrency protection, secure booking references and follow-up tokens, public rate limiting, configurable payment methods, private proof storage, retained Guest payment attempts, Administrator payment review and decisions, payment-driven booking confirmation, invoice issue/detail/print workflows, and append-only audit evidence.
+Available test commands are `composer test`, `composer test:unit`, `composer test:integration`, `composer test:feature`, and `composer test:database`. The suite covers the foundation, Administrator authentication, room management, public room pages, date-range availability, transactional one-room Guest booking, concurrency protection, secure booking references and follow-up tokens, public rate limiting, configurable payment methods, private proof storage, retained Guest payment attempts, Administrator payment review and decisions, payment-driven booking confirmation, invoice workflows, activities, gallery uploads/publication, settings/CMS, contact submission, verified-stay reviews, review moderation, Administrator notifications, transactional SMTP failure isolation, and append-only audit evidence.
 
 The core HTTP bootstrap is executable. After configuring the required local environment values, start PHP's development server from the repository root:
 
@@ -87,7 +87,7 @@ The core HTTP bootstrap is executable. After configuring the required local envi
 php -S 127.0.0.1:8080 -t public public/index.php
 ```
 
-Open `http://127.0.0.1:8080/` to verify the temporary infrastructure welcome response. It confirms only that the bootstrap is running; it is not the production homepage. The production Apache/cPanel document root must point to `public/` so application source, configuration, logs, and private files remain outside direct web access.
+Open `http://127.0.0.1:8080/` for the implemented public homepage and `http://127.0.0.1:8080/admin/login` for Administrator access. Features whose approved policy is environment-driven remain fail-closed until their `.env` values are supplied. The production Apache/cPanel document root must point to `public/` so application source, configuration, logs, and private files remain outside direct web access.
 
 ## View Foundation
 
@@ -95,7 +95,7 @@ The application includes a secure PHP view renderer for trusted project template
 
 Templates must escape HTML text and quoted attribute values through the provided `$e` helper. There is no raw HTML helper; renderer-owned layout content is the only approved unescaped composition value. The HTML helper is not a JavaScript, CSS, JSON, URL, or URL-scheme sanitizer. Templates must not access PDO, repositories, services, sessions, environment values, or configuration, and must not send headers, terminate execution, query data, or contain business logic.
 
-The current `/` page remains infrastructure-only. The secure view foundation now also renders the Administrator layout, room-management pages, public room, availability, booking and payment pages, Administrator booking/payment/invoice pages, protected proof responses, and authenticated invoice printing. Final homepage/content design and later Version 1 modules remain deferred to their approved tickets.
+The `/` route now renders the CMS-composed public homepage. The secure view foundation renders the public rooms, availability, booking/payment, activities, gallery, contact, reviews, review invitation, and published CMS pages, plus protected Administrator room, booking, payment, invoice, activity, gallery, settings/page, contact, review, and notification screens. Protected proof responses and authenticated invoice printing remain no-store server responses.
 
 Run the genuine core test suite with:
 
@@ -105,11 +105,11 @@ composer test
 
 Version 1 uses hardened native PHP sessions. The approved local settings use a 30-minute inactivity timeout, a 12-hour absolute lifetime, `SameSite=Lax`, `HttpOnly`, `Path=/`, and a non-Secure cookie only for local HTTP development. Staging and production require HTTPS with `SESSION_SECURE_COOKIE=true`. Private session files are stored in `storage/sessions/`, outside the public document root.
 
-The session-backed CSRF token system is enforced through narrowly scoped middleware on implemented state-changing HTML and JSON routes, including Administrator authentication, room and payment-method management, public booking/payment submission, Administrator booking/payment decisions, and invoice issue. Session identifiers, cookie contents, session values, signed booking-access values, and CSRF tokens must never be logged.
+The session-backed CSRF token system is enforced through narrowly scoped middleware on implemented state-changing HTML and JSON routes, including Administrator authentication, room/payment-method/activity/gallery/CMS/review/notification management, public booking/payment/contact/review submission, Administrator booking/payment decisions, and invoice issue. Session identifiers, cookie contents, session values, signed booking-access values, raw review tokens, SMTP secrets, private paths, and CSRF tokens must never be logged.
 
 ## Database Foundation
 
-S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. Applied domain migrations now include Administrator authentication, rooms, amenities, room images, bookings, one-room snapshots, booking events, audit logs, payment methods, retained payment attempts, invoices, and invoice items. The Sprint 3 local database baseline is 16 applied migrations with zero pending. Migrations remain the executable schema source of truth.
+S0-004 provides strict environment-driven PDO configuration, ordered migrations, checksummed migration history, last-batch rollback, advisory locking, grouped seeders, and a small CLI. The executable schema now contains 25 migrations covering Administrator identity, rooms, bookings/events/audit, payment methods/attempts, invoices/items, activities, gallery categories/items, settings, CMS pages, contact messages, review invitations/reviews, and Administrator notifications. The Sprint 4 local database baseline is 25 applied migrations with zero pending. Migrations remain the executable schema source of truth.
 
 MariaDB 11.8 is the primary tested database engine. Connections use `utf8mb4`, `utf8mb4_unicode_ci`, UTC session time, native prepared statements, and a five-second timeout. Application display dates remain configured through `APP_TIMEZONE=Asia/Kathmandu`. HTTP bootstrap validates database settings but does not eagerly connect.
 
@@ -257,7 +257,18 @@ Sprint 2 automated baseline: **1245 tests, 7597 assertions, 10 skipped, 0 failur
 
 Sprint 3 local automated baseline: **1558 tests, 9631 assertions, 11 skipped, 0 failures** with **16 applied migrations and 0 pending**. See [Sprint 3 QA Closure Report](docs/43_Sprint_3_QA_Closure_Report.md).
 
-**Later phases** — Remaining operations/content modules, notification delivery, dashboard completion, browser/UAT evidence, hardening, cPanel verification, and production deployment remain unimplemented or externally gated.
+**Sprint 4 Phase 5 slice** — Operations and Content is implemented and locally regression-tested:
+- Administrator and public activity catalogue with active/publication controls
+- Secure private gallery image storage, Administrator category/item management, and public gallery filtering
+- Allowlisted typed settings, structured CMS pages, and composed public homepage
+- Public contact submission with Administrator read-only inbox
+- Checked-out-stay review invitations, public submission/listing, and pending-only moderation
+- Administrator-owned notification inbox with unread/read-one/read-all behavior
+- Environment-driven transactional SMTP for approved booking, payment, and review-invitation events after commit
+
+Sprint 4 implementation baseline: **2118 tests, 13044 assertions, 14 skipped, 0 failures** with **25 applied migrations and 0 pending**. See [Sprint 4 QA Closure Report](docs/45_Sprint_4_QA_Closure_Report.md).
+
+**Later phases** — Pull-request approval/merge, post-merge verification, dashboard completion, formal browser/accessibility/UAT evidence, hardening, cPanel verification, backup/restore rehearsal, and production deployment remain externally gated or later approved work.
 
 ## Ownership
 

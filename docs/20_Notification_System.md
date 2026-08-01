@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Implemented and QA synchronized in Sprint 4 — Review Required
 * Scope: Version 1 Administrator in-app notifications and transactional SMTP email
 
 ## 1. Channel and Audience Contract
@@ -32,8 +32,9 @@ SMTP email may be generated after successful events such as:
 
 * booking received, confirmed, cancelled or rejected;
 * payment submitted, verified or rejected;
-* Administrator password reset;
 * review invitation after checkout.
+
+The architect-approved staff password-reset event remains deferred because no password-reset migration, route, or workflow is registered through Sprint 4.
 
 Templates use approved site settings and escape untrusted content. Email recipients/subjects/bodies contain only necessary information; secure links use signed/single-use values and never expose booking data by reference alone.
 
@@ -43,9 +44,9 @@ Templates use approved site settings and escape untrusted content. Email recipie
 2. It records/dispatches the approved notification event.
 3. Notification Service creates the Administrator in-app record where relevant.
 4. Email Service sends through configured SMTP.
-5. Failure is logged with safe metadata and scheduled/retried according to supported configuration.
+5. Failure is logged with fixed event/entity identifiers only. Sprint 4 performs no automatic retry.
 
-A failed notification/email never rolls back an already committed booking/payment/check-out transaction. Permanent background workers are not required; a cPanel cron retry may be used when supported.
+A failed notification/email never rolls back an already committed booking/payment/check-out transaction. Queueing, retry count, backoff, retention, and cron are not implemented and require later approval.
 
 ## 5. In-App UI
 
@@ -59,7 +60,7 @@ Administrator APIs require PHP session/authorization/CSRF for mutations. SMTP cr
 
 ## 7. Configuration Required
 
-SMTP host/port/encryption/sender credentials, retry count/backoff and retention require Architect/Security/Operations Configuration. Values are not hardcoded in this specification.
+SMTP host/port/encryption/sender credentials require protected environment configuration. Staging/production fail closed without complete encrypted SMTP. Retry count/backoff/retention remain unresolved and unimplemented.
 
 ## 8. Acceptance Tests
 

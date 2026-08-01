@@ -154,9 +154,9 @@ final class SessionBootstrapTest extends TestCase
         self::assertSame('/', $cookie['path']);
         self::assertSame('', $cookie['domain']);
 
-        $response = $application->handle(Request::create('GET', '/'));
+        $response = $application->handle(Request::create('GET', '/__session-bootstrap/close'));
 
-        self::assertSame(200, $response->statusCode());
+        self::assertSame(404, $response->statusCode());
         self::assertSame(PHP_SESSION_NONE, session_status());
 
         $configuration = Config::load(CONFIG_PATH, \App\Core\Environment::load($this->basePath));
@@ -164,7 +164,8 @@ final class SessionBootstrapTest extends TestCase
         self::assertTrue($configuration->has('logging'));
         self::assertTrue($configuration->has('session'));
         self::assertTrue($configuration->has('database'));
-        self::assertFalse($configuration->has('mail'));
+        self::assertTrue($configuration->has('mail'));
+        self::assertFalse($configuration->require('mail.enabled'));
         self::assertFalse($configuration->has('authentication'));
         self::assertFalse($configuration->has('upload'));
     }
@@ -174,6 +175,8 @@ final class SessionBootstrapTest extends TestCase
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'false',
+            'MAIL_HOST' => 'smtp.example.test',
+            'MAIL_FROM_ADDRESS' => 'stay@example.test',
         ]);
 
         $this->expectException(ConfigurationException::class);
@@ -185,6 +188,8 @@ final class SessionBootstrapTest extends TestCase
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
+            'MAIL_HOST' => 'smtp.example.test',
+            'MAIL_FROM_ADDRESS' => 'stay@example.test',
         ]);
 
         $application = Bootstrap::boot($this->basePath);
@@ -193,7 +198,7 @@ final class SessionBootstrapTest extends TestCase
 
         self::assertTrue(session_get_cookie_params()['secure']);
 
-        $application->handle(Request::create('GET', '/'));
+        $application->handle(Request::create('GET', '/__session-bootstrap/close'));
         self::assertSame(PHP_SESSION_NONE, session_status());
     }
 

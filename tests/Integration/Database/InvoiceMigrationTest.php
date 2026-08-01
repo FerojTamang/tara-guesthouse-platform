@@ -29,6 +29,15 @@ final class InvoiceMigrationTest extends DatabaseTestCase
         '20260728000200_create_payments_table',
         '20260730000100_create_invoices_table',
         '20260730000200_create_invoice_items_table',
+        '20260730000300_create_activities_table',
+        '20260730000400_create_gallery_categories_table',
+        '20260730000500_create_gallery_table',
+        '20260731000100_create_settings_table',
+        '20260731000200_create_pages_table',
+        '20260731000300_create_contact_messages_table',
+        '20260801000100_create_review_invitations_table',
+        '20260801000200_create_reviews_table',
+        '20260801000300_create_notifications_table',
     ];
 
     private MigrationRunner $runner;

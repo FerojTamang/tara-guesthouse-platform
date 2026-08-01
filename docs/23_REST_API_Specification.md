@@ -6,8 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.2 |
-| Status | Synchronized — Review Required |
+| Version | 1.3 |
+| Status | Implemented route inventory through Sprint 4 — Review Required |
 | Authority | `00_V1_ARCHITECT_DECISIONS.md` |
 | API type | Same-origin JSON interface for PHP-rendered application |
 | Base prefix | `/api/v1` |
@@ -68,30 +68,10 @@
 
 | Method | Exact endpoint | Purpose |
 |---|---|---|
-| POST | `/api/v1/admin/auth/login` | Validate Administrator credentials and create PHP session |
-| POST | `/api/v1/admin/auth/logout` | Destroy current PHP session |
-| GET | `/api/v1/admin/auth/profile` | Return current Administrator profile |
-| PUT | `/api/v1/admin/auth/password` | Change current Administrator password |
-| POST | `/api/v1/admin/auth/forgot-password` | Request staff password-reset email |
-| POST | `/api/v1/admin/auth/reset-password` | Consume staff reset token |
+| POST | `/api/v1/admin/auth/login` | Validate Administrator credentials and create the PHP session |
+| POST | `/api/v1/admin/auth/logout` | Destroy the current PHP session |
 
-Login response contains Administrator profile data and session-authentication confirmation only. It contains no access token, refresh token, token expiry, or bearer-token type.
-
-```json
-{
-  "success": true,
-  "message": "Login successful.",
-  "data": {
-    "authentication": "php_session",
-    "user": {
-      "id": 1,
-      "full_name": "Administrator",
-      "email": "admin@example.com",
-      "role": "Administrator"
-    }
-  }
-}
-```
+Login returns session-authentication confirmation and safe Administrator profile data. No JWT, bearer token, refresh token, profile-update, password-change, forgot-password, or reset-password JSON route is registered through Sprint 4.
 
 ## 3.2 CSRF
 
@@ -101,16 +81,15 @@ Every state-changing Administrator request includes the application CSRF token a
 
 | Method | Exact endpoint | Purpose | Tables |
 |---|---|---|---|
-| GET | `/api/v1/rooms` | Published active room list | `rooms`, `room_types`, `room_images`, `amenities`, `room_amenities` |
-| GET | `/api/v1/rooms/{slug}` | Published active room detail | same as above |
-| GET | `/api/v1/availability` | Calculated date-range availability | `rooms`, `bookings`, `booking_rooms` |
+| GET | `/api/v1/availability` | Calculated date-range room availability | `rooms`, `bookings`, `booking_rooms` |
+| GET | `/api/v1/payment-methods` | Active configured manual payment methods | `payment_methods` |
 | GET | `/api/v1/activities` | Active and published activities | `activities` |
 | GET | `/api/v1/gallery` | Active and published gallery items | `gallery`, `gallery_categories` |
-| GET | `/api/v1/reviews` | Approved reviews | `reviews` |
+| GET | `/api/v1/reviews` | Approved verified-stay reviews | `reviews` |
 | GET | `/api/v1/pages/{slug}` | Published CMS page | `pages` |
-| GET | `/api/v1/settings/public` | Approved public settings | `settings` |
+| GET | `/api/v1/settings/public` | Allowlisted public settings | `settings` |
 
-Public room responses expose calculated `is_available` only when dates are supplied. They never expose `available`, `reserved`, or `occupied` as stored room operational statuses.
+Room list/detail are PHP-rendered routes at `/rooms` and `/rooms/{slug}`; no `/api/v1/rooms` route is registered. Public repositories enforce active/published/approved/public eligibility before controllers serialize responses.
 
 ## 4.1 Availability Request
 
@@ -203,7 +182,6 @@ Exactly one `room_id` is accepted. Arrays such as `room_ids` or multiple room ob
 
 | Method | Exact endpoint | Purpose | Authentication |
 |---|---|---|---|
-| GET | `/api/v1/payment-methods` | Active configured manual methods | Public |
 | POST | `/api/v1/payments` | Create and submit one payment attempt | Signed booking access plus rate/upload controls |
 
 ## 6.1 Request
@@ -247,37 +225,13 @@ Contact request fields are `name`, `email`, optional `phone`, `subject`, and `me
 
 # 8. Administrator Dashboard
 
-| Method | Exact endpoint | Purpose | Tables |
-|---|---|---|---|
-| GET | `/api/v1/admin/dashboard` | Canonical operational metrics | Approved module tables |
+The implemented Dashboard is the protected PHP-rendered route `GET /admin/dashboard`. No `/api/v1/admin/dashboard` JSON route is registered through Sprint 4. Viewing the dashboard does not mutate business data.
 
-Metrics use canonical booking/payment statuses and calculated room availability. Dashboard endpoints do not mutate business data.
+# 9. Administrator Room Management Route Boundary
 
-# 9. Administrator Room APIs
+Room, room-type, amenity, and room-image management is implemented through protected PHP page/form routes under `/admin/rooms`, `/admin/room-types`, and `/admin/amenities`. These forms use Administrator session authentication and CSRF protection.
 
-| Method | Exact endpoint | Purpose |
-|---|---|---|
-| GET | `/api/v1/admin/room-types` | List room types |
-| POST | `/api/v1/admin/room-types` | Create room type |
-| GET | `/api/v1/admin/room-types/{id}` | Room-type detail |
-| PUT | `/api/v1/admin/room-types/{id}` | Update room type |
-| DELETE | `/api/v1/admin/room-types/{id}` | Soft-delete/deactivate where history requires |
-| GET | `/api/v1/admin/rooms` | List all rooms and calculated current conditions |
-| POST | `/api/v1/admin/rooms` | Create room |
-| GET | `/api/v1/admin/rooms/{id}` | Room detail |
-| PUT | `/api/v1/admin/rooms/{id}` | Update room data |
-| PATCH | `/api/v1/admin/rooms/{id}/operational-status` | Set `active`, `maintenance`, or `inactive` |
-| PATCH | `/api/v1/admin/rooms/{id}/publication` | Set publication boolean |
-| DELETE | `/api/v1/admin/rooms/{id}` | Soft-delete/deactivate subject to history |
-| POST | `/api/v1/admin/rooms/{id}/images` | Upload validated room image |
-| PATCH | `/api/v1/admin/rooms/{id}/images/{imageId}` | Update primary/order/alt data |
-| DELETE | `/api/v1/admin/rooms/{id}/images/{imageId}` | Remove image when allowed |
-| GET | `/api/v1/admin/amenities` | List amenities |
-| POST | `/api/v1/admin/amenities` | Create amenity |
-| PUT | `/api/v1/admin/amenities/{id}` | Update amenity |
-| PUT | `/api/v1/admin/rooms/{id}/amenities` | Replace room amenity assignments |
-
-No endpoint writes Available, Reserved, or Occupied to a room. Administrator list responses may include calculated `is_available_for_dates`, `has_current_checked_in_booking`, and blocking-booking summaries derived from bookings.
+No `/api/v1/admin/rooms`, `/api/v1/admin/room-types`, `/api/v1/admin/amenities`, or room-image JSON route is registered through Sprint 4. No route writes Available, Reserved, or Occupied as a stored room operational status.
 
 # 10. Administrator Booking API
 
@@ -360,7 +314,7 @@ Activity create/update fields are limited to `title`, `slug`, `description`, fix
 | PATCH | `/api/v1/admin/gallery/reorder` | Update ordering |
 | DELETE | `/api/v1/admin/gallery/{id}` | Deactivate/unpublish; no hard delete |
 
-Gallery create/update fields map only to nullable `gallery_category_id`, `title`, `caption`, `file_path` supplied by the secure upload workflow, `alt_text`, `sort_order`, `is_active` and `is_published`. There is no `media_files`, featured, uploaded-by, deleted-at or generated-image field.
+Gallery creation accepts nullable `gallery_category_id`, `title`, `caption`, `alt_text`, `sort_order`, `is_active`, `is_published`, and exactly one multipart `image` upload. The server validates and stores the file, then owns `file_path`; clients cannot submit an authoritative path. Metadata updates do not replace the image. There is no `media_files`, featured, uploaded-by, deleted-at or generated-image field.
 
 # 15. Administrator Review APIs
 
@@ -376,11 +330,10 @@ The endpoint cannot create eligibility, change the linked booking, or accept a r
 
 | Method | Exact endpoint | Purpose |
 |---|---|---|
-| GET | `/api/v1/admin/contact-messages` | List/search messages |
+| GET | `/api/v1/admin/contact-messages` | List retained messages |
 | GET | `/api/v1/admin/contact-messages/{id}` | Message detail |
-| PATCH | `/api/v1/admin/contact-messages/{id}/status` | Update approved contact workflow status |
 
-Final status vocabulary, assignment, retention, and SLA must be confirmed before this endpoint's allowed status values are implemented. **Architect/Client Confirmation Required.**
+The Sprint 4 workflow is read-only for Administrators. Final status vocabulary, assignment, retention, and SLA remain **Architect/Client Confirmation Required**, so `/api/v1/admin/contact-messages/{id}/status` is intentionally absent.
 
 # 17. Administrator CMS and Settings APIs
 
@@ -408,28 +361,11 @@ There is no customer notification inbox in Version 1. SMS, WhatsApp, push, and W
 
 # 19. Administrator User APIs
 
-Version 1 user APIs manage Administrator staff accounts only. They do not create customers or specialized staff roles.
-
-| Method | Exact endpoint | Purpose |
-|---|---|---|
-| GET | `/api/v1/admin/users` | List Administrator accounts |
-| POST | `/api/v1/admin/users` | Create Administrator account |
-| GET | `/api/v1/admin/users/{id}` | Administrator account detail |
-| PUT | `/api/v1/admin/users/{id}` | Update Administrator account |
-| PATCH | `/api/v1/admin/users/{id}/status` | Set active/inactive/locked according to security rules |
-| POST | `/api/v1/admin/users/{id}/password-reset` | Initiate staff reset process |
-
-Guest is never returned as a stored role. Customer, Receptionist, Manager, Accountant, and Content Manager account/permission APIs are Future Enhancements and have no active Version 1 endpoints.
+No Administrator-account management JSON route is registered through Sprint 4. Initial Administrator creation remains a protected CLI bootstrap workflow. Guest/customer and specialized staff account APIs are Future Enhancements.
 
 # 20. Administrator Backup and Audit APIs
 
-| Method | Exact endpoint | Purpose | Data source |
-|---|---|---|---|
-| GET | `/api/v1/admin/audit-logs` | Search append-only audit records | `audit_logs` |
-| GET | `/api/v1/admin/backups` | List approved cPanel/application backup artifacts | Filesystem/hosting implementation artifact |
-| POST | `/api/v1/admin/backups` | Request supported backup operation | Hosting implementation artifact |
-
-Restore is not exposed as a general JSON endpoint until a separately reviewed operational procedure defines authorization, confirmation, validation, and rollback. Backup capabilities depend on the selected cPanel host.
+No `/api/v1/admin/audit-logs` or `/api/v1/admin/backups` route is registered through Sprint 4. Audit evidence is appended internally by approved workflows. Backup/restore remains an operational cPanel/deployment procedure until a separately approved authenticated interface exists.
 
 # 21. Upload Contract
 
@@ -452,6 +388,9 @@ List endpoints accept only documented/allowlisted filters. Canonical status filt
 # 23. Future Enhancements — No Active Version 1 Endpoints
 
 - customer registration/login/profile/portal APIs;
+- Administrator account-management, password-reset, audit-log, backup, and dashboard JSON APIs;
+- Administrator room/room-type/amenity JSON APIs;
+- contact-message status mutation;
 - Role Management and permission-assignment APIs;
 - Receptionist, Manager, Accountant, and Content Manager APIs;
 - JWT/access-token/refresh-token APIs;
@@ -478,4 +417,5 @@ No route in this section may be registered in Version 1 without a later approved
 - public publication filters;
 - response envelope and validation errors;
 - upload security;
-- future endpoints are absent.
+- future and documentation-only endpoints are absent.
+- the static inventory matches the 48 registered routes in `routes/api.php`.

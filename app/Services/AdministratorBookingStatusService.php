@@ -9,7 +9,9 @@ use App\Models\AuditLogEntry;
 use App\Models\Booking;
 use App\Models\BookingStatusSnapshot;
 use App\Models\BookingStatusTransitionResult;
+use App\Models\IssuedReviewInvitation;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\BookingCatalogRepository;
 use App\Repositories\BookingStatusWriteRepository;
 use App\Requests\AdministratorBookingStatusRequest;
 use Closure;
@@ -17,6 +19,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use JsonException;
 use RuntimeException;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -33,6 +36,9 @@ final class AdministratorBookingStatusService
         private readonly AuditLogWriteRepository $auditLogs,
         private readonly BookingTransaction $transaction,
         ?callable $clock = null,
+        private readonly ?CheckoutReviewInvitationCoordinator $reviewInvitations = null,
+        private readonly ?BookingCatalogRepository $bookingCatalog = null,
+        private readonly ?TransactionalMailDispatcher $mail = null,
     ) {
         $this->clock = $clock === null
             ? static fn (): DateTimeImmutable => new DateTimeImmutable(
@@ -101,9 +107,18 @@ final class AdministratorBookingStatusService
                 $userAgent,
                 $changedAt,
             ));
+            $issuedInvitation = $this->createReviewInvitation(
+                $current->id(),
+                $targetStatus,
+                $administratorId,
+                $ipAddress,
+                $userAgent,
+            );
 
             $commitAttempted = true;
             $this->transaction->commit();
+            $this->deliverReviewInvitation($issuedInvitation);
+            $this->deliverBookingStatus($current->id(), $targetStatus);
 
             return new BookingStatusTransitionResult(
                 $current->id(),
@@ -136,6 +151,67 @@ final class AdministratorBookingStatusService
             }
 
             throw $safeFailure;
+        }
+    }
+
+    private function createReviewInvitation(
+        int $bookingId,
+        string $targetStatus,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ?IssuedReviewInvitation {
+        if (
+            $targetStatus !== Booking::STATUS_CHECKED_OUT
+            || !$this->reviewInvitations instanceof CheckoutReviewInvitationCoordinator
+        ) {
+            return null;
+        }
+
+        return $this->reviewInvitations->createDuringCheckout(
+            $bookingId,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+        );
+    }
+
+    private function deliverReviewInvitation(#[SensitiveParameter] ?IssuedReviewInvitation $invitation): void
+    {
+        if (
+            !$invitation instanceof IssuedReviewInvitation
+            || !$this->reviewInvitations instanceof CheckoutReviewInvitationCoordinator
+        ) {
+            return;
+        }
+
+        try {
+            $this->reviewInvitations->deliverAfterCommit($invitation);
+        } catch (Throwable) {
+            error_log('Review invitation post-commit delivery failed.');
+        }
+    }
+
+    private function deliverBookingStatus(int $bookingId, string $targetStatus): void
+    {
+        if (
+            !in_array($targetStatus, [Booking::STATUS_CANCELLED, Booking::STATUS_REJECTED], true)
+            || !$this->bookingCatalog instanceof BookingCatalogRepository
+            || !$this->mail instanceof TransactionalMailDispatcher
+        ) {
+            return;
+        }
+
+        try {
+            $booking = $this->bookingCatalog->findById($bookingId);
+
+            if (!$booking instanceof Booking) {
+                throw BookingException::failure();
+            }
+
+            $this->mail->bookingStatusChanged($booking, $targetStatus);
+        } catch (Throwable) {
+            error_log('Booking status post-commit email delivery failed.');
         }
     }
 

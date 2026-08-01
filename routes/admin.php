@@ -3,11 +3,17 @@
 declare(strict_types=1);
 
 use App\Controllers\AdministratorAmenityController;
+use App\Controllers\AdministratorActivityController;
 use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
+use App\Controllers\AdministratorCmsController;
+use App\Controllers\AdministratorContactController;
+use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorNotificationController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
+use App\Controllers\AdministratorReviewController;
 use App\Controllers\AdministratorRoomCatalogController;
 use App\Controllers\AdministratorRoomController;
 use App\Controllers\AdministratorRoomImageController;
@@ -34,6 +40,12 @@ return static function (
     ?AdministratorPaymentMethodController $paymentMethodController = null,
     ?AdministratorPaymentController $paymentController = null,
     ?AdministratorInvoiceController $invoiceController = null,
+    ?AdministratorActivityController $activityController = null,
+    ?AdministratorGalleryController $galleryController = null,
+    ?AdministratorCmsController $cmsController = null,
+    ?AdministratorContactController $contactController = null,
+    ?AdministratorReviewController $reviewController = null,
+    ?AdministratorNotificationController $notificationController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -51,6 +63,12 @@ return static function (
         && $paymentMethodController === null
         && $paymentController === null
         && $invoiceController === null
+        && $activityController === null
+        && $galleryController === null
+        && $cmsController === null
+        && $contactController === null
+        && $reviewController === null
+        && $notificationController === null
     ) {
         return;
     }
@@ -125,6 +143,89 @@ return static function (
         $router->get(
             '/admin/invoices/{id}',
             [$invoiceController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($activityController !== null) {
+        $router->get(
+            '/admin/activities',
+            [$activityController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/activities/create',
+            [$activityController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/activities/{id}/edit',
+            [$activityController, 'editForm'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($galleryController !== null) {
+        $router->get(
+            '/admin/gallery',
+            [$galleryController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/categories',
+            [$galleryController, 'categories'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/create',
+            [$galleryController, 'createForm'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/gallery/{id}/edit',
+            [$galleryController, 'editForm'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($cmsController !== null) {
+        $router->get('/admin/settings', [$cmsController, 'settings'], [$requireAdministrator]);
+        $router->get('/admin/pages', [$cmsController, 'pages'], [$requireAdministrator]);
+        $router->get('/admin/pages/create', [$cmsController, 'createPageForm'], [$requireAdministrator]);
+        $router->get('/admin/pages/{id}/edit', [$cmsController, 'editPageForm'], [$requireAdministrator]);
+        $router->get('/admin/pages/{id}', [$cmsController, 'showPage'], [$requireAdministrator]);
+    }
+
+    if ($reviewController !== null) {
+        $router->get(
+            '/admin/reviews',
+            [$reviewController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/reviews/{id}',
+            [$reviewController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($notificationController !== null) {
+        $router->get(
+            '/admin/notifications',
+            [$notificationController, 'index'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($contactController !== null) {
+        $router->get(
+            '/admin/contact-messages',
+            [$contactController, 'index'],
+            [$requireAdministrator],
+        );
+        $router->get(
+            '/admin/contact-messages/{id}',
+            [$contactController, 'show'],
             [$requireAdministrator],
         );
     }

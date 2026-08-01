@@ -11,6 +11,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\PaymentStatusTransitionResult;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\BookingCatalogRepository;
 use App\Repositories\PaymentWriteRepository;
 use App\Requests\AdministratorPaymentStatusRequest;
 use Closure;
@@ -34,6 +35,8 @@ final readonly class AdministratorPaymentStatusService
         private VerifiedPaymentBookingConfirmer $bookingConfirmer,
         private BookingTransaction $transaction,
         ?callable $clock = null,
+        private ?BookingCatalogRepository $bookingCatalog = null,
+        private ?TransactionalMailDispatcher $mail = null,
     ) {
         $this->clock = Closure::fromCallable(
             $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable(
@@ -108,6 +111,7 @@ final readonly class AdministratorPaymentStatusService
 
             $commitAttempted = true;
             $this->transaction->commit();
+            $this->deliverPaymentReviewed($reviewed);
 
             return new PaymentStatusTransitionResult(
                 $reviewed->id(),
@@ -201,6 +205,29 @@ final readonly class AdministratorPaymentStatusService
             ),
             $changedAt,
         ];
+    }
+
+
+    private function deliverPaymentReviewed(Payment $payment): void
+    {
+        if (
+            !$this->bookingCatalog instanceof BookingCatalogRepository
+            || !$this->mail instanceof TransactionalMailDispatcher
+        ) {
+            return;
+        }
+
+        try {
+            $booking = $this->bookingCatalog->findById($payment->bookingId());
+
+            if (!$booking instanceof Booking) {
+                throw AdministratorPaymentException::failure();
+            }
+
+            $this->mail->paymentReviewed($booking, $payment);
+        } catch (Throwable) {
+            error_log('Payment review post-commit email delivery failed.');
+        }
     }
 
     private function now(): DateTimeImmutable

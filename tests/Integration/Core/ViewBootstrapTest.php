@@ -130,17 +130,17 @@ final class ViewBootstrapTest extends TestCase
         parent::tearDown();
     }
 
-    public function testBootstrapConstructsRendererAndRendersRootWithoutOpeningPdo(): void
+    public function testBootstrapConstructsRendererAndRendersLoginWithoutOpeningPdo(): void
     {
         $application = Bootstrap::boot(dirname(__DIR__, 3));
         $this->handlersRegistered = true;
         $this->repositorySessionIds[] = session_id();
-        $response = $application->handle(Request::create('GET', '/'));
+        $response = $application->handle(Request::create('GET', '/admin/login'));
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringContainsString('<!doctype html>', $response->body());
-        self::assertStringContainsString('The PHP view renderer is operational.', $response->body());
+        self::assertStringContainsString('Administrator login', $response->body());
         self::assertSame(PHP_SESSION_NONE, session_status());
     }
 

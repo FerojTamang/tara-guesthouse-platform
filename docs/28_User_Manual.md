@@ -2,7 +2,7 @@
 
 ## Document Information
 
-* Status: Synchronized — Review Required
+* Status: Sprint 4 implemented workflows — Review Required
 * Authority: `00_V1_ARCHITECT_DECISIONS.md`
 * Scope: Version 1 Guest and Administrator workflows
 
@@ -89,7 +89,11 @@ The review remains subject to moderation before public publication. A used, inva
 
 ### 2.7 Contact the guest house
 
-Use the public contact form to submit a name, email, phone when requested, subject and message. The system records the message and may send an SMTP email notification. Do not include payment secrets or other highly sensitive data in a contact message.
+Use the public contact form to submit a name, email, optional phone, subject and message. The system validates and retains the message. Do not include payment secrets or other highly sensitive data in a contact message.
+
+### 2.8 Browse activities, gallery, reviews, and pages
+
+The public Activities and Gallery pages show only records that are both active and published. The Reviews page shows approved verified-stay reviews only. About, policy, and other managed pages are available only while their CMS status is `published`; draft and archived pages return a safe Not Found response.
 
 ## 3. Administrator Access
 
@@ -138,18 +142,9 @@ Administrators may create and update room details, room type, capacity, NPR rate
 
 ## 6. Booking Management
 
-### 6.1 Create a booking for a Guest
+### 6.1 Booking creation boundary
 
-The Administrator Create Booking screen uses Guest contact snapshot fields. It does not search for or require a registered customer.
-
-1. Select dates and check calculated availability.
-2. Select exactly one eligible room.
-3. Enter the Guest name, email and phone.
-4. Enter guest count and any permitted special request.
-5. Record terms/policy acceptance as required by the workflow.
-6. Create the booking.
-
-The new booking always starts as `pending`. The form does not allow an arbitrary booking or payment status to be selected and does not always create a payment attempt.
+Sprint 4 does not register an Administrator booking-create screen or JSON endpoint. New Version 1 bookings are created through the public Guest booking flow for exactly one eligible room. Administrators use the protected booking list/detail screens to review existing bookings and perform allowed status transitions.
 
 ### 6.2 Booking actions
 
@@ -192,11 +187,11 @@ Invoices preserve fixed-precision NPR booking/payment snapshots and immutable ac
 
 ## 9. Activities and Gallery
 
-Activities and gallery items keep their active control separate from their publication control. An item can be operationally retained but not publicly published. Administrators should review content, media and publication settings before making an item public.
+Activities and gallery items keep their active control separate from their publication control. Administrators can create/edit activities, manage gallery categories/items, reorder gallery items, and deactivate/unpublish without hard deletion. Gallery uploads must satisfy the configured image policy; the server chooses the stored filename and private path. Only active and published records appear publicly.
 
 ## 10. CMS and Settings
 
-Use Settings for simple site configuration. Use structured CMS page/content records for managed pages.
+Use Settings for simple allowlisted site configuration. Only configured keys and types can be changed; this is not an arbitrary secret editor. Use structured CMS page/content records for managed pages.
 
 CMS content uses:
 
@@ -208,19 +203,19 @@ Only `published` content appears publicly. CMS `archived` is a content status an
 
 ## 11. Review Moderation
 
-Administrators review verified-stay submissions and apply the documented moderation action. Eligibility remains tied to a checked-out booking and a valid invitation; moderation cannot make an ineligible submission valid.
+Administrators review verified-stay submissions in Pending/Approved/Rejected lists. Only a pending review can be approved or rejected. Rejection requires a moderation note, and any note must stay within the configured limit. Eligibility remains tied to a checked-out booking and a valid invitation; moderation cannot make an ineligible submission valid.
 
 ## 12. Contacts and Notifications
 
-Administrators may review contact messages and in-app notifications. Version 1 notification channels are in-app notifications and SMTP email. SMS, push and WhatsApp are Future Enhancements.
+Administrators may review contact messages through read-only list/detail screens. No contact status, assignment, delete, or SLA action is available until a policy is approved.
+
+The notification page shows only the signed-in Administrator's retained notifications, newest first. A notification can be marked read, or all current notifications can be marked read. There is no delete/archive action and no Guest notification centre. Version 1 delivery channels are Administrator in-app notifications and approved transactional SMTP email; SMS, push and WhatsApp are Future Enhancements.
 
 Failed email delivery does not reverse a successful booking, payment or check-out transaction. Delivery failures are recorded for operational follow-up.
 
 ## 13. Administrator Accounts, Backups and Audit
 
-Version 1 Administrator-account management must not offer Guest or specialized staff roles. Administrators with the authorized account-management capability may manage other Administrator records according to the approved security rules.
-
-Backup and audit actions are protected Administrator functions. A backup operation must report success or failure honestly. Audit records must not be edited to hide an action.
+Sprint 4 does not register Administrator account-management, password-reset, audit-log browser, or backup UI/API routes. The initial Administrator is created through the protected CLI bootstrap command. Approved workflows append audit evidence internally, and backup/restore remains a documented cPanel/operations procedure.
 
 ## 14. Common Problems
 

@@ -332,6 +332,15 @@ PHP);
 
         try {
             foreach ([
+                'notifications',
+                'reviews',
+                'review_invitations',
+                'contact_messages',
+                'pages',
+                'settings',
+                'gallery',
+                'gallery_categories',
+                'activities',
                 'invoice_items',
                 'invoices',
                 'payments',

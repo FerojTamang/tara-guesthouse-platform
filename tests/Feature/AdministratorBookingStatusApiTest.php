@@ -16,6 +16,8 @@ use App\Core\ViewRenderer;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
 use App\Models\BookingStatusSnapshot;
+use App\Models\IssuedReviewInvitation;
+use App\Models\ReviewInvitation;
 use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\BookingCatalogRepository;
 use App\Repositories\BookingStatusWriteRepository;
@@ -27,6 +29,7 @@ use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\AdministratorLogoutService;
 use App\Services\BookingTransaction;
+use App\Services\CheckoutReviewInvitationCoordinator;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
@@ -55,6 +58,8 @@ final class AdministratorBookingStatusApiTest extends TestCase
     private BookingStatusApiRepositoryFake $bookings;
 
     private BookingStatusApiAuditFake $audit;
+
+    private BookingStatusApiReviewCoordinatorFake $reviewInvitations;
 
     protected function setUp(): void
     {
@@ -94,6 +99,7 @@ final class AdministratorBookingStatusApiTest extends TestCase
         $this->bookings = new BookingStatusApiRepositoryFake();
         $this->audit = new BookingStatusApiAuditFake();
         $transaction = new BookingStatusApiTransactionFake();
+        $this->reviewInvitations = new BookingStatusApiReviewCoordinatorFake();
         $readRepository = $this->createStub(
             BookingCatalogRepository::class,
         );
@@ -112,6 +118,7 @@ final class AdministratorBookingStatusApiTest extends TestCase
                     static fn (): DateTimeImmutable => new DateTimeImmutable(
                         '2026-08-01 12:00:00 UTC',
                     ),
+                    $this->reviewInvitations,
                 ),
             ),
             $this->administratorSession,
@@ -243,6 +250,32 @@ final class AdministratorBookingStatusApiTest extends TestCase
         self::assertStringNotContainsString('guest_phone', $response->body());
     }
 
+    public function testCheckoutSucceedsWhenPostCommitInvitationDeliveryFails(): void
+    {
+        $this->authenticate();
+        $this->bookings->current = new BookingStatusSnapshot(
+            31,
+            'TGH-2026-STATUSAPI000000001',
+            Booking::STATUS_CHECKED_IN,
+        );
+        $this->reviewInvitations->issued = self::issuedInvitation();
+        $this->reviewInvitations->deliveryFailure = new RuntimeException('private raw token failure');
+
+        $response = $this->router->dispatch($this->request(self::checkoutJson()));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame(Booking::STATUS_CHECKED_OUT, json_decode(
+            $response->body(),
+            true,
+            16,
+            JSON_THROW_ON_ERROR,
+        )['data']['booking_status']);
+        self::assertSame(1, $this->reviewInvitations->createCalls);
+        self::assertSame(1, $this->reviewInvitations->deliveryCalls);
+        self::assertStringNotContainsString('private', $response->body());
+        self::assertStringNotContainsString(self::issuedInvitation()->token(), $response->body());
+    }
+
     public function testContentTypeAndMalformedBodiesFailWithoutStatusWrite(): void
     {
         $this->authenticate();
@@ -352,6 +385,28 @@ final class AdministratorBookingStatusApiTest extends TestCase
         );
     }
 
+    private static function checkoutJson(): string
+    {
+        return json_encode([
+            'status' => Booking::STATUS_CHECKED_OUT,
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    private static function issuedInvitation(): IssuedReviewInvitation
+    {
+        return new IssuedReviewInvitation(
+            new ReviewInvitation(
+                77,
+                31,
+                hash('sha256', str_repeat('ab', 32)),
+                new DateTimeImmutable('2026-08-08 12:00:00 UTC'),
+                null,
+                new DateTimeImmutable('2026-08-01 12:00:00 UTC'),
+            ),
+            str_repeat('ab', 32),
+        );
+    }
+
     private static function cancelJson(): string
     {
         return json_encode([
@@ -408,6 +463,34 @@ final class BookingStatusApiAuthenticatorFake implements AdministratorAuthentica
         string $context = 'http',
     ): AdministratorIdentity {
         return new AdministratorIdentity(91);
+    }
+}
+
+final class BookingStatusApiReviewCoordinatorFake implements CheckoutReviewInvitationCoordinator
+{
+    public ?IssuedReviewInvitation $issued = null;
+    public ?RuntimeException $deliveryFailure = null;
+    public int $createCalls = 0;
+    public int $deliveryCalls = 0;
+
+    public function createDuringCheckout(
+        int $bookingId,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ?IssuedReviewInvitation {
+        $this->createCalls++;
+
+        return $this->issued;
+    }
+
+    public function deliverAfterCommit(IssuedReviewInvitation $invitation): void
+    {
+        $this->deliveryCalls++;
+
+        if ($this->deliveryFailure !== null) {
+            throw $this->deliveryFailure;
+        }
     }
 }
 

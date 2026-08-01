@@ -6,8 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.2 |
-| Status | Synchronized — Review Required |
+| Version | 1.3 |
+| Status | Implemented through Sprint 4 — Review required |
 | Authority | `00_V1_ARCHITECT_DECISIONS.md` |
 | Database | MariaDB/MySQL |
 | Executable source of truth | Versioned database migrations |
@@ -31,7 +31,7 @@ This document defines the approved Version 1 relational data design. The databas
 
 | Module | Tables |
 |---|---|
-| Administrator authentication | `roles`, `users`, `password_resets` |
+| Administrator authentication | `roles`, `users` |
 | Rooms | `room_types`, `rooms`, `room_images`, `amenities`, `room_amenities` |
 | Bookings | `bookings`, `booking_rooms`, `booking_events` |
 | Payments and invoices | `payment_methods`, `payments`, `invoices`, `invoice_items` |
@@ -46,7 +46,7 @@ Version 1 stores Administrator staff accounts only. Guest is an unauthenticated 
 
 Customer registration and the customer portal are future enhancements. A nullable future customer/user relationship may exist on a booking, but Version 1 booking creation must not require it.
 
-Password-reset records apply only to staff Administrator accounts and must store hashed tokens, expiry, and single-use state.
+A `password_resets` table and staff reset workflow are not present in the 25 executable migrations. Any later reset implementation must be Administrator-only and must store only a hash, expiry, and single-use state.
 
 # 5. Room Model
 
@@ -149,9 +149,9 @@ Automatic gateway callbacks and gateway refunds are future. The client policy fo
 - Invoice numbers are unique and stable.
 - Monetary values are fixed-precision NPR snapshots derived from booking and verified-payment data.
 - Later room-price changes do not alter issued invoices.
-- Issued invoices are not deleted or edited through Sprint 3 routes.
+- Issued invoices are not deleted or edited through implemented Version 1 routes.
 - Invoice issue is audited; a later approved correction policy must add separate audited behavior rather than rewriting issued snapshots.
-- Version 1 Sprint 3 tax is exactly `NPR 0.00`; no service charge is stored or calculated.
+- The implemented Version 1 invoice tax is exactly `NPR 0.00`; no service charge is stored or calculated.
 
 # 9. CMS and Settings
 
@@ -160,7 +160,7 @@ Version 1 uses two structures:
 1. `settings` for site-wide configuration such as contact information, social links, booking policies, and operational settings.
 2. `pages` for structured About, policy, and other public content.
 
-`pages.status` uses exactly `draft`, `published`, or `archived`. Only published pages are public. Full version history and rollback are future enhancements.
+`pages.status` uses exactly `draft`, `published`, or `archived`. Only published pages are public. `settings` updates are limited to an environment-provided key/type/publicity allowlist, and public reads require `is_public = true`. Full version history and rollback are future enhancements.
 
 # 10. Activities and Gallery
 
@@ -169,7 +169,7 @@ Activities and gallery items each have separate controls for business activity a
 - `is_active` controls operational use;
 - `is_published` controls public visibility.
 
-Only active and published records are public. These controls must not be collapsed into one ambiguous status.
+Only active and published records are public. These controls must not be collapsed into one ambiguous status. Gallery files use server-generated names and safe relative paths under private non-executable storage; the executable schema stores no public absolute path.
 
 # 11. Reviews
 
@@ -179,12 +179,14 @@ A review is eligible only for a booking whose `booking_status = checked_out`.
 - Status values: `pending`, `approved`, `rejected`.
 - Only approved reviews are public.
 - Customer login is not required.
-- `review_invitations` stores a securely generated token hash, booking, expiry, use timestamp, and creation timestamp.
+- `review_invitations` stores one 64-character lowercase SHA-256 token hash, booking, expiry, use timestamp, and creation timestamp.
 - The invitation is single-use and cannot create a second review for the same booking.
 
 # 12. Notifications and Email
 
-Version 1 stores in-app Administrator notifications and logs transactional SMTP delivery attempts/failures as appropriate. An email failure does not roll back a committed booking or payment transaction.
+Version 1 stores retained in-app notifications owned by one Administrator `user_id`, with optional related entity data and a nullable `read_at`. Read actions are owner-scoped; normal administration provides no delete/archive workflow.
+
+Transactional SMTP is not persisted as a queue table. One delivery attempt occurs only after the owning booking, payment, or checkout transaction commits. A delivery failure is sanitized and logged without rolling back committed domain state.
 
 SMS, WhatsApp, push, WebSockets, and permanent queue-worker data are future enhancements.
 
@@ -196,12 +198,7 @@ Audit and booking-event records are retained and are not editable through normal
 
 # 14. Migration and Seeder Requirements
 
-Migrations must create all approved Version 1 tables, fields, foreign keys, indexes, and constraints in dependency order. Seeders create:
-
-- the Administrator role;
-- the initial Administrator account through a secure deployment process;
-- essential settings;
-- configured manual payment methods.
+Migrations must create all approved Version 1 tables, fields, foreign keys, indexes, and constraints in dependency order. The executable production seeder creates only the non-secret `Administrator` role prerequisite. The initial Administrator account is created through the protected single-use CLI bootstrap command, not a seeder. Settings and payment methods are configured through their approved authenticated/deployment workflows rather than invented default seed data.
 
 # 15. Required Database Tests
 
@@ -222,7 +219,7 @@ The database implementation must not guess these values:
 
 - full versus partial manual refund policy;
 - any future non-zero tax/VAT, service-charge, credit-note, or invoice-correction policy;
-- review-invitation expiry;
+- the deployment value for review-invitation expiry (required by configuration; no hardcoded fallback);
 - contact-message retention duration.
 
 They require an approved client/architect policy or implementation ticket before related constraints are finalized.
