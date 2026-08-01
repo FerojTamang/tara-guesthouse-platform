@@ -127,6 +127,46 @@ final class AdministratorAuthenticationServiceTest extends TestCase
         }
     }
 
+    public function testMalformedStoredHashDeletedAndNonAdministratorAccountsFailClosed(): void
+    {
+        $created = new DateTimeImmutable('2026-07-21 00:00:00 UTC');
+
+        foreach ([
+            'malformed hash' => $this->user(passwordHash: 'not-a-password-hash'),
+            'deleted' => $this->user(deletedAt: $created),
+            'non-administrator' => $this->user(role: new Role(2, 'Reception', null, $created, $created)),
+        ] as $case => $user) {
+            $this->removeRateLimitDirectory();
+            $repository = new AuthenticationRepositoryFake($user);
+            $logger = new AuthenticationLoggerFake();
+            $service = $this->service(
+                $repository,
+                $logger,
+                static fn (string $password, string $hash): bool => password_verify($password, $hash),
+            );
+            $identity = null;
+
+            try {
+                $identity = $service->authenticate(
+                    AdministratorLoginRequest::fromInput('administrator', 'test-only-password', self::policy()),
+                    '127.0.0.1',
+                );
+                self::fail('Expected generic credential rejection for ' . $case);
+            } catch (AdministratorAuthenticationException $exception) {
+                self::assertTrue($exception->isCredentialFailure());
+                self::assertSame('The supplied credentials are invalid.', $exception->getMessage());
+                self::assertStringNotContainsString('test-only-password', $exception->getMessage());
+                self::assertStringNotContainsString('not-a-password-hash', $exception->getMessage());
+                self::assertNull($identity);
+                self::assertNull($repository->recordedUserId);
+                self::assertNull($repository->recordedReplacementHash);
+                self::assertSame('administrator_login_rejected', $logger->records[0]['message']);
+                self::assertArrayNotHasKey('password', $logger->records[0]['context']);
+                self::assertArrayNotHasKey('password_hash', $logger->records[0]['context']);
+            }
+        }
+    }
+
     public function testTheFifthFailureImmediatelyReturnsTheRateLimitFailure(): void
     {
         $repository = new AuthenticationRepositoryFake(null);
@@ -278,10 +318,15 @@ final class AdministratorAuthenticationServiceTest extends TestCase
         );
     }
 
-    private function user(string $status = User::STATUS_ACTIVE): User
+    private function user(
+        string $status = User::STATUS_ACTIVE,
+        ?Role $role = null,
+        string $passwordHash = 'stored-password-hash',
+        ?DateTimeImmutable $deletedAt = null,
+    ): User
     {
         $created = new DateTimeImmutable('2026-07-21 00:00:00 UTC');
-        $role = new Role(1, Role::ADMINISTRATOR, null, $created, $created);
+        $role ??= new Role(1, Role::ADMINISTRATOR, null, $created, $created);
 
         return new User(
             42,
@@ -290,13 +335,13 @@ final class AdministratorAuthenticationServiceTest extends TestCase
             'administrator',
             'admin@example.test',
             null,
-            'stored-password-hash',
+            $passwordHash,
             null,
             null,
             $status,
             $created,
             $created,
-            null,
+            $deletedAt,
         );
     }
 
