@@ -46,7 +46,7 @@ Version 1 stores Administrator staff accounts only. Guest is an unauthenticated 
 
 Customer registration and the customer portal are future enhancements. A nullable future customer/user relationship may exist on a booking, but Version 1 booking creation must not require it.
 
-A `password_resets` table and staff reset workflow are not present in the 25 executable migrations. Any later reset implementation must be Administrator-only and must store only a hash, expiry, and single-use state.
+A `password_resets` table and staff reset workflow are not present in the 26 executable migrations. Any later reset implementation must be Administrator-only and must store only a hash, expiry, and single-use state.
 
 # 5. Room Model
 

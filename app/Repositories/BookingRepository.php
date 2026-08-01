@@ -97,7 +97,7 @@ final class BookingRepository implements BookingCatalogRepository
             $sql = self::BOOKING_COLUMNS . ' WHERE deleted_at IS NULL';
 
             if ($status !== null) {
-                $sql .= ' AND BINARY booking_status = BINARY :booking_status';
+                $sql .= ' AND booking_status = :booking_status';
             }
 
             $sql .= ' ORDER BY created_at DESC, id DESC';

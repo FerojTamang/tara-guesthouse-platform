@@ -81,7 +81,7 @@ Stores authenticated Administrator staff accounts. It does not store public Gues
 
 ## 4.3 Deferred staff password-reset storage
 
-No `password_resets` table exists in the 25 executable migrations. Any later Administrator password-reset workflow requires a separately approved migration and route contract and must store only a token hash, expiry, and single-use evidence.
+No `password_resets` table exists in the 26 executable migrations. Any later Administrator password-reset workflow requires a separately approved migration and route contract and must store only a token hash, expiry, and single-use evidence.
 
 # 5. Room Tables
 
@@ -120,6 +120,8 @@ No `password_resets` table exists in the 25 executable migrations. Any later Adm
 | `deleted_at` | DATETIME | Yes | Soft-delete timestamp |
 
 No `available`, `reserved`, or `occupied` value is stored in `operational_status`.
+
+The measured public-room and availability query path uses `idx_rooms_public_order` on (`deleted_at`, `operational_status`, `is_published`, `room_number`, `id`) so equality eligibility predicates precede deterministic room-number ordering.
 
 Bed type, floor, room size and featured flag are not Version 1 room fields. Public thumbnail/primary selection uses `room_images.is_primary`; generated image variants are filesystem/cache artifacts rather than authoritative columns.
 
@@ -193,7 +195,7 @@ Composite uniqueness on (`room_id`, `amenity_id`).
 | `updated_at` | DATETIME | No | Updated timestamp |
 | `deleted_at` | DATETIME | Yes | Retention-only soft delete; not a workflow status |
 
-Indexes cover reference, date range, status, deadline, email, and relevant FKs.
+Indexes cover reference, date range, status, deadline, email, and relevant FKs. S5-007 adds `idx_bookings_deleted_created` on (`deleted_at`, `created_at`, `id`) for current-booking ordering, `idx_bookings_status_deleted_created` on (`booking_status`, `deleted_at`, `created_at`, `id`) for filtered operational lists, and `idx_bookings_deleted_checkout` on (`deleted_at`, `check_out`) for current departure ranges.
 
 ## 6.2 `booking_rooms`
 

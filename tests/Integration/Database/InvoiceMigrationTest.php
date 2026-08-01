@@ -38,6 +38,7 @@ final class InvoiceMigrationTest extends DatabaseTestCase
         '20260801000100_create_review_invitations_table',
         '20260801000200_create_reviews_table',
         '20260801000300_create_notifications_table',
+        '20260801000400_add_operational_query_indexes',
     ];
 
     private MigrationRunner $runner;

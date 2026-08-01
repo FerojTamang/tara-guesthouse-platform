@@ -56,7 +56,7 @@ final class PdoAvailabilityRepository implements AvailabilityRepository
                 'SELECT r.id '
                 . 'FROM rooms r '
                 . 'WHERE r.deleted_at IS NULL '
-                . "AND BINARY r.operational_status = BINARY 'active' "
+                . "AND r.operational_status = 'active' "
                 . 'AND r.is_published = 1 '
                 . 'AND r.capacity_adults >= :adults '
                 . 'AND r.capacity_children >= :children '

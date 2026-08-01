@@ -56,7 +56,7 @@ final class PaymentRepository implements PaymentCatalogRepository
             $sql = self::SELECT_COLUMNS;
 
             if ($status !== null) {
-                $sql .= ' WHERE BINARY payment_status = BINARY :payment_status';
+                $sql .= ' WHERE payment_status = :payment_status';
             }
 
             $sql .= ' ORDER BY created_at DESC, id DESC';

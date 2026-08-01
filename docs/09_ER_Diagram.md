@@ -2,10 +2,10 @@
 
 ## Document Information
 
-* Status: Implemented through Sprint 4 — Review Required
+* Status: Implemented through S5-007 — Review Required
 * Source: `10_Database_Dictionary.md`
 * Database authority: Executed migrations
-* Scope: Version 1 entities represented by the 25 executable migrations
+* Scope: Version 1 entities represented by the 26 executable migrations
 
 ## 1. Relationship Diagram
 

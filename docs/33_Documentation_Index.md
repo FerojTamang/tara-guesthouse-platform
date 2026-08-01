@@ -30,9 +30,9 @@ When documents conflict, follow the authority order in `00_V1_ARCHITECT_DECISION
 | 05 | `05_Folder_Structure.md` | Folder Structure & Development Standards | Synchronized; review required |
 | 06 | `06_Coding_Standards.md` | Coding Standards & Best Practices | Synchronized; review required |
 | 07 | `07_Git_Workflow.md` | Git Workflow & Version Control | Synchronized; review required |
-| 08 | `08_Database_Design.md` | Database Design | Synchronized to 25 executable migrations through Sprint 4 |
+| 08 | `08_Database_Design.md` | Database Design | Synchronized to 26 executable migrations through S5-007 |
 | 09 | `09_ER_Diagram.md` | Entity Relationship Diagram | Synchronized to executable Sprint 4 relationships |
-| 10 | `10_Database_Dictionary.md` | Database Dictionary | Synchronized to 25 executable migrations |
+| 10 | `10_Database_Dictionary.md` | Database Dictionary | Synchronized to 26 executable migrations through S5-007 |
 | 11 | `11_Booking_System_Specification.md` | Booking System Specification | Synchronized; Sprint 2 implementation and test evidence recorded |
 | 12 | `12_Room_Management_Specification.md` | Room Management Specification | Synchronized; review required |
 | 13 | `13_Activity_Management_Specification.md` | Activity Management Specification | Implemented and QA synchronized in Sprint 4 |

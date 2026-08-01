@@ -159,7 +159,7 @@ final class RoomRepository implements RoomCatalogRepository
     {
         return $this->listing(
             self::SELECT_COLUMNS
-                . " WHERE r.deleted_at IS NULL AND BINARY r.operational_status = BINARY 'active'"
+                . " WHERE r.deleted_at IS NULL AND r.operational_status = 'active'"
                 . ' AND r.is_published = 1 ORDER BY r.room_number ASC, r.id ASC',
         );
     }

@@ -72,7 +72,7 @@ final class PdoAdministratorPaymentRepository implements AdministratorPaymentCat
             $sql = self::SELECT_COLUMNS;
 
             if ($status !== null) {
-                $sql .= ' WHERE BINARY p.payment_status = BINARY :payment_status';
+                $sql .= ' WHERE p.payment_status = :payment_status';
             }
 
             $sql .= ' ORDER BY p.created_at DESC, p.id DESC';
