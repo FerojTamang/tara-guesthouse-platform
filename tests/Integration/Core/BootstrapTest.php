@@ -168,7 +168,8 @@ final class BootstrapTest extends TestCase
         self::assertSame(360, $config->get('booking.pending_deadline_minutes'));
         self::assertTrue($config->has('logging'));
         self::assertTrue($config->has('database'));
-        self::assertFalse($config->has('mail'));
+        self::assertTrue($config->has('mail'));
+        self::assertFalse($config->require('mail.enabled'));
         self::assertTrue($config->has('session'));
         self::assertFalse($config->has('upload'));
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Exceptions\BookingException;
+use App\Models\Booking;
 use App\Models\BookingSubmissionResult;
 use App\Requests\GuestBookingRequest;
 use Throwable;
@@ -14,6 +15,7 @@ final readonly class BookingSubmissionWorkflow
     public function __construct(
         private BookingSubmitter $bookings,
         private BookingAccessToken $tokens,
+        private ?TransactionalMailDispatcher $mail = null,
     ) {
     }
 
@@ -27,14 +29,30 @@ final readonly class BookingSubmissionWorkflow
                 throw BookingException::failure();
             }
 
-            return new BookingSubmissionResult(
+            $result = new BookingSubmissionResult(
                 $booking,
                 $this->tokens->issue($booking->bookingReference(), $deadline),
             );
+            $this->deliverBookingReceived($booking);
+
+            return $result;
         } catch (BookingException $exception) {
             throw $exception;
         } catch (Throwable $failure) {
             throw BookingException::failure($failure);
+        }
+    }
+
+    private function deliverBookingReceived(Booking $booking): void
+    {
+        if (!$this->mail instanceof TransactionalMailDispatcher) {
+            return;
+        }
+
+        try {
+            $this->mail->bookingReceived($booking);
+        } catch (Throwable) {
+            error_log('Booking post-commit email delivery failed.');
         }
     }
 }

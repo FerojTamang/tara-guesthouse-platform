@@ -73,7 +73,6 @@ use App\Services\AdministratorBookingService;
 use App\Services\AdministratorBookingServiceProvider;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
-use App\Services\NullReviewInvitationDelivery;
 use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
 use App\Services\AdministratorNotificationService;
@@ -117,6 +116,14 @@ use App\Services\AdministratorReviewServiceProvider;
 use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\LazyCmsPageContentSanitizer;
+use App\Services\LoggingTransactionalMailDispatcher;
+use App\Services\MailTemplateRenderer;
+use App\Services\NullTransactionalMailDispatcher;
+use App\Services\ReviewInvitationMailDelivery;
+use App\Services\SmtpMailTransport;
+use App\Services\TransactionalMailDispatcher;
+use App\Services\TransactionalMailService;
+use App\Services\TransactionalMailServiceProvider;
 use App\Services\AmenityCatalogService;
 use App\Services\PdoActivityTransaction;
 use App\Services\PdoCmsTransaction;
@@ -163,6 +170,7 @@ use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
 use App\Storage\LazyGalleryImageReader;
 use App\Storage\LazyGalleryImageStorage;
+use SensitiveParameter;
 
 /**
  * Builds the approved core application runtime.
@@ -215,6 +223,26 @@ final class Bootstrap
 
         $viewRenderer = new ViewRenderer(
             $resolvedBasePath . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
+        );
+        $applicationName = $config->require('app.name');
+        $applicationUrl = $config->get('app.url');
+        $mailConfiguration = $config->require('mail');
+
+        if (
+            !is_string($applicationName)
+            || ($applicationUrl !== null && !is_string($applicationUrl))
+            || !is_array($mailConfiguration)
+        ) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        $mail = self::mailDispatcher(
+            $mailConfiguration,
+            $applicationName,
+            $applicationUrl,
+            $timezone,
+            $viewRenderer,
+            $logger,
         );
         $csrfTokens = new CsrfTokenManager($session);
         $administratorSession = new AdministratorSession($session, $csrfTokens);
@@ -351,6 +379,7 @@ final class Bootstrap
                 static function () use (
                     $catalogConnectionProvider,
                     $logger,
+                    $mail,
                     $resolvedBasePath,
                 ): AdministratorBookingStatusService {
                     $connection = $catalogConnectionProvider();
@@ -367,6 +396,8 @@ final class Bootstrap
                         ),
                     );
 
+                    $bookingCatalog = new BookingRepository($connection);
+
                     return new AdministratorBookingStatusService(
                         new PdoBookingStatusWriteRepository($connection),
                         new PdoAuditLogRepository($connection),
@@ -374,9 +405,11 @@ final class Bootstrap
                         null,
                         new ReviewCheckoutInvitationCoordinator(
                             $reviewServices,
-                            new NullReviewInvitationDelivery(),
+                            new ReviewInvitationMailDelivery($bookingCatalog, $mail),
                             $logger,
                         ),
+                        $bookingCatalog,
+                        $mail,
                     );
                 },
             ),
@@ -537,7 +570,10 @@ final class Bootstrap
                 },
             ),
             new AdministratorPaymentStatusServiceProvider(
-                static function () use ($catalogConnectionProvider): AdministratorPaymentStatusService {
+                static function () use (
+                    $catalogConnectionProvider,
+                    $mail,
+                ): AdministratorPaymentStatusService {
                     $connection = $catalogConnectionProvider();
 
                     $auditLogs = new PdoAuditLogRepository($connection);
@@ -550,6 +586,9 @@ final class Bootstrap
                             $auditLogs,
                         ),
                         new PdoBookingTransaction($connection),
+                        null,
+                        new BookingRepository($connection),
+                        $mail,
                     );
                 },
             ),
@@ -615,13 +654,6 @@ final class Bootstrap
             new ReviewSubmissionFlash($session),
             $csrfTokens,
         );
-        $applicationName = $config->require('app.name');
-        $applicationUrl = $config->get('app.url');
-
-        if (!is_string($applicationName) || ($applicationUrl !== null && !is_string($applicationUrl))) {
-            throw new ConfigurationException('Public content configuration is invalid.');
-        }
-
         $publicCmsController = new PublicCmsController(
             $viewRenderer,
             new PublicCmsServiceProvider(
@@ -662,6 +694,7 @@ final class Bootstrap
             static function () use (
                 $catalogConnectionProvider,
                 $bookingConfiguration,
+                $mail,
             ): BookingSubmissionWorkflow {
                 $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
                 $deadlineMinutes = $bookingConfiguration['pending_deadline_minutes'] ?? null;
@@ -691,6 +724,7 @@ final class Bootstrap
                         new BookingDeadlinePolicy($deadlineMinutes),
                     ),
                     new BookingAccessToken($accessTokenKey),
+                    $mail,
                 );
             },
         );
@@ -711,6 +745,7 @@ final class Bootstrap
                 $catalogConnectionProvider,
                 $bookingConfiguration,
                 $paymentProofServices,
+                $mail,
             ): GuestPaymentSubmissionService {
                 $accessTokenKey = $bookingConfiguration['access_token_key'] ?? null;
 
@@ -735,6 +770,8 @@ final class Bootstrap
                     new PdoPaymentWriteRepository($connection),
                     $paymentProofServices->storage(),
                     new PdoBookingTransaction($connection),
+                    null,
+                    $mail,
                 );
             },
         );
@@ -862,6 +899,109 @@ final class Bootstrap
         );
 
         return new Application($router, $errorHandler, $session);
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailDispatcher(
+        #[SensitiveParameter] array $configuration,
+        string $applicationName,
+        ?string $applicationUrl,
+        string $timezone,
+        ViewRenderer $views,
+        \Psr\Log\LoggerInterface $logger,
+    ): TransactionalMailDispatcher {
+        $expectedKeys = [
+            'enabled',
+            'host',
+            'port',
+            'encryption',
+            'username',
+            'password',
+            'from_address',
+            'from_name',
+            'reply_to_address',
+            'reply_to_name',
+            'timeout_seconds',
+        ];
+
+        if (array_keys($configuration) !== $expectedKeys || !is_bool($configuration['enabled'])) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        if ($configuration['enabled'] === false) {
+            return new NullTransactionalMailDispatcher();
+        }
+
+        if (!is_string($applicationUrl) || $applicationUrl === '') {
+            throw new ConfigurationException('APP_URL is required when SMTP is enabled.');
+        }
+
+        $provider = new TransactionalMailServiceProvider(
+            static function () use (
+                $configuration,
+                $applicationName,
+                $applicationUrl,
+                $timezone,
+                $views,
+            ): TransactionalMailService {
+                return new TransactionalMailService(
+                    new SmtpMailTransport(
+                        self::mailString($configuration, 'host'),
+                        self::mailInteger($configuration, 'port'),
+                        self::mailString($configuration, 'encryption'),
+                        self::mailNullableString($configuration, 'username'),
+                        self::mailNullableString($configuration, 'password'),
+                        self::mailString($configuration, 'from_address'),
+                        self::mailString($configuration, 'from_name'),
+                        self::mailNullableString($configuration, 'reply_to_address'),
+                        self::mailNullableString($configuration, 'reply_to_name'),
+                        self::mailInteger($configuration, 'timeout_seconds'),
+                    ),
+                    new MailTemplateRenderer($views),
+                    $applicationName,
+                    rtrim($applicationUrl, '/'),
+                    new \DateTimeZone($timezone),
+                );
+            },
+        );
+
+        return new LoggingTransactionalMailDispatcher($provider, $logger);
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailString(#[SensitiveParameter] array $configuration, string $key): string
+    {
+        $value = $configuration[$key] ?? null;
+
+        if (!is_string($value) || $value === '') {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailNullableString(#[SensitiveParameter] array $configuration, string $key): ?string
+    {
+        $value = $configuration[$key] ?? null;
+
+        if ($value !== null && !is_string($value)) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private static function mailInteger(#[SensitiveParameter] array $configuration, string $key): int
+    {
+        $value = $configuration[$key] ?? null;
+
+        if (!is_int($value)) {
+            throw new ConfigurationException('Application mail configuration is invalid.');
+        }
+
+        return $value;
     }
 
     private static function definePaths(string $basePath): void

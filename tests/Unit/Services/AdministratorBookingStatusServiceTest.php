@@ -7,19 +7,25 @@ namespace Tests\Unit\Services;
 use App\Exceptions\BookingException;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
+use App\Models\BookingEvent;
+use App\Models\BookingRoom;
 use App\Models\BookingStatusSnapshot;
 use App\Models\IssuedReviewInvitation;
+use App\Models\Payment;
 use App\Models\ReviewInvitation;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\BookingCatalogRepository;
 use App\Repositories\BookingStatusWriteRepository;
 use App\Requests\AdministratorBookingStatusRequest;
 use App\Services\AdministratorBookingStatusService;
 use App\Services\BookingTransaction;
 use App\Services\CheckoutReviewInvitationCoordinator;
+use App\Services\TransactionalMailDispatcher;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\MailFixture;
 
 final class AdministratorBookingStatusServiceTest extends TestCase
 {
@@ -211,6 +217,48 @@ final class AdministratorBookingStatusServiceTest extends TestCase
         self::assertSame(1, $coordinator->deliveryCalls);
     }
 
+    public function testCancelledBookingMailRunsAfterCommitAndFailureCannotRollBack(): void
+    {
+        $bookings = new BookingStatusWriteRepositoryFake();
+        $bookings->current = new BookingStatusSnapshot(
+            31,
+            'TGH-2026-STATUS000000000001',
+            Booking::STATUS_CONFIRMED,
+        );
+        $audit = new AuditLogWriteRepositoryFake();
+        $transaction = new BookingStatusTransactionFake();
+        $catalog = new BookingStatusCatalogFake(
+            MailFixture::booking(Booking::STATUS_CANCELLED),
+            $transaction,
+        );
+        $mail = new BookingStatusMailDispatcherFake($transaction);
+        $mail->failure = new RuntimeException('private SMTP failure');
+        $service = self::service(
+            $bookings,
+            $audit,
+            $transaction,
+            null,
+            $catalog,
+            $mail,
+        );
+        $request = AdministratorBookingStatusRequest::fromInput(
+            Booking::STATUS_CANCELLED,
+            'Property closure.',
+            true,
+        );
+
+        $result = $service->transition(31, $request, 91, null, null);
+
+        self::assertSame(Booking::STATUS_CANCELLED, $result->toStatus());
+        self::assertSame(1, $catalog->findByIdCalls);
+        self::assertFalse($catalog->transactionWasActiveDuringLookup);
+        self::assertSame(Booking::STATUS_CANCELLED, $mail->status);
+        self::assertSame($catalog->booking, $mail->booking);
+        self::assertFalse($mail->transactionWasActive);
+        self::assertSame(1, $transaction->commitCalls);
+        self::assertSame(0, $transaction->rollBackCalls);
+    }
+
     #[DataProvider('forbiddenTransitions')]
     public function testForbiddenAndTerminalTransitionsRollBack(
         string $fromStatus,
@@ -369,6 +417,8 @@ final class AdministratorBookingStatusServiceTest extends TestCase
         AuditLogWriteRepositoryFake $audit,
         BookingStatusTransactionFake $transaction,
         ?CheckoutReviewInvitationCoordinator $reviewInvitations = null,
+        ?BookingCatalogRepository $bookingCatalog = null,
+        ?TransactionalMailDispatcher $mail = null,
     ): AdministratorBookingStatusService {
         return new AdministratorBookingStatusService(
             $bookings,
@@ -378,6 +428,8 @@ final class AdministratorBookingStatusServiceTest extends TestCase
                 '2026-08-01 12:00:00 UTC',
             ),
             $reviewInvitations,
+            $bookingCatalog,
+            $mail,
         );
     }
 
@@ -540,5 +592,84 @@ final class BookingStatusTransactionFake implements BookingTransaction
     public function inProgress(): bool
     {
         return $this->active;
+    }
+}
+
+final class BookingStatusCatalogFake implements BookingCatalogRepository
+{
+    public int $findByIdCalls = 0;
+    public bool $transactionWasActiveDuringLookup = true;
+
+    public function __construct(
+        public readonly Booking $booking,
+        private readonly BookingStatusTransactionFake $transaction,
+    ) {
+    }
+
+    public function findAll(?string $status = null): array
+    {
+        return [];
+    }
+
+    public function findById(int $id): ?Booking
+    {
+        $this->findByIdCalls++;
+        $this->transactionWasActiveDuringLookup = $this->transaction->active;
+
+        return $id === $this->booking->id() ? $this->booking : null;
+    }
+
+    public function findByReference(string $bookingReference): ?Booking
+    {
+        return null;
+    }
+
+    public function findRoomByBookingId(int $bookingId): ?BookingRoom
+    {
+        return null;
+    }
+
+    public function findEventsByBookingId(int $bookingId): array
+    {
+        return [];
+    }
+}
+
+final class BookingStatusMailDispatcherFake implements TransactionalMailDispatcher
+{
+    public ?Booking $booking = null;
+    public ?string $status = null;
+    public bool $transactionWasActive = true;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly BookingStatusTransactionFake $transaction)
+    {
+    }
+
+    public function bookingReceived(Booking $booking): void
+    {
+    }
+
+    public function bookingStatusChanged(Booking $booking, string $status): void
+    {
+        $this->booking = $booking;
+        $this->status = $status;
+        $this->transactionWasActive = $this->transaction->active;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function paymentSubmitted(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function paymentReviewed(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function reviewInvitation(Booking $booking, IssuedReviewInvitation $invitation): void
+    {
     }
 }

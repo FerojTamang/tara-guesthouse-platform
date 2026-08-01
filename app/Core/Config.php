@@ -34,6 +34,7 @@ final class Config
             'booking' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'booking.php', $environment),
             'database' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'database.php', $environment),
             'logging' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'logging.php', $environment),
+            'mail' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'mail.php', $environment),
             'security' => self::loadSecurity($resolvedConfigPath, $environment),
             'session' => self::loadFile($resolvedConfigPath . DIRECTORY_SEPARATOR . 'session.php', $environment),
         ]);

@@ -8,14 +8,19 @@ use App\Exceptions\AdministratorPaymentException;
 use App\Exceptions\BookingException;
 use App\Models\AuditLogEntry;
 use App\Models\Booking;
+use App\Models\BookingEvent;
+use App\Models\BookingRoom;
 use App\Models\BookingStatusTransitionResult;
+use App\Models\IssuedReviewInvitation;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\BookingCatalogRepository;
 use App\Repositories\PaymentWriteRepository;
 use App\Requests\AdministratorPaymentStatusRequest;
 use App\Services\AdministratorPaymentStatusService;
 use App\Services\BookingTransaction;
+use App\Services\TransactionalMailDispatcher;
 use App\Services\VerifiedPaymentBookingConfirmer;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -143,6 +148,83 @@ final class AdministratorPaymentStatusServiceTest extends TestCase
         self::assertSame([], $this->bookingConfirmer->calls);
         self::assertSame('payment_rejected', $this->audit->entries[0]->eventType());
         self::assertSame(1, $this->transaction->commitCount);
+    }
+
+    public function testVerifiedPaymentMailRunsAfterCommitAndFailureCannotRollBack(): void
+    {
+        $committedBooking = self::booking(Booking::STATUS_CONFIRMED);
+        $catalog = new PaymentStatusBookingCatalogFake(
+            $committedBooking,
+            $this->transaction,
+        );
+        $mail = new PaymentStatusMailDispatcherFake($this->transaction);
+        $mail->failure = new RuntimeException('private SMTP failure');
+        $service = new AdministratorPaymentStatusService(
+            $this->payments,
+            $this->audit,
+            $this->bookingConfirmer,
+            $this->transaction,
+            static fn (): DateTimeImmutable => new DateTimeImmutable(
+                '2026-07-30 04:00:00 UTC',
+            ),
+            $catalog,
+            $mail,
+        );
+
+        $result = $service->transition(
+            44,
+            self::request(Payment::STATUS_VERIFIED, 'Reference confirmed.'),
+            91,
+            null,
+            null,
+        );
+
+        self::assertSame(Payment::STATUS_VERIFIED, $result->toStatus());
+        self::assertSame($committedBooking, $mail->booking);
+        self::assertTrue($mail->payment?->isVerified());
+        self::assertFalse($mail->transactionWasActive);
+        self::assertSame(1, $catalog->findByIdCalls);
+        self::assertFalse($catalog->transactionWasActiveDuringLookup);
+        self::assertSame(1, $this->transaction->commitCount);
+        self::assertSame(0, $this->transaction->rollbackCount);
+    }
+
+    public function testRejectedPaymentResolvesBookingAfterCommitAndMailFailureCannotRollBack(): void
+    {
+        $catalog = new PaymentStatusBookingCatalogFake(
+            $this->payments->booking,
+            $this->transaction,
+        );
+        $mail = new PaymentStatusMailDispatcherFake($this->transaction);
+        $mail->failure = new RuntimeException('private SMTP failure');
+        $service = new AdministratorPaymentStatusService(
+            $this->payments,
+            $this->audit,
+            $this->bookingConfirmer,
+            $this->transaction,
+            static fn (): DateTimeImmutable => new DateTimeImmutable(
+                '2026-07-30 04:00:00 UTC',
+            ),
+            $catalog,
+            $mail,
+        );
+
+        $result = $service->transition(
+            44,
+            self::request(Payment::STATUS_REJECTED, 'Reference rejected.'),
+            91,
+            null,
+            null,
+        );
+
+        self::assertSame(Payment::STATUS_REJECTED, $result->toStatus());
+        self::assertSame(1, $catalog->findByIdCalls);
+        self::assertFalse($catalog->transactionWasActiveDuringLookup);
+        self::assertSame($this->payments->booking, $mail->booking);
+        self::assertTrue($mail->payment?->isRejected());
+        self::assertFalse($mail->transactionWasActive);
+        self::assertSame(1, $this->transaction->commitCount);
+        self::assertSame(0, $this->transaction->rollbackCount);
     }
 
     public function testOnlySubmittedAttemptMayTransition(): void
@@ -596,5 +678,86 @@ final class PaymentStatusTransactionFake implements BookingTransaction
     public function inProgress(): bool
     {
         return $this->active;
+    }
+}
+
+final class PaymentStatusBookingCatalogFake implements BookingCatalogRepository
+{
+    public int $findByIdCalls = 0;
+    public bool $transactionWasActiveDuringLookup = true;
+
+    public function __construct(
+        private readonly ?Booking $booking,
+        private readonly PaymentStatusTransactionFake $transaction,
+    ) {
+    }
+
+    public function findAll(?string $status = null): array
+    {
+        return [];
+    }
+
+    public function findById(int $id): ?Booking
+    {
+        $this->findByIdCalls++;
+        $this->transactionWasActiveDuringLookup = $this->transaction->active;
+
+        return $this->booking instanceof Booking && $this->booking->id() === $id
+            ? $this->booking
+            : null;
+    }
+
+    public function findByReference(string $bookingReference): ?Booking
+    {
+        return null;
+    }
+
+    public function findRoomByBookingId(int $bookingId): ?BookingRoom
+    {
+        return null;
+    }
+
+    public function findEventsByBookingId(int $bookingId): array
+    {
+        return [];
+    }
+}
+
+final class PaymentStatusMailDispatcherFake implements TransactionalMailDispatcher
+{
+    public ?Booking $booking = null;
+    public ?Payment $payment = null;
+    public bool $transactionWasActive = true;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly PaymentStatusTransactionFake $transaction)
+    {
+    }
+
+    public function bookingReceived(Booking $booking): void
+    {
+    }
+
+    public function bookingStatusChanged(Booking $booking, string $status): void
+    {
+    }
+
+    public function paymentSubmitted(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function paymentReviewed(Booking $booking, Payment $payment): void
+    {
+        $this->booking = $booking;
+        $this->payment = $payment;
+        $this->transactionWasActive = $this->transaction->active;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function reviewInvitation(Booking $booking, IssuedReviewInvitation $invitation): void
+    {
     }
 }

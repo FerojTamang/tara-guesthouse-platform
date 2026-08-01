@@ -164,7 +164,8 @@ final class SessionBootstrapTest extends TestCase
         self::assertTrue($configuration->has('logging'));
         self::assertTrue($configuration->has('session'));
         self::assertTrue($configuration->has('database'));
-        self::assertFalse($configuration->has('mail'));
+        self::assertTrue($configuration->has('mail'));
+        self::assertFalse($configuration->require('mail.enabled'));
         self::assertFalse($configuration->has('authentication'));
         self::assertFalse($configuration->has('upload'));
     }
@@ -174,6 +175,8 @@ final class SessionBootstrapTest extends TestCase
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'false',
+            'MAIL_HOST' => 'smtp.example.test',
+            'MAIL_FROM_ADDRESS' => 'stay@example.test',
         ]);
 
         $this->expectException(ConfigurationException::class);
@@ -185,6 +188,8 @@ final class SessionBootstrapTest extends TestCase
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
+            'MAIL_HOST' => 'smtp.example.test',
+            'MAIL_FROM_ADDRESS' => 'stay@example.test',
         ]);
 
         $application = Bootstrap::boot($this->basePath);

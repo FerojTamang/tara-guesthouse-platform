@@ -8,6 +8,7 @@ use App\Core\UploadedFile;
 use App\Exceptions\DatabaseException;
 use App\Exceptions\GuestPaymentException;
 use App\Models\Booking;
+use App\Models\IssuedReviewInvitation;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Repositories\BookingCatalogRepository;
@@ -18,6 +19,7 @@ use App\Services\BookingAccessToken;
 use App\Services\BookingTransaction;
 use App\Services\GuestPaymentAccessValidator;
 use App\Services\GuestPaymentSubmissionService;
+use App\Services\TransactionalMailDispatcher;
 use App\Storage\PaymentProofStorage;
 use App\Storage\StoredPaymentProof;
 use DateTimeImmutable;
@@ -247,6 +249,36 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
         self::assertCount(1, $storage->removedPaths);
     }
 
+    public function testPaymentSubmittedMailRunsAfterCommitAndFailureCannotRollBack(): void
+    {
+        $booking = $this->booking();
+        $method = $this->method();
+        $writer = new GuestPaymentWriteRepositoryFake($booking, $method);
+        $storage = new GuestPaymentProofStorageFake();
+        $transaction = new GuestPaymentTransactionFake();
+        $mail = new GuestPaymentMailDispatcherFake($transaction);
+        $mail->failure = new RuntimeException('private SMTP failure');
+        $service = $this->service(
+            $booking,
+            $method,
+            $writer,
+            $storage,
+            $transaction,
+            null,
+            $mail,
+        );
+
+        $payment = $service->submit($this->request($booking));
+
+        self::assertSame(44, $payment->id());
+        self::assertSame($booking, $mail->booking);
+        self::assertSame($payment, $mail->payment);
+        self::assertFalse($mail->transactionWasActive);
+        self::assertSame(1, $mail->calls);
+        self::assertSame(1, $transaction->commits);
+        self::assertSame(0, $transaction->rollbacks);
+    }
+
     private function service(
         Booking $initialBooking,
         PaymentMethod $initialMethod,
@@ -254,6 +286,7 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
         GuestPaymentProofStorageFake $storage,
         GuestPaymentTransactionFake $transaction,
         ?callable $clock = null,
+        ?TransactionalMailDispatcher $mail = null,
     ): GuestPaymentSubmissionService {
         $bookings = $this->createStub(BookingCatalogRepository::class);
         $bookings->method('findByReference')->willReturn($initialBooking);
@@ -276,6 +309,7 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
             $storage,
             $transaction,
             $clock,
+            $mail,
         );
     }
 
@@ -563,5 +597,46 @@ final class GuestPaymentTransactionFake implements BookingTransaction
     public function inProgress(): bool
     {
         return $this->active;
+    }
+}
+
+final class GuestPaymentMailDispatcherFake implements TransactionalMailDispatcher
+{
+    public ?Booking $booking = null;
+    public ?Payment $payment = null;
+    public int $calls = 0;
+    public bool $transactionWasActive = true;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly GuestPaymentTransactionFake $transaction)
+    {
+    }
+
+    public function bookingReceived(Booking $booking): void
+    {
+    }
+
+    public function bookingStatusChanged(Booking $booking, string $status): void
+    {
+    }
+
+    public function paymentSubmitted(Booking $booking, Payment $payment): void
+    {
+        $this->calls++;
+        $this->booking = $booking;
+        $this->payment = $payment;
+        $this->transactionWasActive = $this->transaction->inProgress();
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function paymentReviewed(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function reviewInvitation(Booking $booking, IssuedReviewInvitation $invitation): void
+    {
     }
 }

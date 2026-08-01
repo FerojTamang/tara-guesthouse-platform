@@ -72,6 +72,22 @@ Create the production `.env` or host-supported environment configuration outside
 
 Production requirements include HTTPS-aware secure cookies, generic user-facing errors, debug disabled, private logs and secrets excluded from Git/backups distributed to unauthorized users.
 
+### Transactional SMTP configuration and verification
+
+Configure the existing `MAIL_*` environment contract using credentials supplied by the selected SMTP provider. `MAIL_HOST` may remain blank only in local/testing environments; staging and production fail closed when SMTP is absent. Staging and production require verified STARTTLS (`MAIL_ENCRYPTION=tls`) or implicit TLS (`MAIL_ENCRYPTION=ssl`); `MAIL_ENCRYPTION=none` is restricted to unauthenticated local/testing relays. Keep the password and sender credentials outside Git, deployment archives, screenshots and shared logs.
+
+Before release approval, use a controlled staging mailbox to verify each implemented event after its owning transaction commits:
+
+* booking received;
+* payment submitted;
+* payment verified/booking confirmed and payment rejected;
+* booking cancelled and booking rejected;
+* checked-out-stay review invitation.
+
+For each event, record the received timestamp, sender, recipient, subject, plain-text/HTML rendering and TLS/provider evidence. Confirm that review links work once and expire according to configured policy, while raw review tokens, SMTP credentials, payment proof paths and private Administrator notes remain absent from application/provider logs. Deliberately test an unreachable SMTP endpoint and confirm the already committed booking/payment/check-out state remains unchanged while only sanitized event/entity identifiers are logged.
+
+S4-018 performs one immediate post-commit delivery attempt. Retry count, backoff, retention and cron scheduling remain unimplemented until separately approved configuration exists.
+
 ## 8. Composer Dependencies
 
 Preferred supported options:
@@ -154,7 +170,8 @@ Such a deployment requires a separately approved infrastructure architecture, se
 * session inactivity/absolute-lifetime values;
 * upload MIME/extension/size values and image extension capability;
 * cron schedules and locking mechanism;
-* SMTP sender/provider/retry values;
+* SMTP provider/sender credentials and outbound-connectivity evidence;
+* SMTP retry count, backoff, retention and cron schedule;
 * backup frequency/retention/off-host requirements;
 * production log/retention policy;
 * rollback and emergency contact ownership.

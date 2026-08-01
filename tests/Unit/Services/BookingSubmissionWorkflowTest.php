@@ -6,10 +6,13 @@ namespace Tests\Unit\Services;
 
 use App\Exceptions\BookingException;
 use App\Models\Booking;
+use App\Models\IssuedReviewInvitation;
+use App\Models\Payment;
 use App\Requests\GuestBookingRequest;
 use App\Services\BookingAccessToken;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmitter;
+use App\Services\TransactionalMailDispatcher;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
@@ -28,6 +31,23 @@ final class BookingSubmissionWorkflowTest extends TestCase
             '/^v1\.[A-Za-z0-9_-]{43}$/D',
             $result->bookingAccessToken(),
         );
+    }
+
+    public function testBookingReceivedMailRunsAfterSubmissionAndCannotChangeTheResult(): void
+    {
+        $submitter = new WorkflowSubmitterFake();
+        $mail = new BookingWorkflowMailDispatcherFake($submitter);
+        $mail->failure = new \RuntimeException('private SMTP failure');
+        $result = (new BookingSubmissionWorkflow(
+            $submitter,
+            new BookingAccessToken(str_repeat('k', 32)),
+            $mail,
+        ))->submit(self::request());
+
+        self::assertSame($submitter->booking, $result->booking());
+        self::assertSame($submitter->booking, $mail->booking);
+        self::assertTrue($mail->submissionHadCompleted);
+        self::assertSame(1, $mail->calls);
     }
 
     public function testDomainFailuresArePreserved(): void
@@ -70,6 +90,8 @@ final class WorkflowSubmitterFake implements BookingSubmitter
 
     public ?BookingException $failure = null;
 
+    public bool $completed = false;
+
     public function __construct()
     {
         $createdAt = new DateTimeImmutable('2026-08-01 12:00:00 UTC');
@@ -111,6 +133,47 @@ final class WorkflowSubmitterFake implements BookingSubmitter
             throw $this->failure;
         }
 
+        $this->completed = true;
+
         return $this->booking;
+    }
+}
+
+final class BookingWorkflowMailDispatcherFake implements TransactionalMailDispatcher
+{
+    public ?Booking $booking = null;
+    public int $calls = 0;
+    public bool $submissionHadCompleted = false;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly WorkflowSubmitterFake $submitter)
+    {
+    }
+
+    public function bookingReceived(Booking $booking): void
+    {
+        $this->calls++;
+        $this->booking = $booking;
+        $this->submissionHadCompleted = $this->submitter->completed;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function bookingStatusChanged(Booking $booking, string $status): void
+    {
+    }
+
+    public function paymentSubmitted(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function paymentReviewed(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function reviewInvitation(Booking $booking, IssuedReviewInvitation $invitation): void
+    {
     }
 }
