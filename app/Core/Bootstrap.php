@@ -12,6 +12,7 @@ use App\Controllers\AdministratorAuthenticationController;
 use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorContactController;
+use App\Repositories\PdoAdministratorDashboardMetricsRepository;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorNotificationController;
@@ -67,6 +68,8 @@ use App\Services\AdministratorActivityService;
 use App\Services\AdministratorCmsService;
 use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
+use App\Services\AdministratorDashboardMetricsService;
+use App\Services\AdministratorDashboardMetricsServiceProvider;
 use App\Services\ActivityManagementServiceProvider;
 use App\Services\AvailabilityService;
 use App\Services\AdministratorBookingService;
@@ -283,6 +286,12 @@ final class Bootstrap
                 $logger,
             ),
         );
+        $catalogConnection = null;
+        $catalogConnectionProvider = static function () use ($connectionFactory, &$catalogConnection): \PDO {
+            $catalogConnection ??= $connectionFactory->create();
+
+            return $catalogConnection;
+        };
         $controller = new AdministratorAuthenticationController(
             $viewRenderer,
             $authenticator,
@@ -291,13 +300,12 @@ final class Bootstrap
             $csrfTokens,
             $logger,
             $loginPolicy,
+            new AdministratorDashboardMetricsServiceProvider(
+                static fn (): AdministratorDashboardMetricsService => new AdministratorDashboardMetricsService(
+                    new PdoAdministratorDashboardMetricsRepository($catalogConnectionProvider()),
+                ),
+            ),
         );
-        $catalogConnection = null;
-        $catalogConnectionProvider = static function () use ($connectionFactory, &$catalogConnection): \PDO {
-            $catalogConnection ??= $connectionFactory->create();
-
-            return $catalogConnection;
-        };
         $catalogServices = new RoomCatalogServiceProvider(
             static fn (): RoomTypeCatalogService => new RoomTypeCatalogService(
                 new RoomTypeRepository($catalogConnectionProvider()),

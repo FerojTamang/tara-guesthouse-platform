@@ -13,6 +13,7 @@ use App\Exceptions\AdministratorAuthenticationException;
 use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
+use App\Services\AdministratorDashboardMetricsServiceProvider;
 use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -33,6 +34,7 @@ final class AdministratorAuthenticationController
         private readonly CsrfTokenManager $csrfTokens,
         private readonly LoggerInterface $logger,
         private readonly array $loginPolicy,
+        private readonly ?AdministratorDashboardMetricsServiceProvider $dashboardMetrics = null,
     ) {
     }
 
@@ -216,6 +218,18 @@ final class AdministratorAuthenticationController
     /** @param array<string, string> $parameters */
     public function dashboard(Request $request, array $parameters): Response
     {
+        $identity = $this->administratorSession->identity();
+
+        if ($identity === null) {
+            return Response::redirect('/admin/login', 302, ['Cache-Control' => 'no-store']);
+        }
+
+        try {
+            $metrics = $this->dashboardMetrics?->service()->today($identity->userId());
+        } catch (Throwable) {
+            return Response::text('Internal Server Error', 500, ['Cache-Control' => 'no-store']);
+        }
+
         $html = $this->views->render(
             'admin.dashboard',
             [
@@ -223,6 +237,19 @@ final class AdministratorAuthenticationController
                 'pageTitle' => 'Dashboard',
                 'activeNavigation' => 'dashboard',
                 'csrfToken' => $this->csrfTokens->token(),
+                'metrics' => $metrics === null ? null : [
+                    'activeRooms' => $metrics->activeRooms(),
+                    'occupiedRooms' => $metrics->occupiedRooms(),
+                    'availableRooms' => $metrics->availableRooms(),
+                    'arrivalsToday' => $metrics->arrivalsToday(),
+                    'departuresToday' => $metrics->departuresToday(),
+                    'pendingBookings' => $metrics->pendingBookings(),
+                    'confirmedBookings' => $metrics->confirmedBookings(),
+                    'pendingPaymentReviews' => $metrics->pendingPaymentReviews(),
+                    'pendingReviewModeration' => $metrics->pendingReviewModeration(),
+                    'unreadNotifications' => $metrics->unreadNotifications(),
+                ],
+                'reportingDate' => $metrics?->rangeStart()->setTimezone(new \DateTimeZone('Asia/Kathmandu'))->format('F j, Y'),
             ],
             'layouts.admin',
         );

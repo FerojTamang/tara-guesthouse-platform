@@ -21,6 +21,11 @@ use App\Middleware\RequireAdministratorMiddleware;
 use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
+use App\Services\AdministratorDashboardMetricsService;
+use App\Services\AdministratorDashboardMetricsServiceProvider;
+use App\Repositories\AdministratorDashboardMetricsRepository;
+use App\Models\AdministratorDashboardMetrics;
+use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -43,6 +48,8 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
 
     private HtmlAuthenticatorFake $authenticator;
 
+    private DashboardMetricsRepositoryFake $dashboardMetricsRepository;
+
     private Application $application;
 
     protected function setUp(): void
@@ -59,6 +66,7 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
         $this->csrfTokens = new CsrfTokenManager($this->session);
         $this->administratorSession = new AdministratorSession($this->session, $this->csrfTokens);
         $this->authenticator = new HtmlAuthenticatorFake();
+        $this->dashboardMetricsRepository = new DashboardMetricsRepositoryFake();
         $logger = new NullLogger();
         $renderer = new ViewRenderer(
             dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
@@ -71,6 +79,9 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
             $this->csrfTokens,
             $logger,
             self::loginPolicy(),
+            new AdministratorDashboardMetricsServiceProvider(
+                fn (): AdministratorDashboardMetricsService => new AdministratorDashboardMetricsService($this->dashboardMetricsRepository),
+            ),
         );
         $router = new Router();
         $registrar = require dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'admin.php';
@@ -250,15 +261,55 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
         self::assertStringContainsString('aria-label="Administrator navigation"', $response->body());
         self::assertStringContainsString('href="/admin/dashboard"', $response->body());
         self::assertStringContainsString('aria-current="page"', $response->body());
-        self::assertStringContainsString('Administrator dashboard', $response->body());
+        self::assertStringContainsString('<h1 id="administrator-dashboard-heading" class="h2 mb-2">Dashboard</h1>', $response->body());
+        foreach (['Active rooms', 'Occupied rooms', 'Available rooms', 'Arrivals today', 'Departures today', 'Pending bookings', 'Confirmed bookings', 'Pending payment reviews', 'Reviews awaiting moderation', 'Unread notifications'] as $label) {
+            self::assertStringContainsString($label, $response->body());
+        }
         self::assertStringContainsString('method="post" action="/admin/logout"', $response->body());
         self::assertStringContainsString('value="' . $token . '"', $response->body());
         self::assertStringContainsString('/assets/css/admin.css', $response->body());
         self::assertStringContainsString('bootstrap@5.3.8/dist/css/bootstrap.min.css', $response->body());
         self::assertStringContainsString('bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js', $response->body());
         self::assertStringContainsString('integrity="sha384-', $response->body());
-        self::assertStringNotContainsString('Room occupancy', $response->body());
+        self::assertStringNotContainsString('Revenue', $response->body());
         self::assertSame(1, substr_count($response->body(), 'action="/admin/logout"'));
+    }
+
+    public function testDashboardMetricsFailureUsesOnlyTheGenericNoStoreFailureResponse(): void
+    {
+        $this->administratorSession->establish(new AdministratorIdentity(91));
+        $this->dashboardMetricsRepository->failure = new \RuntimeException(
+            'SQLSTATE[HY000] PDO SELECT passwords FROM users at C:\\secret\\database.php',
+        );
+
+        $response = $this->application->handle(Request::create('GET', '/admin/dashboard'));
+
+        self::assertSame(500, $response->statusCode());
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertSame('Internal Server Error', $response->body());
+        self::assertSame(1, $this->dashboardMetricsRepository->calls);
+        self::assertSame(91, $this->dashboardMetricsRepository->administratorId);
+        foreach (['SQLSTATE', 'PDO', 'SELECT', 'users', 'passwords', 'C:\\secret', 'RuntimeException'] as $sensitive) {
+            self::assertStringNotContainsString($sensitive, $response->body());
+        }
+        $this->session = Session::start($this->sessionConfiguration);
+        self::assertSame(91, $this->administratorSession->identity()?->userId());
+    }
+
+    public function testDashboardUsesAuthenticatedIdentityInsteadOfConflictingRequestInput(): void
+    {
+        $this->administratorSession->establish(new AdministratorIdentity(91));
+        $response = $this->application->handle(Request::create(
+            'GET',
+            '/admin/dashboard?administrator_id=92&user_id=92&id=92',
+            input: ['administrator_id' => '92', 'user_id' => '92', 'id' => '92'],
+        ));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame(1, $this->dashboardMetricsRepository->calls);
+        self::assertSame(91, $this->dashboardMetricsRepository->administratorId);
+        self::assertStringContainsString('>9<', $response->body());
+        self::assertStringNotContainsString('>92<', $response->body());
     }
 
     public function testLogoutRequiresPostAndValidCsrfThenDestroysTheSession(): void
@@ -320,6 +371,24 @@ final class AdministratorHtmlAuthenticationTest extends TestCase
             'save_path' => realpath($this->savePath),
             'gc_maxlifetime' => 43200,
         ];
+    }
+}
+
+final class DashboardMetricsRepositoryFake implements AdministratorDashboardMetricsRepository
+{
+    public int $calls = 0;
+    public ?int $administratorId = null;
+    public ?\Throwable $failure = null;
+
+    public function metrics(int $administratorId, DateTimeImmutable $rangeStart, DateTimeImmutable $rangeEnd): AdministratorDashboardMetrics
+    {
+        $this->calls++;
+        $this->administratorId = $administratorId;
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        return new AdministratorDashboardMetrics($rangeStart, $rangeEnd, 5, 2, 3, 4, 5, 6, 7, 8, 9);
     }
 }
 
