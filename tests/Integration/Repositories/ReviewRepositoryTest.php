@@ -71,6 +71,56 @@ final class ReviewRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repository->findById(0));
     }
 
+    public function testApprovedListingExcludesPendingAndUsesNewestFirstOrder(): void
+    {
+        $administratorId = ReviewFixture::insertAdministrator($this->connection);
+
+        $olderBookingId = ReviewFixture::insertBooking($this->connection);
+        $olderInvitationId = ReviewFixture::insertInvitation($this->connection, $olderBookingId);
+        $olderReviewId = ReviewFixture::insertReview($this->connection, $olderBookingId, $olderInvitationId, [
+            'guest_name_snapshot' => 'Older Guest',
+            'review_status' => Review::STATUS_APPROVED,
+            'moderated_by' => $administratorId,
+            'moderated_at' => '2026-08-01 01:00:00',
+            'created_at' => '2026-08-01 00:30:00',
+            'updated_at' => '2026-08-01 01:00:00',
+        ]);
+
+        $newerBookingId = ReviewFixture::insertBooking($this->connection);
+        $newerInvitationId = ReviewFixture::insertInvitation($this->connection, $newerBookingId);
+        $newerReviewId = ReviewFixture::insertReview($this->connection, $newerBookingId, $newerInvitationId, [
+            'guest_name_snapshot' => 'Newer Guest',
+            'review_status' => Review::STATUS_APPROVED,
+            'moderated_by' => $administratorId,
+            'moderated_at' => '2026-08-01 02:00:00',
+            'created_at' => '2026-08-01 01:30:00',
+            'updated_at' => '2026-08-01 02:00:00',
+        ]);
+
+        $pendingBookingId = ReviewFixture::insertBooking($this->connection);
+        $pendingInvitationId = ReviewFixture::insertInvitation($this->connection, $pendingBookingId);
+        ReviewFixture::insertReview($this->connection, $pendingBookingId, $pendingInvitationId, [
+            'guest_name_snapshot' => 'Pending Guest',
+            'created_at' => '2026-08-01 03:30:00',
+            'updated_at' => '2026-08-01 03:30:00',
+        ]);
+
+        $approved = $this->repository->findAllApproved();
+
+        self::assertSame([$newerReviewId, $olderReviewId], array_map(
+            static fn (Review $review): int => $review->id(),
+            $approved,
+        ));
+        self::assertSame(['Newer Guest', 'Older Guest'], array_map(
+            static fn (Review $review): string => $review->guestNameSnapshot(),
+            $approved,
+        ));
+        self::assertSame([Review::STATUS_APPROVED, Review::STATUS_APPROVED], array_map(
+            static fn (Review $review): string => $review->status(),
+            $approved,
+        ));
+    }
+
     public function testOneReviewPerBookingAndInvitationIsEnforced(): void
     {
         $bookingId = ReviewFixture::insertBooking($this->connection);

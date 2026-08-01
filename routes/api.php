@@ -18,6 +18,7 @@ use App\Controllers\PublicCmsController;
 use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentMethodController;
+use App\Controllers\PublicReviewController;
 use App\Core\Router;
 use App\Core\ViewRenderer;
 use App\Middleware\CsrfMiddleware;
@@ -25,6 +26,7 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
+use App\Middleware\PublicReviewRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 
 return static function (
@@ -51,9 +53,11 @@ return static function (
     $publicContact = null;
     $publicPayment = null;
     $publicPaymentMethods = null;
+    $publicReviews = null;
     $publicBookingRateLimit = null;
     $publicPaymentRateLimit = null;
     $publicContactRateLimit = null;
+    $publicReviewRateLimit = null;
 
     foreach ($dependencies as $dependency) {
         if ($dependency instanceof AdministratorActivityController) {
@@ -94,12 +98,16 @@ return static function (
             $publicPayment ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentMethodController) {
             $publicPaymentMethods ??= $dependency;
+        } elseif ($dependency instanceof PublicReviewController) {
+            $publicReviews ??= $dependency;
         } elseif ($dependency instanceof PublicBookingRateLimitMiddleware) {
             $publicBookingRateLimit ??= $dependency;
         } elseif ($dependency instanceof PublicPaymentRateLimitMiddleware) {
             $publicPaymentRateLimit ??= $dependency;
         } elseif ($dependency instanceof PublicContactRateLimitMiddleware) {
             $publicContactRateLimit ??= $dependency;
+        } elseif ($dependency instanceof PublicReviewRateLimitMiddleware) {
+            $publicReviewRateLimit ??= $dependency;
         }
     }
 
@@ -219,6 +227,12 @@ return static function (
         );
     }
 
+    if ($publicReviewRateLimit !== null && ($publicReviews === null || $csrf === null)) {
+        throw new \LogicException(
+            'Public review submissions require complete security dependencies.',
+        );
+    }
+
     if ($publicActivities !== null) {
         $router->get('/api/v1/activities', $publicActivities->index(...));
     }
@@ -256,6 +270,18 @@ return static function (
             '/api/v1/contact',
             [$publicContact, 'apiCreate'],
             [$csrf->forJson(), $publicContactRateLimit],
+        );
+    }
+
+    if ($publicReviews !== null) {
+        $router->get('/api/v1/reviews', [$publicReviews, 'apiIndex']);
+    }
+
+    if ($publicReviews !== null && $publicReviewRateLimit !== null) {
+        $router->post(
+            '/api/v1/reviews',
+            [$publicReviews, 'apiCreate'],
+            [$csrf->forJson(), $publicReviewRateLimit],
         );
     }
 

@@ -40,6 +40,33 @@ final class PdoReviewRepository implements ReviewRepository
     {
     }
 
+    /** @return list<Review> */
+    public function findAllApproved(): array
+    {
+        try {
+            $statement = $this->connection->query(
+                self::SELECT
+                . " WHERE review_status = 'approved'"
+                . ' ORDER BY created_at DESC, id DESC',
+            );
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The public review records could not be loaded.');
+            }
+
+            return array_map(function (mixed $row): Review {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The public review record could not be mapped.');
+                }
+
+                return $this->map($row);
+            }, $rows);
+        } catch (Throwable) {
+            throw new DatabaseException('The public review lookup failed.');
+        }
+    }
+
     public function createPending(
         int $bookingId,
         int $reviewInvitationId,

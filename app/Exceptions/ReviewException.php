@@ -38,6 +38,11 @@ final class ReviewException extends RuntimeException
         return new self('A review already exists for this booking.', 'conflict', $previous);
     }
 
+    public static function invitationUnavailable(?Throwable $previous = null): self
+    {
+        return new self('This review invitation is unavailable.', 'unavailable', $previous);
+    }
+
     public static function failure(?Throwable $previous = null): self
     {
         return new self('Review workflow operation failed.', 'system', $previous);
@@ -46,5 +51,6 @@ final class ReviewException extends RuntimeException
     public function isValidationFailure(): bool { return $this->category === 'validation'; }
     public function isEligibilityFailure(): bool { return $this->category === 'eligibility'; }
     public function isConflict(): bool { return $this->category === 'conflict'; }
+    public function isUnavailable(): bool { return $this->category === 'unavailable'; }
     public function isSystemFailure(): bool { return $this->category === 'system'; }
 }

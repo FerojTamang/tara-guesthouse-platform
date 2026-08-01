@@ -158,6 +158,25 @@ final class PublicCmsServiceTest extends TestCase
         self::assertSame('Tara Guest House', $home['site_name']);
     }
 
+    public function testHomepageUsesTheApprovedReviewProjectionWithoutChangingOtherModules(): void
+    {
+        $reviews = [[
+            'guest_name' => 'Verified Stay Guest',
+            'rating' => 5,
+            'title' => 'A warm stay',
+            'comment' => 'The room was clean and the team was welcoming.',
+            'created_at' => '2026-08-01T00:30:00+00:00',
+        ]];
+        $service = $this->service(reviews: static fn (): array => $reviews);
+
+        $home = $service->homepage();
+
+        self::assertSame($reviews, $home['reviews']);
+        self::assertSame([], $home['rooms']);
+        self::assertSame([], $home['activities']);
+        self::assertSame([], $home['gallery']);
+    }
+
     public function testStoredSettingContractFailureIsSanitized(): void
     {
         $settings = $this->createStub(SettingRepository::class);
@@ -186,6 +205,7 @@ final class PublicCmsServiceTest extends TestCase
         ?ActivityCatalogRepository $activities = null,
         ?GalleryCatalogRepository $gallery = null,
         ?string $applicationUrl = 'https://example.test',
+        ?callable $reviews = null,
     ): PublicCmsService {
         $pages ??= $this->createStub(PageRepository::class);
         $settings ??= $this->createStub(SettingRepository::class);
@@ -211,6 +231,7 @@ final class PublicCmsServiceTest extends TestCase
             ),
             'Tara Guest House',
             $applicationUrl,
+            $reviews,
         );
     }
 

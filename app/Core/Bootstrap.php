@@ -30,6 +30,7 @@ use App\Controllers\PublicContactController;
 use App\Controllers\PublicPaymentController;
 use App\Controllers\PublicPaymentPageController;
 use App\Controllers\PublicPaymentMethodController;
+use App\Controllers\PublicReviewController;
 use App\Controllers\PublicRoomController;
 use App\Exceptions\ConfigurationException;
 use App\Middleware\CsrfMiddleware;
@@ -37,6 +38,7 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Middleware\PublicPaymentRateLimitMiddleware;
+use App\Middleware\PublicReviewRateLimitMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\ActivityRepository;
 use App\Repositories\AmenityRepository;
@@ -130,6 +132,7 @@ use App\Services\ReviewInvitationPolicyProvider;
 use App\Services\ReviewInvitationService;
 use App\Services\ReviewInvitationServiceProvider;
 use App\Services\ReviewTokenHasher;
+use App\Services\ReviewSubmissionFlash;
 use App\Services\SettingDefinitionRegistryProvider;
 use App\Services\PublicActivityService;
 use App\Services\PublicActivityServiceProvider;
@@ -144,6 +147,9 @@ use App\Services\PublicContactRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
 use App\Services\PublicPaymentRateLimiter;
+use App\Services\PublicReviewRateLimiter;
+use App\Services\PublicReviewService;
+use App\Services\PublicReviewServiceProvider;
 use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
@@ -209,6 +215,7 @@ final class Bootstrap
         $publicBookingPolicy = $config->require('security.public_booking');
         $publicPaymentPolicy = $config->require('security.public_payment');
         $publicContactPolicy = $config->require('security.public_contact');
+        $publicReviewPolicy = $config->require('security.public_review');
         $bookingConfiguration = $config->require('booking');
 
         if (
@@ -217,6 +224,7 @@ final class Bootstrap
             || !is_array($publicBookingPolicy)
             || !is_array($publicPaymentPolicy)
             || !is_array($publicContactPolicy)
+            || !is_array($publicReviewPolicy)
             || !is_array($bookingConfiguration)
         ) {
             throw new ConfigurationException('Application service configuration is invalid.');
@@ -547,6 +555,26 @@ final class Bootstrap
             $viewRenderer,
             $publicRoomServices,
         );
+        $publicReviewServices = new PublicReviewServiceProvider(
+            static function () use ($catalogConnectionProvider): PublicReviewService {
+                $connection = $catalogConnectionProvider();
+
+                return new PublicReviewService(
+                    new BookingRepository($connection),
+                    new PdoReviewInvitationRepository($connection),
+                    new PdoReviewRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoReviewTransaction($connection),
+                    new ReviewTokenHasher(),
+                );
+            },
+        );
+        $publicReviewController = new PublicReviewController(
+            $viewRenderer,
+            $publicReviewServices,
+            new ReviewSubmissionFlash($session),
+            $csrfTokens,
+        );
         $applicationName = $config->require('app.name');
         $applicationUrl = $config->get('app.url');
 
@@ -566,6 +594,7 @@ final class Bootstrap
                     $publicGalleryServices->service(),
                     $applicationName,
                     $applicationUrl,
+                    static fn (): array => array_slice($publicReviewServices->service()->approved(), 0, 3),
                 ),
             ),
         );
@@ -739,6 +768,18 @@ final class Bootstrap
                 $publicContactPolicy,
             ),
         );
+        $publicReviewRateLimit = new PublicReviewRateLimitMiddleware(
+            new PublicReviewRateLimiter(
+                STORAGE_PATH
+                    . DIRECTORY_SEPARATOR
+                    . 'cache'
+                    . DIRECTORY_SEPARATOR
+                    . 'review-rate-limits'
+                    . DIRECTORY_SEPARATOR
+                    . 'public',
+                $publicReviewPolicy,
+            ),
+        );
         $router = new Router();
         self::loadRoutes(
             $router,
@@ -764,6 +805,7 @@ final class Bootstrap
             $publicGalleryController,
             $publicCmsController,
             $publicContactController,
+            $publicReviewController,
             $publicRoomController,
             $publicAvailabilityController,
             $publicPaymentMethodController,
@@ -774,6 +816,7 @@ final class Bootstrap
             $publicPaymentPageController,
             $publicPaymentRateLimit,
             $publicContactRateLimit,
+            $publicReviewRateLimit,
         );
 
         return new Application($router, $errorHandler, $session);
@@ -827,6 +870,7 @@ final class Bootstrap
         PublicGalleryController $publicGalleryController,
         PublicCmsController $publicCmsController,
         PublicContactController $publicContactController,
+        PublicReviewController $publicReviewController,
         PublicRoomController $publicRoomController,
         PublicAvailabilityController $publicAvailabilityController,
         PublicPaymentMethodController $publicPaymentMethodController,
@@ -837,6 +881,7 @@ final class Bootstrap
         PublicPaymentPageController $publicPaymentPageController,
         PublicPaymentRateLimitMiddleware $publicPaymentRateLimit,
         PublicContactRateLimitMiddleware $publicContactRateLimit,
+        PublicReviewRateLimitMiddleware $publicReviewRateLimit,
     ): void {
         foreach (self::ROUTE_FILES as $routeFile) {
             $path = ROUTES_PATH . DIRECTORY_SEPARATOR . $routeFile;
@@ -875,6 +920,7 @@ final class Bootstrap
                 $publicGalleryController,
                 $publicCmsController,
                 $publicContactController,
+                $publicReviewController,
                 $publicRoomController,
                 $publicAvailabilityController,
                 $publicPaymentMethodController,
@@ -885,6 +931,7 @@ final class Bootstrap
                 $publicPaymentPageController,
                 $publicPaymentRateLimit,
                 $publicContactRateLimit,
+                $publicReviewRateLimit,
             );
         }
     }

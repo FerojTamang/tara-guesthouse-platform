@@ -10,6 +10,9 @@ use DateTimeImmutable;
 /** Defines retained verified-stay review persistence. */
 interface ReviewRepository
 {
+    /** @return list<Review> */
+    public function findAllApproved(): array;
+
     public function createPending(
         int $bookingId,
         int $reviewInvitationId,

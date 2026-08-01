@@ -82,6 +82,30 @@
 
 <?php if ($reviews !== []): ?>
 <section class="py-4" aria-labelledby="home-reviews-heading">
-    <h2 id="home-reviews-heading" class="h1">Guest reviews</h2>
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
+        <div>
+            <p class="text-uppercase fw-semibold text-secondary mb-1">Verified stays</p>
+            <h2 id="home-reviews-heading" class="h1 mb-0">Guest reviews</h2>
+        </div>
+        <a href="/reviews">Read all reviews</a>
+    </div>
+    <div class="row g-4">
+        <?php foreach ($reviews as $review): ?>
+            <div class="col-lg-4">
+                <article class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <p aria-label="<?= $e((string) $review['rating']) ?> out of 5 stars">
+                            <span aria-hidden="true"><?= str_repeat('★', $review['rating']) ?><?= str_repeat('☆', 5 - $review['rating']) ?></span>
+                        </p>
+                        <?php if ($review['title'] !== null): ?>
+                            <h3 class="h5"><?= $e($review['title']) ?></h3>
+                        <?php endif; ?>
+                        <p><?= nl2br($e($review['comment']), false) ?></p>
+                        <p class="text-secondary mb-0"><?= $e($review['guest_name']) ?></p>
+                    </div>
+                </article>
+            </div>
+        <?php endforeach; ?>
+    </div>
 </section>
 <?php endif; ?>

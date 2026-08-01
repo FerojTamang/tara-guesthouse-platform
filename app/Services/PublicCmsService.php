@@ -27,8 +27,12 @@ final readonly class PublicCmsService
     /** @var \Closure(): SettingDefinitionRegistry */
     private \Closure $definitions;
 
+    /** @var \Closure(): array */
+    private \Closure $reviews;
+
     /**
      * @param callable(): SettingDefinitionRegistry $definitions
+     * @param null|callable(): array $reviews
      */
     public function __construct(
         private PageRepository $pages,
@@ -39,8 +43,10 @@ final readonly class PublicCmsService
         private PublicGalleryService $gallery,
         private string $applicationName,
         private ?string $applicationUrl,
+        ?callable $reviews = null,
     ) {
         $this->definitions = \Closure::fromCallable($definitions);
+        $this->reviews = \Closure::fromCallable($reviews ?? static fn (): array => []);
 
         if ($applicationName === '' || $applicationName !== trim($applicationName)) {
             throw CmsException::failure();
@@ -75,7 +81,7 @@ final readonly class PublicCmsService
      *     rooms: list<array<string, mixed>>,
      *     activities: list<array<string, mixed>>,
      *     gallery: list<array<string, mixed>>,
-     *     reviews: list<never>
+     *     reviews: list<array{guest_name: string, rating: int, title: ?string, comment: string, created_at: string}>
      * }
      */
     public function homepage(): array
@@ -96,10 +102,21 @@ final readonly class PublicCmsService
                 'rooms' => $this->rooms->list(),
                 'activities' => $this->activities->list(),
                 'gallery' => $this->gallery->list(),
-                // The verified-review public projection is introduced by later Sprint 4 tickets.
-                'reviews' => [],
+                'reviews' => $this->homepageReviews(),
             ];
         });
+    }
+
+    /** @return list<array{guest_name: string, rating: int, title: ?string, comment: string, created_at: string}> */
+    private function homepageReviews(): array
+    {
+        $reviews = ($this->reviews)();
+
+        if (!is_array($reviews) || !array_is_list($reviews)) {
+            throw CmsException::failure();
+        }
+
+        return $reviews;
     }
 
     /**

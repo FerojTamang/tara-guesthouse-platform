@@ -54,6 +54,7 @@
                         <li class="nav-item"><a class="nav-link" href="/rooms">Rooms</a></li>
                         <li class="nav-item"><a class="nav-link" href="/activities">Activities</a></li>
                         <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/reviews">Reviews</a></li>
                         <li class="nav-item"><a class="nav-link" href="/availability">Availability</a></li>
                         <li class="nav-item"><a class="nav-link" href="/contact">Contact</a></li>
                         <?php foreach (($navigationPages ?? []) as $navigationPage): ?>

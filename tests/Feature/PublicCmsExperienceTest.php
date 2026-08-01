@@ -71,6 +71,10 @@ final class PublicCmsExperienceTest extends TestCase
         self::assertStringNotContainsString('Reserved route content.', $response->body());
         self::assertStringContainsString('Village Walk', $response->body());
         self::assertStringContainsString('Courtyard', $response->body());
+        self::assertStringContainsString('Verified Stay Guest', $response->body());
+        self::assertStringContainsString('&lt;script&gt;Excellent&lt;/script&gt;', $response->body());
+        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;', $response->body());
+        self::assertStringNotContainsString('<script>Excellent</script>', $response->body());
         self::assertStringContainsString('mailto:hello@example.test', $response->body());
         self::assertStringNotContainsString('private.note', $response->body());
         self::assertStringNotContainsString('secret', $response->body());
@@ -174,13 +178,20 @@ final class PublicCmsExperienceTest extends TestCase
         self::assertStringNotContainsString('SQLSTATE', $api->body());
     }
 
-    private function controller(?callable $definitions = null): PublicCmsController
+    private function controller(?callable $definitions = null, ?callable $reviews = null): PublicCmsController
     {
         $definitions ??= fn (): SettingDefinitionRegistry => new SettingDefinitionRegistry([
             new SettingDefinition('contact.email', 'email', true, 254),
             new SettingDefinition('homepage.enabled', 'boolean', true, 5),
             new SettingDefinition('private.note', 'string', false, 100),
         ]);
+        $reviews ??= static fn (): array => [[
+            'guest_name' => 'Verified Stay Guest',
+            'rating' => 5,
+            'title' => '<script>Excellent</script>',
+            'comment' => '<img src=x onerror=alert(1)> Helpful team.',
+            'created_at' => '2026-08-01T00:30:00+00:00',
+        ]];
         $roomRepository = $this->createStub(RoomCatalogRepository::class);
         $roomRepository->method('findAllPublic')->willReturn([]);
         $activityRepository = $this->createStub(ActivityCatalogRepository::class);
@@ -203,6 +214,7 @@ final class PublicCmsExperienceTest extends TestCase
             ),
             'Tara Guest House',
             'https://example.test',
+            $reviews,
         );
 
         return new PublicCmsController(
