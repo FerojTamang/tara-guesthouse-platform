@@ -9,6 +9,7 @@ use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorNotificationController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorReviewController;
 use App\Controllers\PublicActivityController;
@@ -42,6 +43,7 @@ return static function (
     $administratorContact = null;
     $administratorGallery = null;
     $administratorInvoice = null;
+    $administratorNotification = null;
     $administratorPayment = null;
     $administratorReview = null;
     $guestOnly = null;
@@ -74,6 +76,8 @@ return static function (
             $administratorContact ??= $dependency;
         } elseif ($dependency instanceof AdministratorGalleryController) {
             $administratorGallery ??= $dependency;
+        } elseif ($dependency instanceof AdministratorNotificationController) {
+            $administratorNotification ??= $dependency;
         } elseif ($dependency instanceof AdministratorPaymentController) {
             $administratorPayment ??= $dependency;
         } elseif ($dependency instanceof AdministratorReviewController) {
@@ -433,6 +437,24 @@ return static function (
         $router->patch(
             '/api/v1/admin/reviews/{id}/status',
             [$administratorReview, 'apiTransition'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+    }
+
+    if ($administratorNotification !== null) {
+        $router->get(
+            '/api/v1/admin/notifications',
+            [$administratorNotification, 'apiIndex'],
+            [$requireAdministrator->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/notifications/read-all',
+            [$administratorNotification, 'apiReadAll'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/notifications/{id}/read',
+            [$administratorNotification, 'apiRead'],
             [$requireAdministrator->forJson(), $csrf->forJson()],
         );
     }

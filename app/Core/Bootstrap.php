@@ -14,6 +14,7 @@ use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorNotificationController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorReviewController;
 use App\Controllers\AdministratorPaymentMethodController;
@@ -51,6 +52,7 @@ use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\PdoContactMessageRepository;
 use App\Repositories\PdoInvoiceRepository;
+use App\Repositories\PdoNotificationRepository;
 use App\Repositories\PdoPageRepository;
 use App\Repositories\PdoSettingRepository;
 use App\Repositories\PaymentMethodRepository;
@@ -74,6 +76,8 @@ use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\NullReviewInvitationDelivery;
 use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
+use App\Services\AdministratorNotificationService;
+use App\Services\AdministratorNotificationServiceProvider;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -504,6 +508,17 @@ final class Bootstrap
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
+        $administratorNotificationController = new AdministratorNotificationController(
+            $viewRenderer,
+            new AdministratorNotificationServiceProvider(
+                static fn (): AdministratorNotificationService => new AdministratorNotificationService(
+                    new PdoNotificationRepository($catalogConnectionProvider()),
+                ),
+            ),
+            $administratorSession,
+            $csrfTokens,
+            new \DateTimeZone($timezone),
+        );
         $administratorPaymentController = new AdministratorPaymentController(
             $viewRenderer,
             new AdministratorPaymentServiceProvider(
@@ -827,6 +842,7 @@ final class Bootstrap
             $administratorCmsController,
             $administratorContactController,
             $administratorReviewController,
+            $administratorNotificationController,
             $publicActivityController,
             $publicGalleryController,
             $publicCmsController,
@@ -893,6 +909,7 @@ final class Bootstrap
         AdministratorCmsController $administratorCmsController,
         AdministratorContactController $administratorContactController,
         AdministratorReviewController $administratorReviewController,
+        AdministratorNotificationController $administratorNotificationController,
         PublicActivityController $publicActivityController,
         PublicGalleryController $publicGalleryController,
         PublicCmsController $publicCmsController,
@@ -944,6 +961,7 @@ final class Bootstrap
                 $administratorCmsController,
                 $administratorContactController,
                 $administratorReviewController,
+                $administratorNotificationController,
                 $publicActivityController,
                 $publicGalleryController,
                 $publicCmsController,

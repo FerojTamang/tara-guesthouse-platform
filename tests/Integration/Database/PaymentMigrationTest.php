@@ -37,6 +37,7 @@ final class PaymentMigrationTest extends DatabaseTestCase
         '20260731000300_create_contact_messages_table',
         '20260801000100_create_review_invitations_table',
         '20260801000200_create_reviews_table',
+        '20260801000300_create_notifications_table',
     ];
 
     private MigrationRunner $runner;

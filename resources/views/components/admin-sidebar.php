@@ -31,6 +31,15 @@
                         Dashboard
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'notifications' ? ' active' : '' ?>"
+                        href="/admin/notifications"
+                        <?= $activeNavigation === 'notifications' ? 'aria-current="page"' : '' ?>
+                    >
+                        Notifications
+                    </a>
+                </li>
             </ul>
 
             <p class="admin-navigation-heading mt-4">Management</p>

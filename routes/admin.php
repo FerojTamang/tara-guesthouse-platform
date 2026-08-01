@@ -10,6 +10,7 @@ use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorContactController;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
+use App\Controllers\AdministratorNotificationController;
 use App\Controllers\AdministratorPaymentController;
 use App\Controllers\AdministratorPaymentMethodController;
 use App\Controllers\AdministratorReviewController;
@@ -44,6 +45,7 @@ return static function (
     ?AdministratorCmsController $cmsController = null,
     ?AdministratorContactController $contactController = null,
     ?AdministratorReviewController $reviewController = null,
+    ?AdministratorNotificationController $notificationController = null,
 ): void {
     $dependencyCount = count(array_filter(
         [$controller, $guestOnly, $requireAdministrator, $csrf],
@@ -66,6 +68,7 @@ return static function (
         && $cmsController === null
         && $contactController === null
         && $reviewController === null
+        && $notificationController === null
     ) {
         return;
     }
@@ -202,6 +205,14 @@ return static function (
         $router->get(
             '/admin/reviews/{id}',
             [$reviewController, 'show'],
+            [$requireAdministrator],
+        );
+    }
+
+    if ($notificationController !== null) {
+        $router->get(
+            '/admin/notifications',
+            [$notificationController, 'index'],
             [$requireAdministrator],
         );
     }
