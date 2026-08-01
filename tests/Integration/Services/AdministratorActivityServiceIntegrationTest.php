@@ -60,9 +60,15 @@ final class AdministratorActivityServiceIntegrationTest extends DatabaseTestCase
             ActivityContentRequest::fromInput(
                 'Updated Jungle Walk',
                 'updated-jungle-walk',
+                'Updated guided jungle walk.',
                 'Updated activity content.',
                 '3000.00',
+                'per person',
+                '4 hours',
+                'Dhulikhel',
                 20,
+                true,
+                2,
             ),
             $this->administratorId,
             null,
@@ -217,9 +223,15 @@ final class AdministratorActivityServiceIntegrationTest extends DatabaseTestCase
         return ActivityContentRequest::fromInput(
             'Jungle Walk',
             'jungle-walk',
+            'Explore the forest with a local guide.',
             'Explore the surrounding forest.',
             '2500.00',
+            'per person',
+            '3 hours',
+            'Dhulikhel',
             10,
+            true,
+            1,
         );
     }
 

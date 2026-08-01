@@ -34,8 +34,21 @@ final class Request
      */
     public static function fromGlobals(): self
     {
-        $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $transportMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        $method = $transportMethod;
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $path = self::normalizePath($uri);
+        $contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? '');
+        $mediaType = strtolower(trim(explode(';', $contentType, 2)[0]));
+
+        if (
+            $transportMethod === 'POST'
+            && ($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? null) === 'PUT'
+            && $mediaType === 'multipart/form-data'
+            && preg_match('#^/api/v1/admin/activities/[1-9][0-9]*$#D', $path) === 1
+        ) {
+            $method = 'PUT';
+        }
         $headers = [];
 
         foreach ($_SERVER as $key => $value) {

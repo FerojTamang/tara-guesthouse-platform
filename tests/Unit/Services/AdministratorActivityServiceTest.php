@@ -10,10 +10,14 @@ use App\Models\AuditLogEntry;
 use App\Repositories\ActivityCatalogRepository;
 use App\Repositories\AuditLogWriteRepository;
 use App\Requests\ActivityContentRequest;
+use App\Requests\GalleryImageUploadRequest;
 use App\Services\ActivityTransaction;
 use App\Services\AdministratorActivityService;
+use App\Storage\GalleryImageStorage;
+use App\Storage\StoredGalleryImage;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -63,9 +67,15 @@ final class AdministratorActivityServiceTest extends TestCase
             ActivityContentRequest::fromInput(
                 'Updated Walk',
                 'updated-walk',
+                'Updated walk summary.',
                 'Updated activity description.',
                 '3000.00',
+                'per person',
+                '4 hours',
+                'Dhulikhel',
                 20,
+                true,
+                2,
             ),
             91,
             null,
@@ -256,16 +266,92 @@ final class AdministratorActivityServiceTest extends TestCase
         }
     }
 
+    public function testUpdateRetainsImageWithoutUploadAndReplacesWithCleanupWhenSupplied(): void
+    {
+        $oldPath = 'gallery/' . str_repeat('a', 64) . '.jpg';
+        $newPath = 'gallery/' . str_repeat('b', 64) . '.png';
+        $repository = new AdministratorActivityRepositoryFake();
+        $repository->items[7] = $this->activity(imagePath: $oldPath);
+        $storage = new AdministratorActivityStorageFake($newPath);
+        $service = $this->service(
+            $repository,
+            new AdministratorActivityAuditFake(),
+            new AdministratorActivityTransactionFake(),
+            $storage,
+        );
+
+        self::assertSame($oldPath, $service->update(7, $this->request(), 91, null, null)->featuredImagePath());
+        self::assertSame(0, $storage->stores);
+        self::assertSame([], $storage->removed);
+
+        $updated = $service->update(7, $this->request(), 91, null, null, $this->uploadRequest());
+        self::assertSame($newPath, $updated->featuredImagePath());
+        self::assertSame(1, $storage->stores);
+        self::assertSame([$oldPath], $storage->removed);
+    }
+
+    public function testFailedImageUploadLeavesExistingActivityUnchangedAndIsSanitized(): void
+    {
+        $oldPath = 'gallery/' . str_repeat('a', 64) . '.jpg';
+        $repository = new AdministratorActivityRepositoryFake();
+        $repository->items[7] = $this->activity(imagePath: $oldPath);
+        $storage = new AdministratorActivityStorageFake('gallery/' . str_repeat('b', 64) . '.png');
+        $storage->failure = new RuntimeException('temporary absolute upload path');
+
+        try {
+            $this->service(
+                $repository,
+                new AdministratorActivityAuditFake(),
+                new AdministratorActivityTransactionFake(),
+                $storage,
+            )->update(7, $this->request(), 91, null, null, $this->uploadRequest());
+            self::fail('Expected a safe activity image failure.');
+        } catch (ActivityException $exception) {
+            self::assertSame('Activity catalogue operation failed.', $exception->getMessage());
+            self::assertStringNotContainsString('temporary absolute upload path', $exception->getMessage());
+        }
+
+        self::assertSame($oldPath, $repository->items[7]->featuredImagePath());
+        self::assertSame(0, $storage->stores);
+    }
+
+    public function testCommitUncertaintyDoesNotDeleteThePotentiallyCommittedReplacement(): void
+    {
+        $oldPath = 'gallery/' . str_repeat('a', 64) . '.jpg';
+        $newPath = 'gallery/' . str_repeat('b', 64) . '.png';
+        $repository = new AdministratorActivityRepositoryFake();
+        $repository->items[7] = $this->activity(imagePath: $oldPath);
+        $storage = new AdministratorActivityStorageFake($newPath);
+        $transaction = new AdministratorActivityTransactionFake();
+        $transaction->commitFailureAfterClosing = new RuntimeException('commit state unknown');
+
+        try {
+            $this->service(
+                $repository,
+                new AdministratorActivityAuditFake(),
+                $transaction,
+                $storage,
+            )->update(7, $this->request(), 91, null, null, $this->uploadRequest());
+            self::fail('Expected a safe commit failure.');
+        } catch (ActivityException $exception) {
+            self::assertSame('Activity catalogue operation failed.', $exception->getMessage());
+        }
+
+        self::assertSame([], $storage->removed);
+    }
+
     private function service(
         AdministratorActivityRepositoryFake $repository,
         AdministratorActivityAuditFake $audit,
         AdministratorActivityTransactionFake $transaction,
+        ?GalleryImageStorage $storage = null,
     ): AdministratorActivityService {
         return new AdministratorActivityService(
             $repository,
             $audit,
             $transaction,
             static fn (): DateTimeImmutable => new DateTimeImmutable('2026-07-30 08:30:00 UTC'),
+            $storage,
         );
     }
 
@@ -274,9 +360,15 @@ final class AdministratorActivityServiceTest extends TestCase
         return ActivityContentRequest::fromInput(
             'Jungle Walk',
             'jungle-walk',
+            'Explore the forest with a local guide.',
             'Explore the surrounding forest.',
             '2500.00',
+            'per person',
+            '3 hours',
+            'Dhulikhel',
             10,
+            true,
+            1,
         );
     }
 
@@ -284,6 +376,7 @@ final class AdministratorActivityServiceTest extends TestCase
         int $id = 7,
         bool $active = true,
         bool $published = true,
+        ?string $imagePath = null,
     ): Activity {
         return new Activity(
             $id,
@@ -296,7 +389,47 @@ final class AdministratorActivityServiceTest extends TestCase
             10,
             new DateTimeImmutable('2026-07-30 07:00:00 UTC'),
             new DateTimeImmutable('2026-07-30 07:00:00 UTC'),
+            'Explore the forest with a local guide.',
+            $imagePath,
+            'per person',
+            '3 hours',
+            'Dhulikhel',
+            true,
+            1,
         );
+    }
+
+    private function uploadRequest(): GalleryImageUploadRequest
+    {
+        return (new ReflectionClass(GalleryImageUploadRequest::class))->newInstanceWithoutConstructor();
+    }
+}
+
+final class AdministratorActivityStorageFake implements GalleryImageStorage
+{
+    public int $stores = 0;
+    /** @var list<string> */
+    public array $removed = [];
+    public ?Throwable $failure = null;
+
+    public function __construct(private string $path)
+    {
+    }
+
+    public function store(GalleryImageUploadRequest $request): StoredGalleryImage
+    {
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        $this->stores++;
+
+        return new StoredGalleryImage($this->path, basename($this->path), 'png', 'image/png', 68, 1, 1);
+    }
+
+    public function remove(string $relativePath): void
+    {
+        $this->removed[] = $relativePath;
     }
 }
 
@@ -341,6 +474,13 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
         return null;
     }
 
+    public function findPublicById(int $id): ?Activity
+    {
+        $activity = $this->findById($id);
+
+        return $activity?->isPubliclyVisible() === true ? $activity : null;
+    }
+
     public function findAll(): array
     {
         if ($this->readFailure !== null) {
@@ -358,14 +498,29 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
         ));
     }
 
+    public function findHomepageActivities(int $limit): array
+    {
+        return array_slice(array_values(array_filter(
+            $this->findAllPublic(),
+            static fn (Activity $activity): bool => $activity->isHomepageFeatured(),
+        )), 0, $limit);
+    }
+
     public function create(
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity {
         $this->throwWriteFailure();
         $id = $this->items === [] ? 1 : max(array_keys($this->items)) + 1;
@@ -378,6 +533,13 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
             $active,
             $published,
             $sortOrder,
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
         $this->items[$id] = $activity;
 
@@ -389,8 +551,15 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?Activity {
         $this->throwWriteFailure();
         $current = $this->items[$id] ?? null;
@@ -408,6 +577,13 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
             $current->isActive(),
             $current->isPublished(),
             $sortOrder,
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 
@@ -486,10 +662,17 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity {
         return new Activity(
             $id,
@@ -502,6 +685,13 @@ final class AdministratorActivityRepositoryFake implements ActivityCatalogReposi
             $sortOrder,
             new DateTimeImmutable('2026-07-30 07:00:00 UTC'),
             new DateTimeImmutable('2026-07-30 08:30:00 UTC'),
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 }
@@ -528,6 +718,7 @@ final class AdministratorActivityTransactionFake implements ActivityTransaction
     public int $begins = 0;
     public int $commits = 0;
     public int $rollbacks = 0;
+    public ?Throwable $commitFailureAfterClosing = null;
 
     public function begin(): void
     {
@@ -539,6 +730,10 @@ final class AdministratorActivityTransactionFake implements ActivityTransaction
     {
         $this->commits++;
         $this->active = false;
+
+        if ($this->commitFailureAfterClosing !== null) {
+            throw $this->commitFailureAfterClosing;
+        }
     }
 
     public function rollBack(): void

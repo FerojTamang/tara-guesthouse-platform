@@ -1,10 +1,22 @@
+<?php
+$acceptedMimeTypes = '';
+$uploadPolicySummary = '';
+if (is_array($uploadConfiguration)) {
+    $allowed = $uploadConfiguration['allowed_mime_extensions'] ?? [];
+    $maximum = $uploadConfiguration['maximum_file_size_bytes'] ?? null;
+    if (is_array($allowed) && is_int($maximum)) {
+        $acceptedMimeTypes = implode(',', array_keys($allowed));
+        $uploadPolicySummary = 'Maximum ' . number_format($maximum) . ' bytes.';
+    }
+}
+?>
 <section aria-labelledby="activity-form-heading">
     <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3 mb-4">
         <div class="admin-page-heading mb-0">
             <p class="admin-eyebrow mb-2">Activity catalogue</p>
             <h1 id="activity-form-heading" class="h2 mb-2"><?= $e($heading) ?></h1>
             <p class="text-secondary mb-0">
-                Use only the approved Version 1 content fields. Activity images, categories, duration, and booking are not included.
+                Maintain structured public card content and optional homepage placement. Activity booking is not included.
             </p>
         </div>
         <a class="btn btn-outline-secondary" href="/admin/activities">Back to activities</a>
@@ -24,6 +36,7 @@
 
                     <form
                         method="post"
+                        enctype="multipart/form-data"
                         action="<?= $e($action) ?>"
                         data-activity-editor-form
                         data-api-method="<?= $e($apiMethod) ?>"
@@ -63,6 +76,12 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label" for="activity-summary">Summary</label>
+                            <textarea class="form-control" id="activity-summary" name="summary" maxlength="320" rows="3" required><?= $e($values['summary']) ?></textarea>
+                            <div class="form-text">Concise card copy, maximum 320 characters.</div>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label" for="activity-description">Description</label>
                             <textarea
                                 class="form-control"
@@ -73,8 +92,17 @@
                             ><?= $e($values['description']) ?></textarea>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label" for="activity-image">Featured image</label>
+                            <?php if ($values['featuredImageUrl'] !== null): ?>
+                                <img class="d-block img-thumbnail mb-2" src="<?= $e($values['featuredImageUrl']) ?>" alt="Current featured image for <?= $e($values['title']) ?>" style="max-width: 20rem">
+                            <?php endif; ?>
+                            <input class="form-control" id="activity-image" name="image" type="file" accept="<?= $e($acceptedMimeTypes) ?>">
+                            <div class="form-text"><?= $e($uploadPolicySummary) ?> Leave empty to retain the current image.</div>
+                        </div>
+
                         <div class="row g-3 mb-4">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label" for="activity-price">Price (NPR)</label>
                                 <input
                                     class="form-control"
@@ -85,13 +113,16 @@
                                     pattern="(?:0|[1-9][0-9]{0,9})\.[0-9]{2}"
                                     value="<?= $e($values['price']) ?>"
                                     aria-describedby="activity-price-help"
-                                    required
                                 >
                                 <div id="activity-price-help" class="form-text">
-                                    Use exactly two decimal places, including <code>0.00</code> for a free activity.
+                                    Optional. Use exactly two decimal places; leave empty when no rate is published.
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <label class="form-label" for="activity-price-unit">Rate unit</label>
+                                <input class="form-control" id="activity-price-unit" name="price_unit" maxlength="40" value="<?= $e($values['priceUnit']) ?>" placeholder="per person">
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label" for="activity-sort-order">Sort order</label>
                                 <input
                                     class="form-control"
@@ -106,6 +137,28 @@
                                 >
                             </div>
                         </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label" for="activity-duration">Duration</label>
+                                <input class="form-control" id="activity-duration" name="duration" maxlength="80" value="<?= $e($values['durationLabel']) ?>" placeholder="3 hours">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="activity-location">Location</label>
+                                <input class="form-control" id="activity-location" name="location" maxlength="120" value="<?= $e($values['location']) ?>">
+                            </div>
+                        </div>
+
+                        <fieldset class="mb-4">
+                            <legend class="h6">Homepage preview</legend>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" id="activity-homepage-featured" name="is_homepage_featured" type="checkbox" <?= $values['homepageFeatured'] ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="activity-homepage-featured">Show on homepage</label>
+                            </div>
+                            <label class="form-label" for="activity-homepage-sort-order">Homepage display order</label>
+                            <input class="form-control" id="activity-homepage-sort-order" name="homepage_sort_order" type="number" min="0" max="4294967295" step="1" value="<?= $e($values['homepageSortOrder']) ?>" required>
+                            <div class="form-text">Only active, published selections appear. The homepage shows at most four activities; lower values appear first.</div>
+                        </fieldset>
 
                         <?php if ($creating): ?>
                             <fieldset class="mb-4">

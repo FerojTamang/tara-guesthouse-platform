@@ -139,13 +139,13 @@ final class PublicCmsServiceTest extends TestCase
 
     public function testHomepageUsesEligibleModuleProjectionsInRepositoryOrder(): void
     {
-        $activities = $this->createStub(ActivityCatalogRepository::class);
-        $activities->method('findAllPublic')->willReturn([
+        $activities = $this->createMock(ActivityCatalogRepository::class);
+        $activities->method('findHomepageActivities')->with(4)->willReturn([
             self::activity(2, 'Village Walk'),
             self::activity(4, 'Sunrise Hike'),
         ]);
-        $gallery = $this->createStub(GalleryCatalogRepository::class);
-        $gallery->method('findAllPublicItems')->willReturn([
+        $gallery = $this->createMock(GalleryCatalogRepository::class);
+        $gallery->method('findHomepageGalleryItems')->with(6)->willReturn([
             self::gallery(9, 'Courtyard'),
         ]);
         $service = $this->service(activities: $activities, gallery: $gallery);

@@ -24,10 +24,17 @@ final class ActivityRepository implements ActivityCatalogRepository
             id,
             title,
             slug,
+            summary,
             description,
+            featured_image_path,
             price,
+            price_unit,
+            duration_label,
+            location,
             is_active,
             is_published,
+            is_homepage_featured,
+            homepage_sort_order,
             sort_order,
             created_at,
             updated_at
@@ -79,6 +86,20 @@ final class ActivityRepository implements ActivityCatalogRepository
         );
     }
 
+    public function findPublicById(int $id): ?Activity
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        return $this->lookup(
+            self::SELECT_COLUMNS
+                . ' WHERE id = :lookup AND is_active = 1 AND is_published = 1 LIMIT 1',
+            $id,
+            PDO::PARAM_INT,
+        );
+    }
+
     /**
      * @return list<Activity>
      */
@@ -99,34 +120,60 @@ final class ActivityRepository implements ActivityCatalogRepository
         );
     }
 
+    public function findHomepageActivities(int $limit): array
+    {
+        if ($limit < 1 || $limit > 4) {
+            throw ActivityException::invalidInput('Homepage activity limit is invalid.');
+        }
+
+        return $this->listing(
+            self::SELECT_COLUMNS
+                . ' WHERE is_active = 1 AND is_published = 1 AND is_homepage_featured = 1'
+                . ' ORDER BY homepage_sort_order ASC, sort_order ASC, id ASC LIMIT :limit',
+            $limit,
+        );
+    }
+
     public function create(
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity {
         $this->assertExactPrice($price);
 
         try {
             $statement = $this->connection->prepare(
                 'INSERT INTO activities ('
-                . 'title, slug, description, price, is_active, is_published, sort_order'
+                . 'title, slug, summary, description, featured_image_path, price, price_unit, '
+                . 'duration_label, location, is_active, is_published, is_homepage_featured, '
+                . 'homepage_sort_order, sort_order'
                 . ') VALUES ('
-                . ':title, :slug, :description, :price, :is_active, :is_published, :sort_order'
+                . ':title, :slug, :summary, :description, :featured_image_path, :price, :price_unit, '
+                . ':duration_label, :location, :is_active, :is_published, :is_homepage_featured, '
+                . ':homepage_sort_order, :sort_order'
                 . ')',
             );
-            $statement->execute([
-                'title' => $title,
-                'slug' => $slug,
-                'description' => $description,
-                'price' => $price,
-                'is_active' => $active ? 1 : 0,
+            $this->bindActivityWrite($statement, [
+                'title' => $title, 'slug' => $slug, 'summary' => $summary ?? mb_substr($description, 0, 320),
+                'description' => $description, 'featured_image_path' => $featuredImagePath,
+                'price' => $price, 'price_unit' => $priceUnit, 'duration_label' => $durationLabel,
+                'location' => $location, 'is_active' => $active ? 1 : 0,
                 'is_published' => $published ? 1 : 0,
-                'sort_order' => $sortOrder,
+                'is_homepage_featured' => $homepageFeatured ? 1 : 0,
+                'homepage_sort_order' => $homepageSortOrder, 'sort_order' => $sortOrder,
             ]);
+            $statement->execute();
 
             $activity = $this->findById($this->generatedIdentifier());
 
@@ -149,8 +196,15 @@ final class ActivityRepository implements ActivityCatalogRepository
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?Activity {
         if ($id <= 0) {
             return null;
@@ -161,18 +215,22 @@ final class ActivityRepository implements ActivityCatalogRepository
         try {
             $statement = $this->connection->prepare(
                 'UPDATE activities SET '
-                . 'title = :title, slug = :slug, description = :description, '
-                . 'price = :price, sort_order = :sort_order '
+                . 'title = :title, slug = :slug, summary = :summary, description = :description, '
+                . 'featured_image_path = :featured_image_path, price = :price, price_unit = :price_unit, '
+                . 'duration_label = :duration_label, location = :location, '
+                . 'is_homepage_featured = :is_homepage_featured, '
+                . 'homepage_sort_order = :homepage_sort_order, sort_order = :sort_order '
                 . 'WHERE id = :id',
             );
-            $statement->execute([
-                'id' => $id,
-                'title' => $title,
-                'slug' => $slug,
-                'description' => $description,
-                'price' => $price,
-                'sort_order' => $sortOrder,
+            $this->bindActivityWrite($statement, [
+                'id' => $id, 'title' => $title, 'slug' => $slug,
+                'summary' => $summary ?? mb_substr($description, 0, 320), 'description' => $description,
+                'featured_image_path' => $featuredImagePath, 'price' => $price,
+                'price_unit' => $priceUnit, 'duration_label' => $durationLabel, 'location' => $location,
+                'is_homepage_featured' => $homepageFeatured ? 1 : 0,
+                'homepage_sort_order' => $homepageSortOrder, 'sort_order' => $sortOrder,
             ]);
+            $statement->execute();
 
             return $this->findById($id);
         } catch (PDOException $exception) {
@@ -238,10 +296,13 @@ final class ActivityRepository implements ActivityCatalogRepository
     /**
      * @return list<Activity>
      */
-    private function listing(string $sql): array
+    private function listing(string $sql, ?int $limit = null): array
     {
         try {
             $statement = $this->connection->prepare($sql);
+            if ($limit !== null) {
+                $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+            }
             $statement->execute();
             $rows = $statement->fetchAll();
 
@@ -300,20 +361,39 @@ final class ActivityRepository implements ActivityCatalogRepository
             $this->string($row, 'title'),
             $this->string($row, 'slug'),
             $this->string($row, 'description'),
-            $this->string($row, 'price'),
+            $this->nullableString($row, 'price'),
             $this->boolean($row, 'is_active'),
             $this->boolean($row, 'is_published'),
             $this->nonNegativeInteger($row, 'sort_order'),
             $this->dateTime($row, 'created_at'),
             $this->dateTime($row, 'updated_at'),
+            $this->nullableString($row, 'summary'),
+            $this->nullableString($row, 'featured_image_path'),
+            $this->nullableString($row, 'price_unit'),
+            $this->nullableString($row, 'duration_label'),
+            $this->nullableString($row, 'location'),
+            $this->boolean($row, 'is_homepage_featured'),
+            $this->nonNegativeInteger($row, 'homepage_sort_order'),
         );
     }
 
-    private function assertExactPrice(string $price): void
+    private function assertExactPrice(?string $price): void
     {
-        if (preg_match('/^(?:0|[1-9][0-9]{0,9})\.[0-9]{2}$/D', $price) !== 1) {
+        if ($price !== null && preg_match('/^(?:0|[1-9][0-9]{0,9})\.[0-9]{2}$/D', $price) !== 1) {
             throw ActivityException::invalidInput(
                 'Activity price must be a non-negative NPR amount with exactly two decimal places.',
+            );
+        }
+    }
+
+    /** @param array<string, int|string|null> $values */
+    private function bindActivityWrite(\PDOStatement $statement, array $values): void
+    {
+        foreach ($values as $key => $value) {
+            $statement->bindValue(
+                $key,
+                $value,
+                $value === null ? PDO::PARAM_NULL : (is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR),
             );
         }
     }

@@ -140,28 +140,83 @@ final class ActivityRepositoryTest extends DatabaseTestCase
             false,
             true,
             30,
+            'Learn about elephant conservation.',
+            'gallery/' . str_repeat('e', 64) . '.jpg',
+            'per person',
+            '2 hours',
+            'Sauraha',
+            true,
+            3,
         );
 
         self::assertGreaterThan(0, $created->id());
         self::assertFalse($created->isActive());
         self::assertTrue($created->isPublished());
+        self::assertSame('Learn about elephant conservation.', $created->summary());
+        self::assertSame('per person', $created->priceUnit());
+        self::assertSame('2 hours', $created->durationLabel());
+        self::assertSame('Sauraha', $created->location());
+        self::assertTrue($created->isHomepageFeatured());
+        self::assertSame(3, $created->homepageSortOrder());
 
         $updated = $this->repository->update(
             $created->id(),
             'Elephant Conservation Center',
             'elephant-conservation-center',
             'Learn about local elephant conservation.',
-            '1500.00',
+            null,
             25,
+            'Local conservation programme.',
+            null,
+            null,
+            null,
+            null,
+            false,
+            0,
         );
 
         self::assertInstanceOf(Activity::class, $updated);
         self::assertSame('Elephant Conservation Center', $updated->title());
         self::assertSame('elephant-conservation-center', $updated->slug());
-        self::assertSame('1500.00', $updated->price());
+        self::assertNull($updated->price());
+        self::assertNull($updated->featuredImagePath());
+        self::assertNull($updated->priceUnit());
+        self::assertFalse($updated->isHomepageFeatured());
         self::assertSame(25, $updated->sortOrder());
         self::assertFalse($updated->isActive());
         self::assertTrue($updated->isPublished());
+    }
+
+    public function testHomepageActivitiesAreEligibleDeterministicStructuredAndLimitedToFour(): void
+    {
+        foreach ([
+            ['title' => 'Tie Second', 'slug' => 'tie-second', 'homepage_sort_order' => 2, 'sort_order' => 4],
+            ['title' => 'First', 'slug' => 'first', 'homepage_sort_order' => 1, 'sort_order' => 8, 'price' => null, 'price_unit' => null],
+            ['title' => 'Tie First', 'slug' => 'tie-first', 'homepage_sort_order' => 2, 'sort_order' => 4],
+            ['title' => 'Fourth', 'slug' => 'fourth', 'homepage_sort_order' => 3, 'sort_order' => 1],
+            ['title' => 'Limited Out', 'slug' => 'limited-out', 'homepage_sort_order' => 4, 'sort_order' => 1],
+            ['title' => 'Draft Selected', 'slug' => 'draft-selected', 'homepage_sort_order' => 0, 'is_published' => 0],
+            ['title' => 'Inactive Selected', 'slug' => 'inactive-selected', 'homepage_sort_order' => 0, 'is_active' => 0],
+        ] as $values) {
+            ActivityFixture::insert($this->connection, array_replace([
+                'summary' => 'Structured homepage card.',
+                'description' => 'Structured homepage activity description.',
+                'is_homepage_featured' => 1,
+                'duration_label' => '2 hours',
+                'location' => 'Dhulikhel',
+            ], $values));
+        }
+
+        $activities = $this->repository->findHomepageActivities(4);
+
+        self::assertSame(['First', 'Tie Second', 'Tie First', 'Fourth'], array_map(
+            static fn (Activity $activity): string => $activity->title(),
+            $activities,
+        ));
+        self::assertNull($activities[0]->price());
+        self::assertSame('Structured homepage card.', $activities[0]->summary());
+        self::assertSame('2 hours', $activities[0]->durationLabel());
+        self::assertSame('Dhulikhel', $activities[0]->location());
     }
 
     public function testItChangesActiveAndPublicationControlsIndependentlyThenRemovesSafely(): void

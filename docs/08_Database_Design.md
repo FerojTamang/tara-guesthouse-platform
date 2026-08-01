@@ -46,7 +46,7 @@ Version 1 stores Administrator staff accounts only. Guest is an unauthenticated 
 
 Customer registration and the customer portal are future enhancements. A nullable future customer/user relationship may exist on a booking, but Version 1 booking creation must not require it.
 
-A `password_resets` table and staff reset workflow are not present in the 26 executable migrations. Any later reset implementation must be Administrator-only and must store only a hash, expiry, and single-use state.
+A `password_resets` table and staff reset workflow are not present in the 27 executable migrations. Any later reset implementation must be Administrator-only and must store only a hash, expiry, and single-use state.
 
 # 5. Room Model
 
@@ -170,6 +170,8 @@ Activities and gallery items each have separate controls for business activity a
 - `is_published` controls public visibility.
 
 Only active and published records are public. These controls must not be collapsed into one ambiguous status. Gallery files use server-generated names and safe relative paths under private non-executable storage; the executable schema stores no public absolute path.
+
+Activities additionally store a required card summary at the application boundary, an optional server-controlled featured-image path, nullable NPR price and dependent price unit, optional duration/location labels, and explicit homepage selection/order. Legacy summaries are backfilled from trimmed descriptions. Gallery items use the same explicit homepage selection/order controls. Homepage reads require active, published, selected records and order by homepage order, global order, then identifier; output is capped at four activities and six gallery images. Activity images reuse the validated private gallery image pipeline and expose only a controlled application URL.
 
 # 11. Reviews
 

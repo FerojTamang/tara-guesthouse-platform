@@ -253,9 +253,9 @@ Invoice issue action uses `POST /api/v1/admin/bookings/{bookingId}/invoice`. Tot
 
 ## 16.1 Activities and Gallery
 
-Activity fields are title, slug, description, fixed-precision NPR price, Active, Published and sort order. Activity category/image/featured/duration/meeting-point/maximum-participant controls are Future Enhancements.
+Activity fields are title, slug, required card summary, full description, optional validated featured-image upload, nullable fixed-precision NPR price and rate unit, optional duration/location, Active, Published, global sort order, homepage selection and homepage order. Edit retains the current image when no replacement is selected. Homepage help states that only active/published selections qualify and at most four are shown. Activity category/meeting-point/maximum-participant controls remain Future Enhancements.
 
-Gallery-category fields are name, slug and Active. Gallery-item fields are optional category, title, caption, image upload/path managed by the server, alt text, sort order, Active and Published. There is no media-library selector, Featured, Uploaded By, Deleted At or generated-image field. Public preview reflects only active and published records.
+Gallery-category fields are name, slug and Active. Gallery-item fields are optional category, title, caption, image upload/path managed by the server, alt text, sort order, Active, Published, homepage selection and homepage order. There is no media-library selector, Uploaded By, Deleted At or generated-image field. Public preview reflects only active and published records; the homepage uses only selected eligible items and displays at most six.
 
 ## 16.2 Reviews
 

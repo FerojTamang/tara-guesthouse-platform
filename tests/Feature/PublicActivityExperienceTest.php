@@ -12,6 +12,8 @@ use App\Models\Activity;
 use App\Repositories\ActivityCatalogRepository;
 use App\Services\PublicActivityService;
 use App\Services\PublicActivityServiceProvider;
+use App\Storage\GalleryImageReader;
+use App\Storage\RetrievedGalleryImage;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -22,11 +24,14 @@ final class PublicActivityExperienceTest extends TestCase
 
     private Router $router;
 
+    private GalleryImageReader $reader;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createStub(ActivityCatalogRepository::class);
+        $this->reader = $this->createStub(GalleryImageReader::class);
         $controller = new PublicActivityController(
             new ViewRenderer(
                 dirname(__DIR__, 2)
@@ -36,7 +41,7 @@ final class PublicActivityExperienceTest extends TestCase
                     . 'views',
             ),
             new PublicActivityServiceProvider(
-                fn (): PublicActivityService => new PublicActivityService($this->repository),
+                fn (): PublicActivityService => new PublicActivityService($this->repository, $this->reader),
             ),
         );
         $this->router = new Router();
@@ -141,8 +146,13 @@ final class PublicActivityExperienceTest extends TestCase
                 'activity_id' => 7,
                 'title' => 'Village Walk',
                 'slug' => 'village-walk',
+                'summary' => 'Explore nearby paths.',
                 'description' => 'Explore nearby paths.',
+                'image_url' => null,
                 'price' => '500.00',
+                'price_unit' => null,
+                'duration' => null,
+                'location' => null,
             ]],
         ], json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString('is_active', $response->body());
@@ -187,6 +197,43 @@ final class PublicActivityExperienceTest extends TestCase
         self::assertStringNotContainsString('private', $api->body());
     }
 
+    public function testEligibleActivityImageUsesControlledHeadersAndExactBytes(): void
+    {
+        $path = 'gallery/' . str_repeat('a', 64) . '.png';
+        $this->repository->method('findPublicById')->willReturn(self::activity(
+            7, 'Village Walk', 'village-walk', 'Explore nearby paths.', '500.00', true, true, 1, $path,
+        ));
+        $this->reader = $this->createMock(GalleryImageReader::class);
+        $this->reader->expects(self::once())->method('read')->with($path)->willReturn(
+            new RetrievedGalleryImage('safe image bytes', 'png', 'image/png', 1, 1),
+        );
+
+        $response = $this->router->dispatch(Request::create('GET', '/activities?image=7'));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame('safe image bytes', $response->body());
+        self::assertSame('image/png', $response->headers()['Content-Type']);
+        self::assertSame('16', $response->headers()['Content-Length']);
+        self::assertSame('inline; filename="activity-image-7.png"', $response->headers()['Content-Disposition']);
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
+    }
+
+    public function testMalformedMissingAndIneligibleActivityImagesShareSafeNotFound(): void
+    {
+        $this->repository->method('findPublicById')->willReturn(null);
+
+        foreach (['bad', '0', '7&extra=value', '7'] as $query) {
+            $response = $this->router->dispatch(Request::create('GET', '/activities?image=' . $query));
+
+            self::assertSame(404, $response->statusCode());
+            self::assertSame('Not Found', $response->body());
+            self::assertSame('no-store', $response->headers()['Cache-Control']);
+            self::assertStringNotContainsString('gallery/', $response->body());
+            self::assertStringNotContainsString('C:\\', $response->body());
+        }
+    }
+
     private static function activity(
         int $id,
         string $title,
@@ -196,6 +243,7 @@ final class PublicActivityExperienceTest extends TestCase
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $featuredImagePath = null,
     ): Activity {
         $timestamp = new DateTimeImmutable('2026-07-30 12:00:00 UTC');
 
@@ -210,6 +258,8 @@ final class PublicActivityExperienceTest extends TestCase
             $sortOrder,
             $timestamp,
             $timestamp,
+            null,
+            $featuredImagePath,
         );
     }
 }

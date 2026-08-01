@@ -51,10 +51,14 @@
     <?php else: ?>
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
             <?php foreach ($activities as $activity): ?>
-                <div class="col"><article class="card h-100 shadow-sm"><div class="card-body d-flex flex-column">
+                <div class="col"><article class="card h-100 shadow-sm">
+                    <?php if ($activity['image_url'] !== null): ?><img class="card-img-top" src="<?= $e($activity['image_url']) ?>" alt="<?= $e($activity['title']) ?>" loading="lazy" decoding="async"><?php endif; ?>
+                    <div class="card-body d-flex flex-column">
                     <h3 class="h4"><?= $e($activity['title']) ?></h3>
-                    <p class="flex-grow-1"><?= nl2br($e($activity['description'])) ?></p>
-                    <p class="fw-semibold mb-0">NPR <?= $e($activity['price']) ?></p>
+                    <p class="flex-grow-1"><?= $e($activity['summary']) ?></p>
+                    <?php if ($activity['duration'] !== null): ?><p class="mb-1"><?= $e($activity['duration']) ?></p><?php endif; ?>
+                    <?php if ($activity['location'] !== null): ?><p class="mb-1"><?= $e($activity['location']) ?></p><?php endif; ?>
+                    <?php if ($activity['price'] !== null): ?><p class="fw-semibold mb-0">NPR <?= $e($activity['price']) ?><?= $activity['price_unit'] === null ? '' : ' ' . $e($activity['price_unit']) ?></p><?php endif; ?>
                 </div></article></div>
             <?php endforeach; ?>
         </div>

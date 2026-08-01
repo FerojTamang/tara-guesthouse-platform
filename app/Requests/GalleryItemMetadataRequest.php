@@ -20,6 +20,8 @@ final readonly class GalleryItemMetadataRequest
         private ?string $caption,
         private string $alternativeText,
         private int $sortOrder,
+        private bool $homepageFeatured,
+        private int $homepageSortOrder,
     ) {
     }
 
@@ -29,6 +31,8 @@ final readonly class GalleryItemMetadataRequest
         mixed $caption,
         mixed $alternativeText,
         mixed $sortOrder,
+        mixed $homepageFeatured = false,
+        mixed $homepageSortOrder = 0,
     ): self {
         return new self(
             self::normalizeCategoryId($categoryId),
@@ -36,6 +40,8 @@ final readonly class GalleryItemMetadataRequest
             self::normalizeCaption($caption),
             self::requiredText($alternativeText, 'Gallery alternative text', 500),
             self::normalizeSortOrder($sortOrder),
+            self::normalizeBoolean($homepageFeatured),
+            self::normalizeHomepageSortOrder($homepageSortOrder),
         );
     }
 
@@ -62,6 +68,16 @@ final readonly class GalleryItemMetadataRequest
     public function sortOrder(): int
     {
         return $this->sortOrder;
+    }
+
+    public function isHomepageFeatured(): bool
+    {
+        return $this->homepageFeatured;
+    }
+
+    public function homepageSortOrder(): int
+    {
+        return $this->homepageSortOrder;
     }
 
     private static function normalizeCategoryId(mixed $value): ?int
@@ -171,5 +187,31 @@ final readonly class GalleryItemMetadataRequest
         }
 
         return $sortOrder;
+    }
+
+    private static function normalizeHomepageSortOrder(mixed $value): int
+    {
+        try {
+            return self::normalizeSortOrder($value);
+        } catch (GalleryException) {
+            throw GalleryException::invalidInput('Gallery homepage sort order is invalid.');
+        }
+    }
+
+    private static function normalizeBoolean(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === '1') {
+            return true;
+        }
+
+        if ($value === '0') {
+            return false;
+        }
+
+        throw GalleryException::invalidInput('Gallery homepage selection must be true or false.');
     }
 }

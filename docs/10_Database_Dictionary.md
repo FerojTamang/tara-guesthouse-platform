@@ -81,7 +81,7 @@ Stores authenticated Administrator staff accounts. It does not store public Gues
 
 ## 4.3 Deferred staff password-reset storage
 
-No `password_resets` table exists in the 26 executable migrations. Any later Administrator password-reset workflow requires a separately approved migration and route contract and must store only a token hash, expiry, and single-use evidence.
+No `password_resets` table exists in the 27 executable migrations. Any later Administrator password-reset workflow requires a separately approved migration and route contract and must store only a token hash, expiry, and single-use evidence.
 
 # 5. Room Tables
 
@@ -305,15 +305,24 @@ A booking has zero or more payment rows.
 | `id` | BIGINT UNSIGNED | No | Primary key |
 | `title` | VARCHAR(200) | No | Trimmed display title |
 | `slug` | VARCHAR(200) | No | Unique lowercase slug |
+| `summary` | VARCHAR(320) | Yes | Backfilled card summary; required for Administrator writes |
 | `description` | TEXT | No | Trimmed public description |
-| `price` | DECIMAL(12,2) | No | Non-negative NPR amount |
+| `featured_image_path` | VARCHAR(500) | Yes | Server-controlled safe relative private image path |
+| `price` | DECIMAL(12,2) | Yes | Optional non-negative NPR amount |
+| `price_unit` | VARCHAR(40) | Yes | Rate unit; present only with a price |
+| `duration_label` | VARCHAR(80) | Yes | Optional bounded duration label |
+| `location` | VARCHAR(120) | Yes | Optional bounded location label |
 | `is_active` | TINYINT(1) | No | Operational control |
 | `is_published` | TINYINT(1) | No | Public visibility control |
+| `is_homepage_featured` | TINYINT(1) | No | Explicit homepage selection; default 0 |
+| `homepage_sort_order` | INT UNSIGNED | No | Homepage order; default 0 |
 | `sort_order` | INT UNSIGNED | No | Deterministic order; default 0 |
 | `created_at` | DATETIME | No | Created timestamp |
 | `updated_at` | DATETIME | No | Updated timestamp |
 
-Activity categories, images, featured flag, duration, meeting point and maximum participants are not Version 1 fields/tables.
+Rollback of `20260802000100_add_activity_catalogue_homepage_curation` converts any null activity price to `0.00` solely to restore the historical non-null `DECIMAL(12,2)` contract before removing the new catalogue fields.
+
+Activity categories, a separate activity-image table, meeting point and maximum participants remain outside Version 1. Featured-image bytes reuse the private validated gallery storage pipeline; the database never stores an absolute filesystem path.
 
 ## 8.2 `gallery_categories`
 
@@ -339,10 +348,12 @@ Activity categories, images, featured flag, duration, meeting point and maximum 
 | `sort_order` | INT UNSIGNED | No | Deterministic order; default 0 |
 | `is_active` | TINYINT(1) | No | Operational control |
 | `is_published` | TINYINT(1) | No | Public visibility control |
+| `is_homepage_featured` | TINYINT(1) | No | Explicit homepage selection; default 0 |
+| `homepage_sort_order` | INT UNSIGNED | No | Homepage order; default 0 |
 | `created_at` | DATETIME | No | Created timestamp |
 | `updated_at` | DATETIME | No | Updated timestamp |
 
-There is no `media_files` dependency. Featured, uploaded-by, soft-delete and generated-image fields are not part of Version 1; removal uses active/publication controls and audit history.
+There is no `media_files` dependency. Homepage selection is stored directly on the item; uploaded-by, soft-delete and generated-image fields are not part of Version 1. Removal uses active/publication controls and audit history.
 
 ## 8.4 `settings`
 

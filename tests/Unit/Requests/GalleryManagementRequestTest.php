@@ -46,6 +46,8 @@ final class GalleryManagementRequestTest extends TestCase
             " Morning light.\r\n Calm water. ",
             ' Sunrise over the river ',
             '10',
+            '0',
+            '3',
         );
 
         self::assertNull($request->categoryId());
@@ -53,6 +55,8 @@ final class GalleryManagementRequestTest extends TestCase
         self::assertSame("Morning light.\n Calm water.", $request->caption());
         self::assertSame('Sunrise over the river', $request->alternativeText());
         self::assertSame(10, $request->sortOrder());
+        self::assertFalse($request->isHomepageFeatured());
+        self::assertSame(3, $request->homepageSortOrder());
     }
 
     public function testItemMetadataRejectsUnsafeOrUnapprovedValues(): void

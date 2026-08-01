@@ -5,7 +5,7 @@
 * Status: Implemented through S5-007 — Review Required
 * Source: `10_Database_Dictionary.md`
 * Database authority: Executed migrations
-* Scope: Version 1 entities represented by the 26 executable migrations
+* Scope: Version 1 entities represented by the 27 executable migrations
 
 ## 1. Relationship Diagram
 
@@ -14,8 +14,16 @@ erDiagram
     activities {
         BIGINT id PK
         VARCHAR title
+        VARCHAR summary
+        VARCHAR featured_image_path
+        DECIMAL price
+        VARCHAR price_unit
+        VARCHAR duration_label
+        VARCHAR location
         BOOLEAN is_active
         BOOLEAN is_published
+        BOOLEAN is_homepage_featured
+        INT homepage_sort_order
     }
     contact_messages {
         BIGINT id PK
@@ -109,8 +117,9 @@ erDiagram
 
 ## 7. Content Relationships
 
-* `activities` contains the complete approved Version 1 activity record; no activity-category or activity-image relationship is currently approved.
+* `activities` contains the complete approved Version 1 activity record, including an optional server-controlled featured-image path; no activity-category or separate activity-image table is approved.
 * A gallery category may contain many gallery items; an item may have no category.
+* Activities and gallery items have independent homepage-selection and homepage-order values; these do not replace active/publication eligibility.
 * `settings` stores simple site-wide values.
 * `pages` stores structured CMS content with `draft`, `published` and `archived` status.
 * Settings do not substitute for structured pages.

@@ -194,10 +194,10 @@ final class PublicCmsExperienceTest extends TestCase
         ]];
         $roomRepository = $this->createStub(RoomCatalogRepository::class);
         $roomRepository->method('findAllPublic')->willReturn([]);
-        $activityRepository = $this->createStub(ActivityCatalogRepository::class);
-        $activityRepository->method('findAllPublic')->willReturn([self::activity()]);
-        $galleryRepository = $this->createStub(GalleryCatalogRepository::class);
-        $galleryRepository->method('findAllPublicItems')->willReturn([self::gallery()]);
+        $activityRepository = $this->createMock(ActivityCatalogRepository::class);
+        $activityRepository->method('findHomepageActivities')->with(4)->willReturn([self::activity()]);
+        $galleryRepository = $this->createMock(GalleryCatalogRepository::class);
+        $galleryRepository->method('findHomepageGalleryItems')->with(6)->willReturn([self::gallery()]);
         $service = new PublicCmsService(
             $this->pages,
             $this->settings,

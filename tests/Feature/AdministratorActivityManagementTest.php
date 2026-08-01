@@ -230,7 +230,7 @@ final class AdministratorActivityManagementTest extends TestCase
         self::assertSame(1, substr_count($response->body(), 'aria-current="page"'));
     }
 
-    public function testCreateAndEditFormsExposeOnlyApprovedFields(): void
+    public function testCreateAndEditFormsExposeApprovedCatalogueAndHomepageFields(): void
     {
         $this->repository->items[7] = $this->activity(active: false, published: true);
         $this->authenticate();
@@ -243,6 +243,10 @@ final class AdministratorActivityManagementTest extends TestCase
         self::assertStringContainsString('data-api-method="POST"', $create->body());
         self::assertStringContainsString('name="is_active"', $create->body());
         self::assertStringContainsString('name="is_published"', $create->body());
+        foreach (['summary', 'image', 'price_unit', 'duration', 'location', 'is_homepage_featured', 'homepage_sort_order'] as $field) {
+            self::assertStringContainsString('name="' . $field . '"', $create->body());
+        }
+        self::assertStringContainsString('at most four activities', $create->body());
         $this->assertNoFutureFields($create->body());
 
         $this->reopenSession();
@@ -256,6 +260,10 @@ final class AdministratorActivityManagementTest extends TestCase
         self::assertStringNotContainsString('name="is_published"', $edit->body());
         self::assertStringContainsString('Inactive', $edit->body());
         self::assertStringContainsString('Published', $edit->body());
+        self::assertStringContainsString('Explore the forest with a local guide.', $edit->body());
+        self::assertStringContainsString('value="per person"', $edit->body());
+        self::assertStringContainsString('value="3 hours"', $edit->body());
+        self::assertStringContainsString('value="Dhulikhel"', $edit->body());
         $this->assertNoFutureFields($edit->body());
     }
 
@@ -478,10 +486,16 @@ final class AdministratorActivityManagementTest extends TestCase
         return [
             'title' => 'Jungle Walk',
             'slug' => 'jungle-walk',
+            'summary' => 'Explore the forest with a local guide.',
             'description' => 'Explore the surrounding forest.',
             'price' => '2500.00',
+            'price_unit' => 'per person',
+            'duration' => '3 hours',
+            'location' => 'Dhulikhel',
             'is_active' => true,
             'is_published' => false,
+            'is_homepage_featured' => true,
+            'homepage_sort_order' => 1,
             'sort_order' => 10,
         ];
     }
@@ -504,6 +518,13 @@ final class AdministratorActivityManagementTest extends TestCase
             10,
             new DateTimeImmutable('2026-07-30 07:00:00 UTC'),
             new DateTimeImmutable('2026-07-30 08:00:00 UTC'),
+            'Explore the forest with a local guide.',
+            null,
+            'per person',
+            '3 hours',
+            'Dhulikhel',
+            true,
+            1,
         );
     }
 
@@ -511,9 +532,7 @@ final class AdministratorActivityManagementTest extends TestCase
     {
         foreach ([
             'category_id',
-            'image',
             'featured',
-            'duration',
             'meeting_point',
             'maximum_participants',
         ] as $field) {
@@ -587,6 +606,13 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
         return null;
     }
 
+    public function findPublicById(int $id): ?Activity
+    {
+        $activity = $this->findById($id);
+
+        return $activity?->isPubliclyVisible() === true ? $activity : null;
+    }
+
     public function findAll(): array
     {
         return array_values($this->items);
@@ -600,14 +626,29 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
         ));
     }
 
+    public function findHomepageActivities(int $limit): array
+    {
+        return array_slice(array_values(array_filter(
+            $this->findAllPublic(),
+            static fn (Activity $activity): bool => $activity->isHomepageFeatured(),
+        )), 0, $limit);
+    }
+
     public function create(
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity {
         foreach ($this->items as $item) {
             if ($item->slug() === $slug) {
@@ -626,6 +667,13 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
             $active,
             $published,
             $sortOrder,
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 
@@ -634,8 +682,15 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?Activity {
         $current = $this->items[$id] ?? null;
 
@@ -652,6 +707,13 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
             $current->isActive(),
             $current->isPublished(),
             $sortOrder,
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 
@@ -720,10 +782,17 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity {
         return new Activity(
             $id,
@@ -736,6 +805,13 @@ final class AdministratorActivityRepositoryFeatureFake implements ActivityCatalo
             $sortOrder,
             new DateTimeImmutable('2026-07-30 07:00:00 UTC'),
             new DateTimeImmutable('2026-07-30 09:00:00 UTC'),
+            $summary,
+            $featuredImagePath,
+            $priceUnit,
+            $durationLabel,
+            $location,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 }

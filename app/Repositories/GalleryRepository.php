@@ -42,6 +42,8 @@ final class GalleryRepository implements GalleryCatalogRepository
             g.sort_order,
             g.is_active,
             g.is_published,
+            g.is_homepage_featured,
+            g.homepage_sort_order,
             g.created_at,
             g.updated_at
         FROM gallery g
@@ -241,6 +243,23 @@ final class GalleryRepository implements GalleryCatalogRepository
         );
     }
 
+    public function findHomepageGalleryItems(int $limit): array
+    {
+        if ($limit < 1 || $limit > 6) {
+            throw GalleryException::invalidInput('Homepage gallery limit is invalid.');
+        }
+
+        return $this->itemListing(
+            self::ITEM_COLUMNS
+                . ' LEFT JOIN gallery_categories c ON c.id = g.gallery_category_id'
+                . ' WHERE g.is_active = 1 AND g.is_published = 1'
+                . ' AND g.is_homepage_featured = 1'
+                . ' AND (g.gallery_category_id IS NULL OR c.is_active = 1)'
+                . ' ORDER BY g.homepage_sort_order ASC, g.sort_order ASC, g.id ASC LIMIT :limit',
+            $limit,
+        );
+    }
+
     public function createItem(
         ?int $categoryId,
         string $title,
@@ -250,6 +269,8 @@ final class GalleryRepository implements GalleryCatalogRepository
         int $sortOrder,
         bool $active,
         bool $published,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): GalleryItem {
         $this->assertItemInput($categoryId, $filePath, $sortOrder);
 
@@ -257,10 +278,10 @@ final class GalleryRepository implements GalleryCatalogRepository
             $statement = $this->connection->prepare(
                 'INSERT INTO gallery ('
                 . 'gallery_category_id, title, caption, file_path, alt_text, sort_order, '
-                . 'is_active, is_published'
+                . 'is_active, is_published, is_homepage_featured, homepage_sort_order'
                 . ') VALUES ('
                 . ':gallery_category_id, :title, :caption, :file_path, :alt_text, :sort_order, '
-                . ':is_active, :is_published'
+                . ':is_active, :is_published, :is_homepage_featured, :homepage_sort_order'
                 . ')',
             );
             $statement->bindValue(
@@ -275,6 +296,8 @@ final class GalleryRepository implements GalleryCatalogRepository
             $statement->bindValue('sort_order', $sortOrder, PDO::PARAM_INT);
             $statement->bindValue('is_active', $active ? 1 : 0, PDO::PARAM_INT);
             $statement->bindValue('is_published', $published ? 1 : 0, PDO::PARAM_INT);
+            $statement->bindValue('is_homepage_featured', $homepageFeatured ? 1 : 0, PDO::PARAM_INT);
+            $statement->bindValue('homepage_sort_order', $homepageSortOrder, PDO::PARAM_INT);
             $statement->execute();
             $item = $this->findItemById($this->generatedIdentifier());
 
@@ -302,6 +325,8 @@ final class GalleryRepository implements GalleryCatalogRepository
         string $filePath,
         string $altText,
         int $sortOrder,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?GalleryItem {
         if ($id <= 0) {
             return null;
@@ -313,7 +338,9 @@ final class GalleryRepository implements GalleryCatalogRepository
             $statement = $this->connection->prepare(
                 'UPDATE gallery SET '
                 . 'gallery_category_id = :gallery_category_id, title = :title, caption = :caption, '
-                . 'file_path = :file_path, alt_text = :alt_text, sort_order = :sort_order '
+                . 'file_path = :file_path, alt_text = :alt_text, sort_order = :sort_order, '
+                . 'is_homepage_featured = :is_homepage_featured, '
+                . 'homepage_sort_order = :homepage_sort_order '
                 . 'WHERE id = :id',
             );
             $statement->bindValue('id', $id, PDO::PARAM_INT);
@@ -327,6 +354,8 @@ final class GalleryRepository implements GalleryCatalogRepository
             $statement->bindValue('file_path', $filePath, PDO::PARAM_STR);
             $statement->bindValue('alt_text', $altText, PDO::PARAM_STR);
             $statement->bindValue('sort_order', $sortOrder, PDO::PARAM_INT);
+            $statement->bindValue('is_homepage_featured', $homepageFeatured ? 1 : 0, PDO::PARAM_INT);
+            $statement->bindValue('homepage_sort_order', $homepageSortOrder, PDO::PARAM_INT);
             $statement->execute();
 
             return $this->findItemById($id);
@@ -461,10 +490,13 @@ final class GalleryRepository implements GalleryCatalogRepository
     }
 
     /** @return list<GalleryItem> */
-    private function itemListing(string $sql): array
+    private function itemListing(string $sql, ?int $limit = null): array
     {
         try {
             $statement = $this->connection->prepare($sql);
+            if ($limit !== null) {
+                $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+            }
             $statement->execute();
             $rows = $statement->fetchAll();
 
@@ -534,6 +566,8 @@ final class GalleryRepository implements GalleryCatalogRepository
             $this->boolean($row, 'is_published'),
             $this->dateTime($row, 'created_at'),
             $this->dateTime($row, 'updated_at'),
+            $this->boolean($row, 'is_homepage_featured'),
+            $this->nonNegativeInteger($row, 'homepage_sort_order'),
         );
     }
 

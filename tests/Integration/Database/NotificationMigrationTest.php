@@ -40,6 +40,7 @@ final class NotificationMigrationTest extends DatabaseTestCase
         '20260801000200_create_reviews_table',
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
+        '20260802000100_add_activity_catalogue_homepage_curation',
     ];
 
     private MigrationRunner $runner;

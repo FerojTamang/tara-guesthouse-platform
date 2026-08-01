@@ -20,14 +20,21 @@
                 <?php $headingId = 'activity-heading-' . (string) $index; ?>
                 <div class="col">
                     <article class="card h-100 shadow-sm" aria-labelledby="<?= $e($headingId) ?>">
+                        <?php if ($activity['image_url'] !== null): ?>
+                            <img class="card-img-top" src="<?= $e($activity['image_url']) ?>" alt="<?= $e($activity['title']) ?>" loading="lazy" decoding="async">
+                        <?php endif; ?>
                         <div class="card-body d-flex flex-column">
                             <h2 id="<?= $e($headingId) ?>" class="h4 card-title">
                                 <?= $e($activity['title']) ?>
                             </h2>
                             <p class="card-text flex-grow-1">
-                                <?= nl2br($e($activity['description'])) ?>
+                                <?= nl2br($e($activity['summary'])) ?>
                             </p>
-                            <p class="fs-5 fw-semibold mb-0">NPR <?= $e($activity['price']) ?></p>
+                            <?php if ($activity['duration'] !== null): ?><p class="mb-1"><strong>Duration:</strong> <?= $e($activity['duration']) ?></p><?php endif; ?>
+                            <?php if ($activity['location'] !== null): ?><p class="mb-1"><strong>Location:</strong> <?= $e($activity['location']) ?></p><?php endif; ?>
+                            <?php if ($activity['price'] !== null): ?>
+                                <p class="fs-5 fw-semibold mb-0">NPR <?= $e($activity['price']) ?><?= $activity['price_unit'] === null ? '' : ' ' . $e($activity['price_unit']) ?></p>
+                            <?php endif; ?>
                         </div>
                     </article>
                 </div>

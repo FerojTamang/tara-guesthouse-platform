@@ -10,6 +10,9 @@ use App\Models\AuditLogEntry;
 use App\Repositories\ActivityCatalogRepository;
 use App\Repositories\AuditLogWriteRepository;
 use App\Requests\ActivityContentRequest;
+use App\Requests\GalleryImageUploadRequest;
+use App\Storage\GalleryImageStorage;
+use App\Storage\StoredGalleryImage;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -30,6 +33,7 @@ final readonly class AdministratorActivityService
         private AuditLogWriteRepository $auditLogs,
         private ActivityTransaction $transaction,
         ?callable $clock = null,
+        private ?GalleryImageStorage $imageStorage = null,
     ) {
         $this->clock = Closure::fromCallable(
             $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable(
@@ -65,16 +69,22 @@ final readonly class AdministratorActivityService
         int $administratorId,
         ?string $ipAddress,
         ?string $userAgent,
+        ?GalleryImageUploadRequest $upload = null,
     ): Activity {
         $this->assertAdministrator($administratorId);
 
-        return $this->transact(function () use (
+        $stored = $this->storeImage($upload);
+        $cleanupAllowed = true;
+
+        try {
+            return $this->transact(function () use (
             $request,
             $active,
             $published,
             $administratorId,
             $ipAddress,
             $userAgent,
+            $stored,
         ): Activity {
             $activity = $this->activities->create(
                 $request->title(),
@@ -84,6 +94,13 @@ final readonly class AdministratorActivityService
                 $active,
                 $published,
                 $request->sortOrder(),
+                $request->summary(),
+                $stored?->relativePath(),
+                $request->priceUnit(),
+                $request->durationLabel(),
+                $request->location(),
+                $request->isHomepageFeatured(),
+                $request->homepageSortOrder(),
             );
             $changedAt = $this->now();
             $this->appendAudit(
@@ -104,7 +121,13 @@ final readonly class AdministratorActivityService
             );
 
             return $activity;
-        });
+            }, $cleanupAllowed);
+        } catch (Throwable $failure) {
+            if ($cleanupAllowed) {
+                $this->removeStoredImage($stored);
+            }
+            throw $failure;
+        }
     }
 
     public function update(
@@ -113,17 +136,26 @@ final readonly class AdministratorActivityService
         int $administratorId,
         ?string $ipAddress,
         ?string $userAgent,
+        ?GalleryImageUploadRequest $upload = null,
     ): Activity {
         $this->assertAdministrator($administratorId);
 
-        return $this->transact(function () use (
+        $stored = $this->storeImage($upload);
+        $previousImagePath = null;
+        $cleanupAllowed = true;
+
+        try {
+            $updated = $this->transact(function () use (
             $id,
             $request,
             $administratorId,
             $ipAddress,
             $userAgent,
+            $stored,
+            &$previousImagePath,
         ): Activity {
             $current = $this->locked($id);
+            $previousImagePath = $current->featuredImagePath();
             $updated = $this->activities->update(
                 $current->id(),
                 $request->title(),
@@ -131,6 +163,13 @@ final readonly class AdministratorActivityService
                 $request->description(),
                 $request->price(),
                 $request->sortOrder(),
+                $request->summary(),
+                $stored?->relativePath() ?? $current->featuredImagePath(),
+                $request->priceUnit(),
+                $request->durationLabel(),
+                $request->location(),
+                $request->isHomepageFeatured(),
+                $request->homepageSortOrder(),
             );
 
             if (!$updated instanceof Activity) {
@@ -156,7 +195,21 @@ final readonly class AdministratorActivityService
             );
 
             return $updated;
-        });
+            }, $cleanupAllowed);
+
+            if ($stored instanceof StoredGalleryImage && is_string($previousImagePath)) {
+                $this->imageStorage?->remove($previousImagePath);
+            }
+
+            return $updated;
+        } catch (Throwable $failure) {
+            if ($cleanupAllowed) {
+                $this->removeStoredImage($stored);
+            }
+            throw $failure instanceof ActivityException
+                ? $failure
+                : ActivityException::failure($failure);
+        }
     }
 
     public function setActive(
@@ -370,6 +423,36 @@ final readonly class AdministratorActivityService
         }
     }
 
+    private function storeImage(?GalleryImageUploadRequest $upload): ?StoredGalleryImage
+    {
+        if ($upload === null) {
+            return null;
+        }
+
+        if (!$this->imageStorage instanceof GalleryImageStorage) {
+            throw ActivityException::failure();
+        }
+
+        try {
+            return $this->imageStorage->store($upload);
+        } catch (Throwable $failure) {
+            throw ActivityException::failure($failure);
+        }
+    }
+
+    private function removeStoredImage(?StoredGalleryImage $stored): void
+    {
+        if (!$stored instanceof StoredGalleryImage || !$this->imageStorage instanceof GalleryImageStorage) {
+            return;
+        }
+
+        try {
+            $this->imageStorage->remove($stored->relativePath());
+        } catch (Throwable $failure) {
+            throw ActivityException::failure($failure);
+        }
+    }
+
     /**
      * @template T
      * @param callable(): T $operation
@@ -391,10 +474,11 @@ final readonly class AdministratorActivityService
      * @param callable(): T $operation
      * @return T
      */
-    private function transact(callable $operation): mixed
+    private function transact(callable $operation, ?bool &$cleanupAllowed = null): mixed
     {
         $this->rejectExistingTransaction();
         $commitAttempted = false;
+        $cleanupAllowed = true;
 
         try {
             $this->transaction->begin();
@@ -411,6 +495,7 @@ final readonly class AdministratorActivityService
             try {
                 $active = $this->transaction->inProgress();
             } catch (Throwable $stateFailure) {
+                $cleanupAllowed = false;
                 throw ActivityException::failure($stateFailure);
             }
 
@@ -423,6 +508,7 @@ final readonly class AdministratorActivityService
             }
 
             if ($commitAttempted) {
+                $cleanupAllowed = $active;
                 throw ActivityException::failure($safeFailure);
             }
 

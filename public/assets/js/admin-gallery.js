@@ -84,6 +84,8 @@
             const caption = itemForm.querySelector('[name="caption"]');
             const alternativeText = itemForm.querySelector('[name="alt_text"]');
             const sortOrder = itemForm.querySelector('[name="sort_order"]');
+            const homepageFeatured = itemForm.querySelector('[name="is_homepage_featured"]');
+            const homepageSortOrder = itemForm.querySelector('[name="homepage_sort_order"]');
             const button = itemForm.querySelector('button[type="submit"]');
             const method = itemForm.dataset.apiMethod;
 
@@ -94,6 +96,8 @@
                 || !(caption instanceof HTMLTextAreaElement)
                 || !(alternativeText instanceof HTMLTextAreaElement)
                 || !(sortOrder instanceof HTMLInputElement)
+                || !(homepageFeatured instanceof HTMLInputElement)
+                || !(homepageSortOrder instanceof HTMLInputElement)
                 || !method
             ) {
                 showMessage(message, 'The gallery form could not be prepared.', 'danger');
@@ -104,6 +108,10 @@
             const normalizedSortOrder = Number.isSafeInteger(parsedSortOrder)
                 ? parsedSortOrder
                 : sortOrder.value;
+            const parsedHomepageSortOrder = Number.parseInt(homepageSortOrder.value, 10);
+            const normalizedHomepageSortOrder = Number.isSafeInteger(parsedHomepageSortOrder)
+                ? parsedHomepageSortOrder
+                : homepageSortOrder.value;
 
             if (button instanceof HTMLButtonElement) {
                 button.disabled = true;
@@ -132,6 +140,8 @@
                     payload.set('caption', caption.value);
                     payload.set('alt_text', alternativeText.value);
                     payload.set('sort_order', String(normalizedSortOrder));
+                    payload.set('is_homepage_featured', homepageFeatured.checked ? '1' : '0');
+                    payload.set('homepage_sort_order', String(normalizedHomepageSortOrder));
                     payload.set('is_active', active.checked ? '1' : '0');
                     payload.set('is_published', published.checked ? '1' : '0');
                     payload.set('image', image.files[0]);
@@ -143,6 +153,8 @@
                         caption: caption.value,
                         alt_text: alternativeText.value,
                         sort_order: normalizedSortOrder,
+                        is_homepage_featured: homepageFeatured.checked,
+                        homepage_sort_order: normalizedHomepageSortOrder,
                     });
                 }
 

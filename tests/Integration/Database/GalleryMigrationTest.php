@@ -40,6 +40,7 @@ final class GalleryMigrationTest extends DatabaseTestCase
         '20260801000200_create_reviews_table',
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
+        '20260802000100_add_activity_catalogue_homepage_curation',
     ];
 
     private MigrationRunner $runner;
@@ -95,6 +96,8 @@ final class GalleryMigrationTest extends DatabaseTestCase
             'sort_order',
             'is_active',
             'is_published',
+            'is_homepage_featured',
+            'homepage_sort_order',
             'created_at',
             'updated_at',
         ], $this->columns('gallery'));
@@ -118,6 +121,8 @@ final class GalleryMigrationTest extends DatabaseTestCase
         self::assertSame(['int', 'NO', 'MUL', '0', '', 'unsigned'], $this->column('gallery', 'sort_order'));
         self::assertSame(['tinyint', 'NO', 'MUL', null, '', null], $this->column('gallery', 'is_active'));
         self::assertSame(['tinyint', 'NO', '', null, '', null], $this->column('gallery', 'is_published'));
+        self::assertSame(['tinyint', 'NO', '', '0', '', null], $this->column('gallery', 'is_homepage_featured'));
+        self::assertSame(['int', 'NO', '', '0', '', 'unsigned'], $this->column('gallery', 'homepage_sort_order'));
         self::assertSame(
             ['is_active', 'is_published', 'sort_order', 'id'],
             $this->indexColumns('gallery', 'idx_gallery_public_order'),
@@ -126,6 +131,10 @@ final class GalleryMigrationTest extends DatabaseTestCase
             ['gallery_category_id', 'is_active', 'is_published', 'sort_order', 'id'],
             $this->indexColumns('gallery', 'idx_gallery_category_public_order'),
         );
+        self::assertSame([
+            'is_active', 'is_published', 'is_homepage_featured',
+            'homepage_sort_order', 'sort_order', 'id',
+        ], $this->indexColumns('gallery', 'idx_gallery_homepage_order'));
         self::assertSame('gallery_categories', $this->foreignReference('gallery', 'fk_gallery_category'));
         self::assertSame('SET NULL', $this->foreignDeleteRule('gallery', 'fk_gallery_category'));
         self::assertSame('InnoDB', $this->tableOption('gallery_categories', 'ENGINE'));
@@ -182,6 +191,7 @@ final class GalleryMigrationTest extends DatabaseTestCase
             ['sort_order' => -1],
             ['is_active' => 2],
             ['is_published' => 2],
+            ['is_homepage_featured' => 2],
             ['gallery_category_id' => 999999],
         ] as $override) {
             $this->assertPdoFailure(

@@ -45,6 +45,28 @@
         return body;
     };
 
+    const multipartRequest = async (url, method, csrf, payload) => {
+        const headers = {'Accept': 'application/json', 'X-CSRF-Token': csrf};
+
+        if (method === 'PUT') {
+            headers['X-HTTP-Method-Override'] = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method === 'PUT' ? 'POST' : method,
+            credentials: 'same-origin',
+            headers,
+            body: payload,
+        });
+        const body = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(responseMessage(body, 'The activity request could not be completed.'));
+        }
+
+        return body;
+    };
+
     const editor = document.querySelector('[data-activity-editor-form]');
 
     if (editor instanceof HTMLFormElement) {
@@ -60,9 +82,16 @@
             const csrf = editor.querySelector('input[name="_csrf"]');
             const title = editor.querySelector('[name="title"]');
             const slug = editor.querySelector('[name="slug"]');
+            const summary = editor.querySelector('[name="summary"]');
             const description = editor.querySelector('[name="description"]');
             const price = editor.querySelector('[name="price"]');
+            const priceUnit = editor.querySelector('[name="price_unit"]');
+            const duration = editor.querySelector('[name="duration"]');
+            const location = editor.querySelector('[name="location"]');
             const sortOrder = editor.querySelector('[name="sort_order"]');
+            const homepageFeatured = editor.querySelector('[name="is_homepage_featured"]');
+            const homepageSortOrder = editor.querySelector('[name="homepage_sort_order"]');
+            const image = editor.querySelector('[name="image"]');
             const button = editor.querySelector('button[type="submit"]');
             const method = editor.dataset.apiMethod;
 
@@ -70,9 +99,16 @@
                 !(csrf instanceof HTMLInputElement)
                 || !(title instanceof HTMLInputElement)
                 || !(slug instanceof HTMLInputElement)
+                || !(summary instanceof HTMLTextAreaElement)
                 || !(description instanceof HTMLTextAreaElement)
                 || !(price instanceof HTMLInputElement)
+                || !(priceUnit instanceof HTMLInputElement)
+                || !(duration instanceof HTMLInputElement)
+                || !(location instanceof HTMLInputElement)
                 || !(sortOrder instanceof HTMLInputElement)
+                || !(homepageFeatured instanceof HTMLInputElement)
+                || !(homepageSortOrder instanceof HTMLInputElement)
+                || !(image instanceof HTMLInputElement)
                 || !method
             ) {
                 showMessage(message, 'The activity form could not be prepared.', 'danger');
@@ -80,13 +116,22 @@
             }
 
             const parsedSortOrder = Number.parseInt(sortOrder.value, 10);
-            const payload = {
-                title: title.value,
-                slug: slug.value,
-                description: description.value,
-                price: price.value,
-                sort_order: Number.isSafeInteger(parsedSortOrder) ? parsedSortOrder : sortOrder.value,
-            };
+            const parsedHomepageSortOrder = Number.parseInt(homepageSortOrder.value, 10);
+            const payload = new FormData();
+            payload.set('title', title.value);
+            payload.set('slug', slug.value);
+            payload.set('summary', summary.value);
+            payload.set('description', description.value);
+            payload.set('price', price.value);
+            payload.set('price_unit', priceUnit.value);
+            payload.set('duration', duration.value);
+            payload.set('location', location.value);
+            payload.set('sort_order', String(Number.isSafeInteger(parsedSortOrder) ? parsedSortOrder : sortOrder.value));
+            payload.set('is_homepage_featured', homepageFeatured.checked ? '1' : '0');
+            payload.set('homepage_sort_order', String(Number.isSafeInteger(parsedHomepageSortOrder) ? parsedHomepageSortOrder : homepageSortOrder.value));
+            if (image.files?.length === 1) {
+                payload.set('image', image.files[0]);
+            }
 
             if (editor.dataset.creating === 'true') {
                 const active = editor.querySelector('[name="is_active"]');
@@ -97,8 +142,8 @@
                     return;
                 }
 
-                payload.is_active = active.checked;
-                payload.is_published = published.checked;
+                payload.set('is_active', active.checked ? '1' : '0');
+                payload.set('is_published', published.checked ? '1' : '0');
             }
 
             if (button instanceof HTMLButtonElement) {
@@ -108,7 +153,7 @@
             showMessage(message, 'Saving activity…', 'info');
 
             try {
-                await jsonRequest(editor.action, method, csrf.value, payload);
+                await multipartRequest(editor.action, method, csrf.value, payload);
                 showMessage(message, 'Activity saved. Redirecting…', 'success');
                 window.location.assign('/admin/activities');
             } catch (failure) {

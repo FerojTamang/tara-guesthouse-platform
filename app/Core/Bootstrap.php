@@ -436,6 +436,7 @@ final class Bootstrap
             $csrfTokens,
             new PaymentMethodFlashMessages($session),
         );
+        $galleryImageStorage = new GalleryImageStorageProvider($resolvedBasePath);
         $administratorActivityController = new AdministratorActivityController(
             $viewRenderer,
             new ActivityManagementServiceProvider(
@@ -446,14 +447,15 @@ final class Bootstrap
                         new ActivityRepository($connection),
                         new PdoAuditLogRepository($connection),
                         new PdoActivityTransaction($connection),
+                        imageStorage: new LazyGalleryImageStorage($galleryImageStorage->storage(...)),
                     );
                 },
             ),
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
+            $galleryImageStorage,
         );
-        $galleryImageStorage = new GalleryImageStorageProvider($resolvedBasePath);
         $administratorGalleryController = new AdministratorGalleryController(
             $viewRenderer,
             new GalleryManagementServiceProvider(
@@ -615,6 +617,7 @@ final class Bootstrap
         $publicActivityServices = new PublicActivityServiceProvider(
             static fn (): PublicActivityService => new PublicActivityService(
                 new ActivityRepository($catalogConnectionProvider()),
+                new LazyGalleryImageReader($galleryImageStorage->reader(...)),
             ),
         );
         $publicActivityController = new PublicActivityController(

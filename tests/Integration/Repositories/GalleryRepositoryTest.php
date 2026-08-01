@@ -167,9 +167,13 @@ final class GalleryRepositoryTest extends DatabaseTestCase
             30,
             false,
             true,
+            true,
+            4,
         );
         self::assertFalse($item->isActive());
         self::assertTrue($item->isPublished());
+        self::assertTrue($item->isHomepageFeatured());
+        self::assertSame(4, $item->homepageSortOrder());
 
         $item = $this->repository->updateItem(
             $item->id(),
@@ -179,6 +183,8 @@ final class GalleryRepositoryTest extends DatabaseTestCase
             'gallery/' . str_repeat('f', 64) . '.png',
             'Welcome area inside Tara Guest House',
             25,
+            false,
+            0,
         );
         self::assertInstanceOf(GalleryItem::class, $item);
         self::assertNull($item->categoryId());
@@ -186,6 +192,33 @@ final class GalleryRepositoryTest extends DatabaseTestCase
         self::assertSame(25, $item->sortOrder());
         self::assertFalse($item->isActive());
         self::assertTrue($item->isPublished());
+        self::assertFalse($item->isHomepageFeatured());
+    }
+
+    public function testHomepageGalleryIsEligibleDeterministicAndLimitedToSix(): void
+    {
+        foreach ([
+            ['title' => 'Tie Second', 'homepage_sort_order' => 2, 'sort_order' => 4],
+            ['title' => 'First', 'homepage_sort_order' => 1, 'sort_order' => 8],
+            ['title' => 'Tie First', 'homepage_sort_order' => 2, 'sort_order' => 4],
+            ['title' => 'Fourth', 'homepage_sort_order' => 3, 'sort_order' => 1],
+            ['title' => 'Fifth', 'homepage_sort_order' => 4, 'sort_order' => 1],
+            ['title' => 'Sixth', 'homepage_sort_order' => 5, 'sort_order' => 1],
+            ['title' => 'Limited Out', 'homepage_sort_order' => 6, 'sort_order' => 1],
+            ['title' => 'Draft Selected', 'homepage_sort_order' => 0, 'is_published' => 0],
+            ['title' => 'Inactive Selected', 'homepage_sort_order' => 0, 'is_active' => 0],
+            ['title' => 'Inactive Category Selected', 'homepage_sort_order' => 0, 'gallery_category_id' => $this->categoryIds['inactive']],
+        ] as $offset => $values) {
+            GalleryFixture::insertItem($this->connection, array_replace([
+                'file_path' => 'gallery/' . str_pad(dechex($offset + 1), 64, '0', STR_PAD_LEFT) . '.jpg',
+                'is_homepage_featured' => 1,
+            ], $values));
+        }
+
+        self::assertSame(['First', 'Tie Second', 'Tie First', 'Fourth', 'Fifth', 'Sixth'], array_map(
+            static fn (GalleryItem $item): string => $item->title(),
+            $this->repository->findHomepageGalleryItems(6),
+        ));
     }
 
     public function testItChangesStateAndOrderIndependentlyAndRetainsRemovedItems(): void

@@ -214,6 +214,8 @@ final readonly class AdministratorGalleryService
                 $metadata->sortOrder(),
                 $active,
                 $published,
+                $metadata->isHomepageFeatured(),
+                $metadata->homepageSortOrder(),
             );
             $this->appendAudit(
                 $administratorId,
@@ -298,6 +300,8 @@ final readonly class AdministratorGalleryService
                 $current->filePath(),
                 $metadata->alternativeText(),
                 $metadata->sortOrder(),
+                $metadata->isHomepageFeatured(),
+                $metadata->homepageSortOrder(),
             );
 
             if (!$updated instanceof GalleryItem) {

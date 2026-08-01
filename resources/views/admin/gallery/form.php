@@ -155,6 +155,17 @@ if ($creating && is_array($uploadConfiguration)) {
                             >
                         </div>
 
+                        <fieldset class="mb-4">
+                            <legend class="h6">Homepage preview</legend>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" id="gallery-homepage-featured" name="is_homepage_featured" type="checkbox" <?= $values['homepageFeatured'] ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="gallery-homepage-featured">Show on homepage</label>
+                            </div>
+                            <label class="form-label" for="gallery-homepage-sort-order">Homepage display order</label>
+                            <input class="form-control" id="gallery-homepage-sort-order" name="homepage_sort_order" type="number" min="0" max="4294967295" step="1" value="<?= $e($values['homepageSortOrder']) ?>" required>
+                            <div class="form-text">Only active, published images appear. The homepage shows at most six selected images; lower values appear first.</div>
+                        </fieldset>
+
                         <?php if ($creating): ?>
                             <fieldset class="mb-4">
                                 <legend class="h6">Initial visibility</legend>

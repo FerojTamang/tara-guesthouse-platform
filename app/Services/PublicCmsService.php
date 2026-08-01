@@ -100,8 +100,8 @@ final readonly class PublicCmsService
                 'navigation_pages' => $layout['navigation_pages'],
                 'footer_settings' => $layout['footer_settings'],
                 'rooms' => $this->rooms->list(),
-                'activities' => $this->activities->list(),
-                'gallery' => $this->gallery->list(),
+                'activities' => $this->activities->homepage(4),
+                'gallery' => $this->gallery->homepage(6),
                 'reviews' => $this->homepageReviews(),
             ];
         });

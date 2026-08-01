@@ -261,6 +261,9 @@ final class AdministratorGalleryManagementTest extends TestCase
         self::assertStringContainsString('enctype="multipart/form-data"', $create->body());
         self::assertStringContainsString('name="alt_text"', $create->body());
         self::assertStringContainsString('name="image"', $create->body());
+        self::assertStringContainsString('name="is_homepage_featured"', $create->body());
+        self::assertStringContainsString('name="homepage_sort_order"', $create->body());
+        self::assertStringContainsString('at most six selected images', $create->body());
         self::assertStringContainsString('accept="image/png"', $create->body());
         self::assertStringContainsString(
             'Maximum 100,000 bytes; dimensions 1x1 to 100x100 pixels.',
@@ -320,6 +323,8 @@ final class AdministratorGalleryManagementTest extends TestCase
             'caption' => null,
             'alt_text' => 'Updated accessible sunrise description',
             'sort_order' => 15,
+            'is_homepage_featured' => true,
+            'homepage_sort_order' => 2,
         ]);
         self::assertSame(200, $updated->statusCode());
         self::assertSame('Updated sunrise', $this->decoded($updated)['data']['title']);
@@ -532,6 +537,8 @@ final class AdministratorGalleryManagementTest extends TestCase
             'sort_order' => '10',
             'is_active' => '1',
             'is_published' => '0',
+            'is_homepage_featured' => '1',
+            'homepage_sort_order' => '1',
         ];
     }
 
@@ -763,6 +770,14 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
         ));
     }
 
+    public function findHomepageGalleryItems(int $limit): array
+    {
+        return array_slice(array_values(array_filter(
+            $this->findAllPublicItems(),
+            static fn (GalleryItem $item): bool => $item->isHomepageFeatured(),
+        )), 0, $limit);
+    }
+
     public function createItem(
         ?int $categoryId,
         string $title,
@@ -772,6 +787,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
         int $sortOrder,
         bool $active,
         bool $published,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): GalleryItem {
         $id = $this->items === [] ? 1 : max(array_keys($this->items)) + 1;
 
@@ -785,6 +802,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
             $sortOrder,
             $active,
             $published,
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 
@@ -796,6 +815,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
         string $filePath,
         string $altText,
         int $sortOrder,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?GalleryItem {
         $current = $this->items[$id] ?? null;
 
@@ -813,6 +834,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
             $sortOrder,
             $current->isActive(),
             $current->isPublished(),
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 
@@ -895,6 +918,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
         int $sortOrder,
         bool $active,
         bool $published,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): GalleryItem {
         return new GalleryItem(
             $id,
@@ -908,6 +933,8 @@ final class AdministratorGalleryRepositoryFeatureFake implements GalleryCatalogR
             $published,
             new DateTimeImmutable('2026-07-30 08:00:00 UTC'),
             new DateTimeImmutable('2026-07-30 10:30:00 UTC'),
+            $homepageFeatured,
+            $homepageSortOrder,
         );
     }
 }

@@ -42,16 +42,18 @@ final class GalleryFixture
             'sort_order' => 10,
             'is_active' => 1,
             'is_published' => 1,
+            'is_homepage_featured' => 0,
+            'homepage_sort_order' => 0,
             'created_at' => '2026-07-30 08:00:00',
             'updated_at' => '2026-07-30 08:00:00',
         ], $overrides);
         $statement = $connection->prepare(
             'INSERT INTO gallery ('
             . 'gallery_category_id, title, caption, file_path, alt_text, sort_order, '
-            . 'is_active, is_published, created_at, updated_at'
+            . 'is_active, is_published, is_homepage_featured, homepage_sort_order, created_at, updated_at'
             . ') VALUES ('
             . ':gallery_category_id, :title, :caption, :file_path, :alt_text, :sort_order, '
-            . ':is_active, :is_published, :created_at, :updated_at'
+            . ':is_active, :is_published, :is_homepage_featured, :homepage_sort_order, :created_at, :updated_at'
             . ')',
         );
         $statement->bindValue(
@@ -68,6 +70,8 @@ final class GalleryFixture
             'sort_order',
             'is_active',
             'is_published',
+            'is_homepage_featured',
+            'homepage_sort_order',
             'created_at',
             'updated_at',
         ] as $key) {

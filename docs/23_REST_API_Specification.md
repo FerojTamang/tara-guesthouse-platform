@@ -297,7 +297,7 @@ The request accepts only an empty JSON object and never accepts arbitrary totals
 | PATCH | `/api/v1/admin/activities/{id}/publication` | Set publication control |
 | DELETE | `/api/v1/admin/activities/{id}` | Deactivate/unpublish; no hard delete |
 
-Activity create/update fields are limited to `title`, `slug`, `description`, fixed-precision NPR `price`, `is_active`, `is_published` and `sort_order`. Categories, images, featured, duration, meeting point and maximum participants are Future Enhancements.
+Activity create/update fields are `title`, `slug`, required bounded `summary`, `description`, nullable fixed-precision NPR `price`, dependent nullable `price_unit`, optional `duration` and `location`, `is_homepage_featured`, `homepage_sort_order`, and `sort_order`; create additionally accepts `is_active` and `is_published`. Multipart create/update may include one validated `image`; the server owns its randomized safe relative path. A multipart edit is logically `PUT` and may use the exact `X-HTTP-Method-Override: PUT` over POST transport so PHP can parse files. That override is accepted only for multipart POST transport to `/api/v1/admin/activities/{positive-id}` and is ignored for every other route, media type, transport method, or override value; no POST update route is registered. Categories, meeting point and maximum participants remain Future Enhancements.
 
 # 14. Administrator Gallery APIs
 
@@ -314,7 +314,7 @@ Activity create/update fields are limited to `title`, `slug`, `description`, fix
 | PATCH | `/api/v1/admin/gallery/reorder` | Update ordering |
 | DELETE | `/api/v1/admin/gallery/{id}` | Deactivate/unpublish; no hard delete |
 
-Gallery creation accepts nullable `gallery_category_id`, `title`, `caption`, `alt_text`, `sort_order`, `is_active`, `is_published`, and exactly one multipart `image` upload. The server validates and stores the file, then owns `file_path`; clients cannot submit an authoritative path. Metadata updates do not replace the image. There is no `media_files`, featured, uploaded-by, deleted-at or generated-image field.
+Gallery creation accepts nullable `gallery_category_id`, `title`, `caption`, `alt_text`, `sort_order`, `is_homepage_featured`, `homepage_sort_order`, `is_active`, `is_published`, and exactly one multipart `image` upload. The server validates and stores the file, then owns `file_path`; clients cannot submit an authoritative path. Metadata updates retain the image. There is no `media_files`, uploaded-by, deleted-at or generated-image field.
 
 # 15. Administrator Review APIs
 

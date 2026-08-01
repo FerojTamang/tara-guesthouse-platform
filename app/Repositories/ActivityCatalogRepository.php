@@ -17,20 +17,32 @@ interface ActivityCatalogRepository
 
     public function findBySlug(string $slug): ?Activity;
 
+    public function findPublicById(int $id): ?Activity;
+
     /** @return list<Activity> */
     public function findAll(): array;
 
     /** @return list<Activity> */
     public function findAllPublic(): array;
 
+    /** @return list<Activity> */
+    public function findHomepageActivities(int $limit): array;
+
     public function create(
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         bool $active,
         bool $published,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): Activity;
 
     public function update(
@@ -38,8 +50,15 @@ interface ActivityCatalogRepository
         string $title,
         string $slug,
         string $description,
-        string $price,
+        ?string $price,
         int $sortOrder,
+        ?string $summary = null,
+        ?string $featuredImagePath = null,
+        ?string $priceUnit = null,
+        ?string $durationLabel = null,
+        ?string $location = null,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?Activity;
 
     public function setActive(int $id, bool $active): ?Activity;

@@ -80,12 +80,12 @@ The homepage uses:
 
 * settings for hero text, one configured hero image and section visibility/configuration;
 * a Room Preview queried from the Rooms module;
-* an Activities preview queried from active, published Activities records;
-* a Gallery preview queried from active, published Gallery records;
+* an Activities preview queried from active, published, homepage-selected Activities records, limited to four;
+* a Gallery preview queried from active, published, homepage-selected Gallery records, limited to six;
 * a Reviews preview queried from approved Reviews records;
 * approved global contact/footer settings.
 
-The CMS does not create duplicate room, activity, gallery or review records. It does not require featured-room or featured-activity flags. Preview selection uses approved module filtering/order/configuration rather than duplicate CMS content.
+The CMS does not create duplicate room, activity, gallery or review records. Activity/gallery homepage selection and ordering remain owned by their modules; the homepage only consumes those bounded projections.
 
 ## 7. Payment Instructions
 

@@ -8,12 +8,16 @@ use App\Authentication\AdministratorSession;
 use App\Core\CsrfTokenManager;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\UploadedFile;
 use App\Core\ViewRenderer;
 use App\Exceptions\ActivityException;
+use App\Exceptions\GalleryImageException;
 use App\Models\Activity;
 use App\Requests\ActivityContentRequest;
 use App\Requests\ActivityStateRequest;
+use App\Requests\GalleryImageUploadRequest;
 use App\Services\ActivityManagementServiceProvider;
+use App\Services\GalleryImageStorageProvider;
 use DateTimeImmutable;
 use DateTimeZone;
 use JsonException;
@@ -29,6 +33,7 @@ final readonly class AdministratorActivityController
         private AdministratorSession $administratorSession,
         private CsrfTokenManager $csrfTokens,
         private DateTimeZone $timezone,
+        private ?GalleryImageStorageProvider $images = null,
     ) {
     }
 
@@ -58,7 +63,8 @@ final readonly class AdministratorActivityController
     /** @param array<string, string> $parameters */
     public function createForm(Request $request, array $parameters): Response
     {
-        return $this->formPage(
+        try {
+            return $this->formPage(
             'Create activity',
             '/api/v1/admin/activities',
             'POST',
@@ -66,13 +72,24 @@ final readonly class AdministratorActivityController
                 'title' => '',
                 'slug' => '',
                 'description' => '',
-                'price' => '0.00',
+                'summary' => '',
+                'price' => '',
+                'priceUnit' => '',
+                'durationLabel' => '',
+                'location' => '',
                 'sortOrder' => '0',
+                'homepageFeatured' => false,
+                'homepageSortOrder' => '0',
+                'featuredImageUrl' => null,
                 'active' => true,
                 'published' => false,
             ],
             true,
-        );
+            $this->images?->uploadConfiguration(),
+            );
+        } catch (GalleryImageException) {
+            return Response::text('Activity image upload is not configured.', 503, ['Cache-Control' => 'no-store']);
+        }
     }
 
     /** @param array<string, string> $parameters */
@@ -95,12 +112,22 @@ final readonly class AdministratorActivityController
                     'title' => $activity->title(),
                     'slug' => $activity->slug(),
                     'description' => $activity->description(),
-                    'price' => $activity->price(),
+                    'summary' => $activity->summary(),
+                    'price' => $activity->price() ?? '',
+                    'priceUnit' => $activity->priceUnit() ?? '',
+                    'durationLabel' => $activity->durationLabel() ?? '',
+                    'location' => $activity->location() ?? '',
                     'sortOrder' => (string) $activity->sortOrder(),
+                    'homepageFeatured' => $activity->isHomepageFeatured(),
+                    'homepageSortOrder' => (string) $activity->homepageSortOrder(),
+                    'featuredImageUrl' => $activity->featuredImagePath() === null
+                        ? null
+                        : '/activities?image=' . (string) $activity->id(),
                     'active' => $activity->isActive(),
                     'published' => $activity->isPublished(),
                 ],
                 false,
+                $this->images?->uploadConfiguration(),
             );
         } catch (ActivityException $exception) {
             return $exception->isNotFound() ? $this->notFound() : $this->failure();
@@ -157,19 +184,30 @@ final readonly class AdministratorActivityController
     /** @param array<string, string> $parameters */
     public function apiCreate(Request $request, array $parameters): Response
     {
-        $payload = $this->jsonObject($request);
+        $multipart = $this->usesMultipartFormData($request);
+        $payload = $multipart ? $request->input() : $this->jsonObject($request);
 
         if ($payload instanceof Response) {
             return $payload;
         }
 
+        if (!is_array($payload)) {
+            return $this->jsonError('Request payload is invalid.', 422);
+        }
+
         if (!$this->hasExactKeys($payload, [
             'description',
+            'duration',
+            'homepage_sort_order',
+            'is_homepage_featured',
             'is_active',
             'is_published',
+            'location',
             'price',
+            'price_unit',
             'slug',
             'sort_order',
+            'summary',
             'title',
         ])) {
             return $this->jsonError('Request payload is invalid.', 422);
@@ -185,16 +223,22 @@ final readonly class AdministratorActivityController
             $content = ActivityContentRequest::fromInput(
                 $payload['title'],
                 $payload['slug'],
+                $payload['summary'],
                 $payload['description'],
                 $payload['price'],
+                $payload['price_unit'],
+                $payload['duration'],
+                $payload['location'],
                 $payload['sort_order'],
+                $payload['is_homepage_featured'],
+                $payload['homepage_sort_order'],
             );
             $active = ActivityStateRequest::fromInput(
-                $payload['is_active'],
+                $multipart ? $this->formBoolean($payload['is_active'], 'Activity active state') : $payload['is_active'],
                 'Activity active state',
             );
             $published = ActivityStateRequest::fromInput(
-                $payload['is_published'],
+                $multipart ? $this->formBoolean($payload['is_published'], 'Activity publication state') : $payload['is_published'],
                 'Activity publication state',
             );
             $activity = $this->services->service()->create(
@@ -204,6 +248,7 @@ final readonly class AdministratorActivityController
                 $identity->userId(),
                 $request->remoteAddress(),
                 $this->auditUserAgent($request),
+                $this->activityUpload($request, $multipart),
             );
 
             return Response::json(
@@ -215,6 +260,10 @@ final readonly class AdministratorActivityController
                 201,
                 ['Cache-Control' => 'no-store'],
             );
+        } catch (GalleryImageException $exception) {
+            return $exception->isValidationFailure()
+                ? $this->activityValidationError($exception->getMessage())
+                : $this->jsonError('Internal Server Error.', 500);
         } catch (ActivityException $exception) {
             return $this->activityError($exception);
         }
@@ -229,17 +278,28 @@ final readonly class AdministratorActivityController
             return $this->jsonError('The activity was not found.', 404);
         }
 
-        $payload = $this->jsonObject($request);
+        $multipart = $this->usesMultipartFormData($request);
+        $payload = $multipart ? $request->input() : $this->jsonObject($request);
 
         if ($payload instanceof Response) {
             return $payload;
         }
 
+        if (!is_array($payload)) {
+            return $this->jsonError('Request payload is invalid.', 422);
+        }
+
         if (!$this->hasExactKeys($payload, [
             'description',
+            'duration',
+            'homepage_sort_order',
+            'is_homepage_featured',
+            'location',
             'price',
+            'price_unit',
             'slug',
             'sort_order',
+            'summary',
             'title',
         ])) {
             return $this->jsonError('Request payload is invalid.', 422);
@@ -257,13 +317,20 @@ final readonly class AdministratorActivityController
                 ActivityContentRequest::fromInput(
                     $payload['title'],
                     $payload['slug'],
+                    $payload['summary'],
                     $payload['description'],
                     $payload['price'],
+                    $payload['price_unit'],
+                    $payload['duration'],
+                    $payload['location'],
                     $payload['sort_order'],
+                    $payload['is_homepage_featured'],
+                    $payload['homepage_sort_order'],
                 ),
                 $identity->userId(),
                 $request->remoteAddress(),
                 $this->auditUserAgent($request),
+                $this->activityUpload($request, $multipart),
             );
 
             return Response::json(
@@ -275,6 +342,10 @@ final readonly class AdministratorActivityController
                 200,
                 ['Cache-Control' => 'no-store'],
             );
+        } catch (GalleryImageException $exception) {
+            return $exception->isValidationFailure()
+                ? $this->activityValidationError($exception->getMessage())
+                : $this->jsonError('Internal Server Error.', 500);
         } catch (ActivityException $exception) {
             return $this->activityError($exception);
         }
@@ -490,11 +561,20 @@ final readonly class AdministratorActivityController
             'title' => $activity->title(),
             'slug' => $activity->slug(),
             'description' => $activity->description(),
+            'summary' => $activity->summary(),
+            'image_url' => $activity->featuredImagePath() === null
+                ? null
+                : '/activities?image=' . (string) $activity->id(),
             'currency' => 'NPR',
             'price' => $activity->price(),
+            'price_unit' => $activity->priceUnit(),
+            'duration' => $activity->durationLabel(),
+            'location' => $activity->location(),
             'is_active' => $activity->isActive(),
             'is_published' => $activity->isPublished(),
             'sort_order' => $activity->sortOrder(),
+            'is_homepage_featured' => $activity->isHomepageFeatured(),
+            'homepage_sort_order' => $activity->homepageSortOrder(),
             'created_at' => $this->dateTime($activity->createdAt()),
             'updated_at' => $this->dateTime($activity->updatedAt()),
         ];
@@ -508,11 +588,14 @@ final readonly class AdministratorActivityController
             'title' => $activity->title(),
             'slug' => $activity->slug(),
             'description' => $activity->description(),
-            'price' => 'NPR ' . $activity->price(),
+            'summary' => $activity->summary(),
+            'price' => $activity->price() === null ? 'Not published' : 'NPR ' . $activity->price(),
             'active' => $activity->isActive(),
             'published' => $activity->isPublished(),
             'publiclyVisible' => $activity->isPubliclyVisible(),
             'sortOrder' => $activity->sortOrder(),
+            'homepageFeatured' => $activity->isHomepageFeatured(),
+            'homepageSortOrder' => $activity->homepageSortOrder(),
             'updatedAt' => $this->dateTime($activity->updatedAt()),
         ];
     }
@@ -539,6 +622,7 @@ final readonly class AdministratorActivityController
         string $method,
         array $values,
         bool $creating,
+        ?array $uploadConfiguration,
     ): Response {
         return $this->page(
             'admin.activities.form',
@@ -551,8 +635,61 @@ final readonly class AdministratorActivityController
                 'apiMethod' => $method,
                 'values' => $values,
                 'creating' => $creating,
+                'uploadConfiguration' => $uploadConfiguration,
             ],
         );
+    }
+
+    private function usesMultipartFormData(Request $request): bool
+    {
+        $contentType = $request->header('Content-Type');
+
+        return $contentType !== null
+            && strtolower(trim(explode(';', $contentType, 2)[0])) === 'multipart/form-data';
+    }
+
+    private function formBoolean(mixed $value, string $label): bool
+    {
+        return match ($value) {
+            '1' => true,
+            '0' => false,
+            default => throw ActivityException::invalidInput($label . ' must be true or false.'),
+        };
+    }
+
+    private function activityUpload(Request $request, bool $multipart): ?GalleryImageUploadRequest
+    {
+        if (!$multipart) {
+            return null;
+        }
+
+        $files = $request->file();
+
+        if (!is_array($files) || ($files !== [] && array_keys($files) !== ['image'])) {
+            throw ActivityException::invalidInput('Activity image upload is invalid.');
+        }
+
+        if ($files === []) {
+            return null;
+        }
+
+        if (!$files['image'] instanceof UploadedFile || !$this->images instanceof GalleryImageStorageProvider) {
+            throw ActivityException::invalidInput('Activity image upload is invalid.');
+        }
+
+        return GalleryImageUploadRequest::fromInput(
+            $files['image'],
+            $this->images->uploadConfiguration(),
+        );
+    }
+
+    private function activityValidationError(string $message): Response
+    {
+        return Response::json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => ['activity' => [$message]],
+        ], 422, ['Cache-Control' => 'no-store']);
     }
 
     /** @param array<string, string> $parameters */

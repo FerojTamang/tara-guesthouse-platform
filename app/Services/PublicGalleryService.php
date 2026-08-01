@@ -52,6 +52,21 @@ final readonly class PublicGalleryService
         }
     }
 
+    /** @return list<array<string, mixed>> */
+    public function homepage(int $limit = 6): array
+    {
+        try {
+            return array_map(
+                $this->projection(...),
+                $this->repository->findHomepageGalleryItems($limit),
+            );
+        } catch (GalleryException $exception) {
+            throw $exception;
+        } catch (Throwable $throwable) {
+            throw GalleryException::failure($throwable);
+        }
+    }
+
     public function image(int $id): RetrievedGalleryImage
     {
         if ($id <= 0) {

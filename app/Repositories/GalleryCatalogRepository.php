@@ -42,6 +42,9 @@ interface GalleryCatalogRepository
     /** @return list<GalleryItem> */
     public function findAllPublicItems(): array;
 
+    /** @return list<GalleryItem> */
+    public function findHomepageGalleryItems(int $limit): array;
+
     public function createItem(
         ?int $categoryId,
         string $title,
@@ -51,6 +54,8 @@ interface GalleryCatalogRepository
         int $sortOrder,
         bool $active,
         bool $published,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): GalleryItem;
 
     public function updateItem(
@@ -61,6 +66,8 @@ interface GalleryCatalogRepository
         string $filePath,
         string $altText,
         int $sortOrder,
+        bool $homepageFeatured = false,
+        int $homepageSortOrder = 0,
     ): ?GalleryItem;
 
     public function setItemActive(int $id, bool $active): ?GalleryItem;

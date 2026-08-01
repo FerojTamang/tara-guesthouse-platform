@@ -40,6 +40,7 @@ final class ActivityMigrationTest extends DatabaseTestCase
         '20260801000200_create_reviews_table',
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
+        '20260802000100_add_activity_catalogue_homepage_curation',
     ];
 
     private MigrationRunner $runner;
@@ -63,10 +64,17 @@ final class ActivityMigrationTest extends DatabaseTestCase
             'id',
             'title',
             'slug',
+            'summary',
             'description',
+            'featured_image_path',
             'price',
+            'price_unit',
+            'duration_label',
+            'location',
             'is_active',
             'is_published',
+            'is_homepage_featured',
+            'homepage_sort_order',
             'sort_order',
             'created_at',
             'updated_at',
@@ -84,12 +92,19 @@ final class ActivityMigrationTest extends DatabaseTestCase
             $this->column('activities', 'slug', includeLength: true),
         );
         self::assertSame(['text', 'NO', '', null, '', null], $this->column('activities', 'description'));
+        self::assertSame(['varchar', 'YES', '', 'NULL', '', '320'], $this->column('activities', 'summary', includeLength: true));
+        self::assertSame(['varchar', 'YES', '', 'NULL', '', '500'], $this->column('activities', 'featured_image_path', includeLength: true));
         self::assertSame(
-            ['decimal', 'NO', '', null, '', '12,2'],
+            ['decimal', 'YES', '', 'NULL', '', '12,2'],
             $this->column('activities', 'price', includePrecision: true),
         );
+        self::assertSame(['varchar', 'YES', '', 'NULL', '', '40'], $this->column('activities', 'price_unit', includeLength: true));
+        self::assertSame(['varchar', 'YES', '', 'NULL', '', '80'], $this->column('activities', 'duration_label', includeLength: true));
+        self::assertSame(['varchar', 'YES', '', 'NULL', '', '120'], $this->column('activities', 'location', includeLength: true));
         self::assertSame(['tinyint', 'NO', 'MUL', null, '', null], $this->column('activities', 'is_active'));
         self::assertSame(['tinyint', 'NO', '', null, '', null], $this->column('activities', 'is_published'));
+        self::assertSame(['tinyint', 'NO', '', '0', '', null], $this->column('activities', 'is_homepage_featured'));
+        self::assertSame(['int', 'NO', '', '0', '', 'unsigned'], $this->column('activities', 'homepage_sort_order'));
         self::assertSame(['int', 'NO', 'MUL', '0', '', 'unsigned'], $this->column('activities', 'sort_order'));
         self::assertSame('InnoDB', $this->tableOption('activities', 'ENGINE'));
         self::assertSame(
@@ -107,6 +122,10 @@ final class ActivityMigrationTest extends DatabaseTestCase
             ['sort_order', 'id'],
             $this->indexColumns('activities', 'idx_activities_admin_order'),
         );
+        self::assertSame([
+            'is_active', 'is_published', 'is_homepage_featured',
+            'homepage_sort_order', 'sort_order', 'id',
+        ], $this->indexColumns('activities', 'idx_activities_homepage_order'));
     }
 
     public function testActivityConstraintsAndIndependentVisibilityFlagsAreEnforced(): void
@@ -137,8 +156,14 @@ final class ActivityMigrationTest extends DatabaseTestCase
             ['description' => ' '],
             ['description' => 'Untrimmed description '],
             ['price' => '-0.01'],
+            ['summary' => ' '],
+            ['featured_image_path' => '../public/image.jpg'],
+            ['price_unit' => ' '],
+            ['duration_label' => ' '],
+            ['location' => ' '],
             ['is_active' => 2],
             ['is_published' => 2],
+            ['is_homepage_featured' => 2],
         ] as $override) {
             $this->assertPdoFailure(
                 fn () => ActivityFixture::insert(
@@ -153,6 +178,12 @@ final class ActivityMigrationTest extends DatabaseTestCase
             'slug' => 'free-bird-watching',
             'price' => '0.00',
             'sort_order' => 0,
+        ]));
+        self::assertGreaterThan(0, ActivityFixture::insert($this->connection, [
+            'title' => 'Price on request',
+            'slug' => 'price-on-request',
+            'price' => null,
+            'price_unit' => null,
         ]));
     }
 
