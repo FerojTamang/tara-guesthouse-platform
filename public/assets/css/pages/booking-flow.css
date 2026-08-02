@@ -1,0 +1,527 @@
+.tg-page-booking-flow {
+    background: var(--tg-cream-light);
+}
+
+.tg-main--journey {
+    min-height: 60vh;
+}
+
+.tg-journey-hero {
+    padding: clamp(3.5rem, 7vw, 6.5rem) 0 clamp(2.75rem, 5vw, 4.5rem);
+    background: linear-gradient(135deg, var(--tg-emerald-deep), var(--tg-emerald));
+    color: var(--tg-white);
+}
+
+.tg-journey-hero--compact {
+    text-align: center;
+}
+
+.tg-journey-hero .tg-eyebrow {
+    color: var(--tg-mint);
+}
+
+.tg-journey-hero h1 {
+    max-width: 850px;
+    margin-bottom: 1rem;
+    color: var(--tg-white);
+    font-size: clamp(2.4rem, 5vw, 4.8rem);
+}
+
+.tg-journey-hero--compact h1,
+.tg-journey-hero--compact p {
+    margin-inline: auto;
+}
+
+.tg-journey-hero p:last-child {
+    max-width: 690px;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 1.05rem;
+}
+
+.tg-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.86rem;
+}
+
+.tg-breadcrumb a,
+.tg-breadcrumb span {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tg-journey-content {
+    padding-top: clamp(2rem, 5vw, 4rem);
+    padding-bottom: var(--tg-space-section);
+}
+
+.tg-progress {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 760px;
+    margin: 0 auto 2.5rem;
+    padding: 0;
+    list-style: none;
+    counter-reset: journey;
+}
+
+.tg-progress li {
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    justify-items: center;
+    color: var(--tg-muted);
+    font-size: 0.78rem;
+    font-weight: 750;
+    text-align: center;
+    counter-increment: journey;
+}
+
+.tg-progress li::before {
+    z-index: 1;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 2px solid rgba(6, 95, 70, 0.22);
+    border-radius: 50%;
+    background: var(--tg-cream-light);
+    content: counter(journey);
+}
+
+.tg-progress li::after {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: rgba(6, 95, 70, 0.18);
+    content: "";
+}
+
+.tg-progress li:last-child::after {
+    display: none;
+}
+
+.tg-progress .is-complete,
+.tg-progress [aria-current="step"] {
+    color: var(--tg-emerald-deep);
+}
+
+.tg-progress .is-complete::before,
+.tg-progress [aria-current="step"]::before {
+    border-color: var(--tg-emerald);
+    background: var(--tg-emerald);
+    color: var(--tg-white);
+}
+
+.tg-search-card,
+.tg-selected-room,
+.tg-availability-card,
+.tg-booking-form,
+.tg-stay-summary,
+.tg-payment-form,
+.tg-payment-summary,
+.tg-status-card {
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-lg);
+    background: var(--tg-white);
+    box-shadow: var(--tg-shadow-sm);
+}
+
+.tg-search-card {
+    margin-top: -6rem;
+    padding: clamp(1rem, 3vw, 1.75rem);
+}
+
+.tg-search-card__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr)) auto;
+    gap: 0.8rem;
+    align-items: end;
+}
+
+.tg-journey-form label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--tg-emerald-deep);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.tg-journey-form label span {
+    color: var(--tg-muted);
+    font-weight: 500;
+}
+
+.tg-journey-form input:not([type="checkbox"]),
+.tg-journey-form select,
+.tg-journey-form textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.72rem 0.85rem;
+    border: 1px solid rgba(6, 95, 70, 0.22);
+    border-radius: var(--tg-radius-sm);
+    background: var(--tg-cream-light);
+    color: var(--tg-text);
+}
+
+.tg-journey-form textarea {
+    resize: vertical;
+}
+
+.tg-journey-form input:focus-visible,
+.tg-journey-form select:focus-visible,
+.tg-journey-form textarea:focus-visible {
+    border-color: var(--tg-emerald);
+    outline: 3px solid rgba(6, 95, 70, 0.14);
+    outline-offset: 1px;
+}
+
+.tg-selected-room {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding: 1.4rem;
+}
+
+.tg-selected-room h2,
+.tg-selected-room p {
+    margin-bottom: 0.3rem;
+}
+
+.tg-results {
+    padding-top: clamp(3rem, 6vw, 5rem);
+}
+
+.tg-availability-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+.tg-availability-card {
+    display: grid;
+    overflow: hidden;
+}
+
+.tg-availability-card > img {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+}
+
+.tg-availability-card__content { padding: clamp(1.15rem, 3vw, 1.8rem); }
+
+.tg-availability-card h3 {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.tg-availability-card__price {
+    color: var(--tg-muted);
+}
+
+.tg-availability-card__price strong {
+    color: var(--tg-emerald-deep);
+}
+
+.tg-selected-result {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+    overflow: hidden;
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-lg);
+    background: var(--tg-white);
+    box-shadow: var(--tg-shadow-md);
+}
+
+.tg-selected-result > img {
+    width: 100%;
+    height: 100%;
+    min-height: 390px;
+    object-fit: cover;
+}
+
+.tg-selected-result__content { padding: clamp(1.4rem, 4vw, 3rem); }
+.tg-selected-result__type { color: var(--tg-muted); font-weight: 700; }
+.tg-selected-result.is-unavailable { border-color: rgba(180, 35, 24, 0.25); }
+
+.tg-result-amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 1rem 0 1.25rem;
+    padding: 0;
+    list-style: none;
+}
+
+.tg-result-amenities li {
+    padding: 0.4rem 0.65rem;
+    border-radius: 999px;
+    background: var(--tg-sage);
+    color: var(--tg-emerald-deep);
+    font-size: 0.75rem;
+    font-weight: 750;
+}
+
+.tg-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.tg-empty-state {
+    gap: 1rem;
+}
+
+.tg-empty-state h2,
+.tg-empty-state h3,
+.tg-empty-state p {
+    margin: 0;
+}
+
+.tg-alert {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.2rem;
+    border-radius: var(--tg-radius-sm);
+}
+
+.tg-alert p {
+    margin: 0.3rem 0 0;
+}
+
+.tg-alert--error {
+    border: 1px solid #b42318;
+    background: #fff1f0;
+    color: #7a271a;
+}
+
+.tg-booking-layout,
+.tg-payment-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: start;
+}
+
+.tg-booking-form,
+.tg-payment-form,
+.tg-payment-summary {
+    padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.tg-form-grid--booking {
+    margin: 1.5rem 0;
+}
+
+.tg-field--wide {
+    grid-column: 1 / -1;
+}
+
+.tg-terms {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.7rem;
+    align-items: start;
+}
+
+.tg-terms input {
+    width: 20px;
+    height: 20px;
+    margin-top: 0.15rem;
+    accent-color: var(--tg-emerald);
+}
+
+.tg-stay-summary,
+.tg-payment-summary {
+    position: sticky;
+    top: calc(var(--tg-header-height) + 1.5rem);
+    overflow: hidden;
+}
+
+.tg-stay-summary img {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+}
+
+.tg-stay-summary > div {
+    padding: 1.5rem;
+}
+
+.tg-stay-summary dl,
+.tg-payment-summary dl,
+.tg-status-card dl {
+    display: grid;
+    gap: 0.8rem;
+    margin: 1.25rem 0;
+}
+
+.tg-stay-summary dl div,
+.tg-payment-summary dl div,
+.tg-status-card dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--tg-border);
+}
+
+.tg-stay-summary dd,
+.tg-payment-summary dd,
+.tg-status-card dd {
+    margin: 0;
+    color: var(--tg-emerald-deep);
+    font-weight: 750;
+    text-align: right;
+}
+
+.tg-button--full {
+    width: 100%;
+}
+
+.tg-form-note,
+.tg-field-error {
+    margin: 0.55rem 0 0;
+    color: var(--tg-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+.tg-field-error {
+    color: #b42318;
+    font-weight: 700;
+}
+
+.tg-payment-layout {
+    grid-template-columns: minmax(280px, 0.65fr) minmax(0, 1.35fr);
+}
+
+.tg-payment-summary {
+    order: -1;
+}
+
+.tg-payment-form {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.tg-payment-method-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.tg-payment-method-card,
+.tg-method-details {
+    padding: 1rem;
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-sm);
+    background: var(--tg-sage);
+}
+
+.tg-payment-method-card h3 {
+    font-size: 1.15rem;
+}
+
+.tg-payment-method-card img {
+    display: block;
+    width: min(100%, 220px);
+    aspect-ratio: 1;
+    margin: 1rem auto;
+    object-fit: contain;
+}
+
+.tg-payment-empty {
+    min-height: 26rem;
+}
+
+.tg-status-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1.5rem;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.tg-status-card__mark {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--tg-mint-soft);
+    color: var(--tg-emerald);
+    font-size: 1.4rem;
+    font-weight: 900;
+}
+
+@media (max-width: 991.98px) {
+    .tg-search-card__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tg-search-card__grid .tg-button {
+        grid-column: 1 / -1;
+    }
+
+    .tg-booking-layout,
+    .tg-payment-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-stay-summary,
+    .tg-payment-summary {
+        position: static;
+        order: -1;
+    }
+
+    .tg-selected-result { grid-template-columns: 1fr; }
+    .tg-selected-result > img { min-height: 0; aspect-ratio: 16 / 10; }
+}
+
+@media (max-width: 767.98px) {
+    .tg-availability-card,
+    .tg-selected-room {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tg-availability-card .tg-button,
+    .tg-action-row .tg-button {
+        flex: 1 1 100%;
+    }
+
+    .tg-payment-method-list {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-availability-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 575.98px) {
+    .tg-search-card {
+        margin-top: -4rem;
+    }
+
+    .tg-search-card__grid,
+    .tg-form-grid--booking {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-field--wide {
+        grid-column: auto;
+    }
+
+    .tg-status-card {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-progress li {
+        font-size: 0.7rem;
+    }
+}

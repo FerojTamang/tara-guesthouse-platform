@@ -30,7 +30,7 @@ final readonly class PublicRoomCatalogService
     /** @return array<string, mixed> */
     public function get(string $slug): array
     {
-        if (preg_match('/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/D', $slug) !== 1) {
+        if (!PublicRoomSlug::isCanonical($slug)) {
             throw PublicRoomCatalogException::notFound();
         }
         try {
@@ -42,17 +42,59 @@ final readonly class PublicRoomCatalogService
     }
 
     /** @return array<string, mixed> */
+    public function getById(int $roomId): array
+    {
+        if ($roomId <= 0) {
+            throw PublicRoomCatalogException::notFound();
+        }
+
+        try {
+            foreach ($this->rooms->findAllPublic() as $room) {
+                if ($room->id() === $roomId) {
+                    return $this->map($room, true);
+                }
+            }
+
+            throw PublicRoomCatalogException::notFound();
+        } catch (PublicRoomCatalogException $failure) {
+            throw $failure;
+        } catch (Throwable $failure) {
+            throw PublicRoomCatalogException::failure($failure);
+        }
+    }
+
+    /** @return array<string, mixed> */
     private function map(\App\Models\Room $room, bool $detail): array
     {
         $primary = $this->images->findPrimaryByRoomId($room->id());
         $images = $detail ? $this->images->findAllByRoomId($room->id()) : [];
+        $primaryUrl = $primary === null ? self::PLACEHOLDER : $this->safeImageUrl($primary->filePath());
+        $publicImages = [];
+        $seenUrls = [];
+
+        foreach ($images as $image) {
+            $url = $this->safeImageUrl($image->filePath());
+
+            if ($url === self::PLACEHOLDER || isset($seenUrls[$url])) {
+                continue;
+            }
+
+            $seenUrls[$url] = true;
+            $publicImages[] = [
+                'url' => $url,
+                'altText' => $image->altText() ?? $room->name(),
+                'isPrimary' => $url === $primaryUrl,
+            ];
+        }
+
         return [
             'name' => $room->name(), 'slug' => $room->slug(), 'description' => $room->description() ?? '',
             'roomTypeName' => $room->roomType()->name(), 'pricePerNight' => $room->pricePerNight(),
             'capacityAdults' => $room->capacityAdults(), 'capacityChildren' => $room->capacityChildren(),
             'amenities' => array_map(static fn ($amenity): array => ['name' => $amenity->name()], $this->rooms->findActiveAmenitiesByRoomId($room->id())),
-            'primaryImageUrl' => $primary === null ? self::PLACEHOLDER : $this->safeImageUrl($primary->filePath()),
-            'images' => array_map(fn ($image): array => ['url' => $this->safeImageUrl($image->filePath()), 'altText' => $image->altText() ?? $room->name()], $images),
+            'primaryImageUrl' => $primaryUrl,
+            'images' => $publicImages,
+            'imageCount' => count($publicImages),
         ];
     }
 

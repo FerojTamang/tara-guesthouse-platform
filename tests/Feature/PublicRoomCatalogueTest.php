@@ -134,10 +134,58 @@ final class PublicRoomCatalogueTest extends TestCase
     public function testDetailAndAllIneligibleSlugsReturnSafeExpectedResponses(): void
     {
         $room = $this->room('Garden', 'garden-room', 'A room'); $this->rooms->method('findPublicBySlug')->willReturnCallback(fn (string $slug) => $slug === 'garden-room' ? $room : null); $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([$this->amenity('Wi-Fi')]); $this->images->method('findPrimaryByRoomId')->willReturn($this->image()); $this->images->method('findAllByRoomId')->willReturn([$this->image()]);
-        $detail = $this->router->dispatch(Request::create('GET', '/rooms/garden-room'));
+        $detail = $this->router->dispatch(Request::create('GET', '/rooms/garden-room?check_in=2026-08-10&check_out=2026-08-12&adults=2&children=0'));
         self::assertSame(200, $detail->statusCode()); self::assertSame('no-store', $detail->headers()['Cache-Control']); self::assertStringContainsString('NPR 6200.00', $detail->body()); self::assertStringContainsString('Deluxe', $detail->body()); self::assertStringContainsString('Wi-Fi', $detail->body());
+        self::assertStringContainsString('method="get" action="/availability"', $detail->body());
+        self::assertStringContainsString('type="hidden" name="room" value="garden-room"', $detail->body());
+        self::assertStringContainsString('value="2026-08-10"', $detail->body());
+        self::assertStringContainsString('value="2026-08-12"', $detail->body());
+        self::assertStringContainsString('Check This Room’s Availability', $detail->body());
+        self::assertStringContainsString('/assets/css/pages/room-detail.css', $detail->body());
+        self::assertSame(1, substr_count($detail->body(), '<h1'));
+        self::assertStringNotContainsString('101', $detail->body());
+        self::assertStringNotContainsString('operational_status', $detail->body());
+        self::assertStringNotContainsString('is_published', $detail->body());
         foreach (['/rooms/Malformed', '/rooms/missing-room', '/rooms/draft-room', '/rooms/maintenance-room', '/rooms/inactive-room', '/rooms/deleted-room'] as $path) { $response = $this->router->dispatch(Request::create('GET', $path)); self::assertSame(404, $response->statusCode()); self::assertSame('Not Found', $response->body()); self::assertSame('no-store', $response->headers()['Cache-Control']); }
         self::assertSame(405, $this->router->dispatch(Request::create('POST', '/rooms'))->statusCode());
+    }
+
+    public function testDetailRendersFiveImageGalleryAndAccessibleViewerInBackendOrder(): void
+    {
+        $room = $this->room('Garden', 'garden-room', 'A room');
+        $this->rooms->method('findPublicBySlug')->willReturn($room);
+        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
+        $images = [];
+
+        foreach (range('a', 'f') as $index => $character) {
+            $images[] = new RoomImage(
+                $index + 1,
+                1,
+                'uploads/rooms/' . str_repeat($character, 64) . '.png',
+                'Photo ' . ($index + 1),
+                $index,
+                $index === 0,
+                new DateTimeImmutable('2026-07-23 UTC'),
+            );
+        }
+
+        $this->images->method('findPrimaryByRoomId')->willReturn($images[0]);
+        $this->images->method('findAllByRoomId')->willReturn($images);
+
+        $body = $this->router->dispatch(Request::create('GET', '/rooms/garden-room'))->body();
+
+        self::assertSame(5, substr_count($body, 'class="tg-room-gallery__item'));
+        self::assertStringContainsString('6 photos', $body);
+        self::assertStringContainsString('View all photos', $body);
+        self::assertStringContainsString('role="dialog" aria-modal="true"', $body);
+        self::assertStringContainsString('data-photo-previous', $body);
+        self::assertStringContainsString('data-photo-next', $body);
+        self::assertStringContainsString('/assets/js/pages/room-detail.js', $body);
+        foreach (range('a', 'f') as $character) {
+            self::assertStringContainsString('/uploads/rooms/' . str_repeat($character, 64) . '.png', $body);
+        }
+        self::assertStringNotContainsString('storage/', $body);
+        self::assertStringNotContainsString('C:\\', $body);
     }
 
     private function room(string $name, string $slug, ?string $description, int $id = 1): Room { $t = new DateTimeImmutable('2026-07-23 UTC'); return new Room($id, new RoomType(1, 'Deluxe', 'deluxe', null, '5000.00', 2, 1, true, $t, $t), '101', $name, $slug, $description, '6200.00', 2, 1, Room::STATUS_ACTIVE, true, $t, $t, null); }

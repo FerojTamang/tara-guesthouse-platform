@@ -14,6 +14,11 @@ use App\Exceptions\BookingException;
 use App\Middleware\CsrfMiddleware;
 use App\Middleware\PublicBookingRateLimitMiddleware;
 use App\Models\Booking;
+use App\Models\Room;
+use App\Models\RoomType;
+use App\Presentation\RoomImageUrl;
+use App\Repositories\RoomCatalogRepository;
+use App\Repositories\RoomImageCatalogRepository;
 use App\Requests\GuestBookingRequest;
 use App\Services\BookingAccessToken;
 use App\Services\BookingSubmissionWorkflow;
@@ -22,11 +27,15 @@ use App\Services\BookingSubmitter;
 use App\Services\BookingSuccessFlash;
 use App\Services\GuestPaymentContinuation;
 use App\Services\PublicBookingRateLimiter;
+use App\Services\PublicRoomCatalogService;
+use App\Services\PublicRoomCatalogServiceProvider;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use RuntimeException;
 
 #[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
@@ -45,6 +54,8 @@ final class PublicBookingPageTest extends TestCase
     private GuestPaymentContinuation $paymentContinuation;
 
     private PublicBookingPageSubmitterFake $submitter;
+
+    private PublicBookingPageLoggerFake $logger;
 
     protected function setUp(): void
     {
@@ -65,7 +76,13 @@ final class PublicBookingPageTest extends TestCase
         $this->tokens = new CsrfTokenManager($this->session);
         $this->paymentContinuation = new GuestPaymentContinuation($this->session);
         $this->submitter = new PublicBookingPageSubmitterFake();
+        $this->logger = new PublicBookingPageLoggerFake();
         $timezone = new DateTimeZone('Asia/Kathmandu');
+        $rooms = $this->createStub(RoomCatalogRepository::class);
+        $rooms->method('findAllPublic')->willReturn([self::room()]);
+        $images = $this->createStub(RoomImageCatalogRepository::class);
+        $images->method('findPrimaryByRoomId')->willReturn(null);
+        $images->method('findAllByRoomId')->willReturn([]);
         $controller = new PublicBookingPageController(
             new ViewRenderer(
                 dirname(__DIR__, 2)
@@ -83,6 +100,14 @@ final class PublicBookingPageTest extends TestCase
             new BookingSuccessFlash($this->session, $timezone),
             $this->paymentContinuation,
             $this->tokens,
+            new PublicRoomCatalogServiceProvider(
+                static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                    $rooms,
+                    $images,
+                    new RoomImageUrl(),
+                ),
+            ),
+            $this->logger,
         );
 
         $this->router = new Router();
@@ -146,13 +171,29 @@ final class PublicBookingPageTest extends TestCase
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('no-store', $response->headers()['Cache-Control']);
-        self::assertStringContainsString('Request your stay', $response->body());
-        self::assertStringContainsString('value="12"', $response->body());
+        self::assertStringContainsString('Tell us about your stay', $response->body());
+        self::assertStringContainsString('Deluxe Garden Room', $response->body());
+        self::assertStringContainsString('NPR 4500.00', $response->body());
+        self::assertStringContainsString('type="hidden" name="room_id" value="12"', $response->body());
+        self::assertStringNotContainsString('type="number" name="room_id"', $response->body());
         self::assertStringContainsString('value="2026-08-10"', $response->body());
         self::assertStringContainsString(
             'value="' . $this->tokens->token() . '"',
             $response->body(),
         );
+    }
+
+    public function testMissingOrIneligibleRoomSelectionShowsChooseRoomState(): void
+    {
+        $missing = $this->router->dispatch(Request::create('GET', '/booking'));
+        $invalid = $this->router->dispatch(Request::create('GET', '/booking?room_id=999'));
+
+        foreach ([$missing, $invalid] as $response) {
+            self::assertSame(200, $response->statusCode());
+            self::assertStringContainsString('Choose a room first', $response->body());
+            self::assertStringNotContainsString('name="room_id"', $response->body());
+            self::assertStringNotContainsString('Room ID', $response->body());
+        }
     }
 
     public function testPostRequiresCsrfBeforeConsumingRateLimit(): void
@@ -256,6 +297,8 @@ final class PublicBookingPageTest extends TestCase
             'not-an-email',
             $validation->body(),
         );
+        self::assertStringContainsString('href="#guest_email"', $validation->body());
+        self::assertStringContainsString('Deluxe Garden Room', $validation->body());
 
         $this->submitter->failure = BookingException::roomUnavailable();
         $conflictInput = self::input();
@@ -276,6 +319,32 @@ final class PublicBookingPageTest extends TestCase
         );
     }
 
+    public function testUnexpectedFailureIsLoggedAndReturnsOnlySafePublicError(): void
+    {
+        $this->submitter->failure = BookingException::failure(
+            new RuntimeException('SQLSTATE private C:\\storage\\secret'),
+        );
+        $input = self::input();
+        $input['_csrf'] = $this->tokens->token();
+
+        $response = $this->router->dispatch(Request::create(
+            'POST',
+            '/booking',
+            input: $input,
+            remoteAddress: '203.0.113.14',
+        ));
+
+        self::assertSame(500, $response->statusCode());
+        self::assertSame('Internal Server Error', $response->body());
+        self::assertStringNotContainsString('SQLSTATE', $response->body());
+        self::assertStringNotContainsString('storage', $response->body());
+        self::assertStringNotContainsString('secret', $response->body());
+        self::assertCount(1, $this->logger->records);
+        self::assertSame('error', $this->logger->records[0]['level']);
+        self::assertSame('Public booking submission failed.', $this->logger->records[0]['message']);
+        self::assertInstanceOf(BookingException::class, $this->logger->records[0]['context']['exception']);
+    }
+
     /** @return array<string, mixed> */
     private static function input(): array
     {
@@ -291,6 +360,29 @@ final class PublicBookingPageTest extends TestCase
             'special_request' => 'Late arrival.',
             'terms_accepted' => '1',
         ];
+    }
+
+    private static function room(): Room
+    {
+        $timestamp = new DateTimeImmutable('2026-07-01 10:00:00 UTC');
+        $type = new RoomType(1, 'Deluxe', 'deluxe', null, '4500.00', 2, 1, true, $timestamp, $timestamp);
+
+        return new Room(
+            12,
+            $type,
+            'D-12',
+            'Deluxe Garden Room',
+            'deluxe-garden-room',
+            'A private garden-facing room.',
+            '4500.00',
+            2,
+            1,
+            Room::STATUS_ACTIVE,
+            true,
+            $timestamp,
+            $timestamp,
+            null,
+        );
     }
 
     /** @return array<string, mixed> */
@@ -315,6 +407,22 @@ final class PublicBookingPageTest extends TestCase
             'save_handler' => 'files',
             'save_path' => realpath($this->sessionPath),
             'gc_maxlifetime' => 43200,
+        ];
+    }
+}
+
+final class PublicBookingPageLoggerFake extends AbstractLogger
+{
+    /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+    public array $records = [];
+
+    /** @param array<string, mixed> $context */
+    public function log($level, string|\Stringable $message, array $context = []): void
+    {
+        $this->records[] = [
+            'level' => $level,
+            'message' => (string) $message,
+            'context' => $context,
         ];
     }
 }

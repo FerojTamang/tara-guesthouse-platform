@@ -2,6 +2,8 @@
 <?php
 $isHomePage = ($isHome ?? false) === true;
 $isRoomsPage = ($isRooms ?? false) === true;
+$isRoomDetailPage = ($isRoomDetail ?? false) === true;
+$isBookingFlowPage = ($isBookingFlow ?? false) === true;
 $isImmersivePublicPage = $isHomePage || $isRoomsPage;
 ?>
 <html lang="en">
@@ -47,8 +49,14 @@ $isImmersivePublicPage = $isHomePage || $isRoomsPage;
     <?php if ($isRoomsPage): ?>
     <link rel="stylesheet" href="/assets/css/pages/rooms.css">
     <?php endif; ?>
+    <?php if ($isRoomDetailPage): ?>
+    <link rel="stylesheet" href="/assets/css/pages/room-detail.css">
+    <?php endif; ?>
+    <?php if ($isBookingFlowPage): ?>
+    <link rel="stylesheet" href="/assets/css/pages/booking-flow.css">
+    <?php endif; ?>
 </head>
-<body class="<?= $isHomePage ? 'tg-page-home' : ($isRoomsPage ? 'tg-page-rooms' : 'tg-page-public') ?>">
+<body class="<?= $isHomePage ? 'tg-page-home' : ($isRoomDetailPage ? 'tg-page-room-detail' : ($isRoomsPage ? 'tg-page-rooms' : ($isBookingFlowPage ? 'tg-page-booking-flow' : 'tg-page-public'))) ?>">
     <a class="tg-skip-link" href="#main-content">Skip to main content</a>
     <?php if (($showPublicNavigation ?? true) === true): ?>
     <header class="tg-public-header<?= $isImmersivePublicPage ? ' tg-public-header--overlay' : '' ?>" data-public-header>
@@ -88,7 +96,7 @@ $isImmersivePublicPage = $isHomePage || $isRoomsPage;
         </nav>
     </header>
     <?php endif; ?>
-    <main id="main-content" class="<?= $isHomePage ? 'tg-main tg-main--home' : ($isRoomsPage ? 'tg-main tg-main--rooms' : 'tg-main tg-container tg-page-shell') ?>" tabindex="-1">
+    <main id="main-content" class="<?= $isHomePage ? 'tg-main tg-main--home' : ($isRoomsPage ? 'tg-main tg-main--rooms' : ($isBookingFlowPage ? 'tg-main tg-main--journey' : 'tg-main tg-container tg-page-shell')) ?>" tabindex="-1">
         <?= $content ?>
     </main>
     <?php if (($showPublicNavigation ?? true) === true): ?>
@@ -160,6 +168,9 @@ $isImmersivePublicPage = $isHomePage || $isRoomsPage;
     <?php endif; ?>
     <?php if ($isHomePage): ?>
     <script src="/assets/js/pages/home.js" defer></script>
+    <?php endif; ?>
+    <?php if ($isRoomDetailPage): ?>
+    <script src="/assets/js/pages/room-detail.js" defer></script>
     <?php endif; ?>
 </body>
 </html>

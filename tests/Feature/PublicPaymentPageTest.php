@@ -57,6 +57,9 @@ final class PublicPaymentPageTest extends TestCase
 
     private string $bookingAccessToken;
 
+    /** @var list<PaymentMethod> */
+    private array $activePaymentMethods = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -88,11 +91,14 @@ final class PublicPaymentPageTest extends TestCase
                 ? $this->booking
                 : null,
         );
+        $this->activePaymentMethods = [
+            self::method(7, 'Bank Transfer', false, 'storage/private/secret.png'),
+            self::method(8, 'Digital Wallet', true, 'payment-methods/wallet.png'),
+        ];
         $paymentMethods = $this->createStub(PaymentMethodCatalogRepository::class);
-        $paymentMethods->method('findAllActive')->willReturn([
-            self::method(7, 'Bank Transfer', false),
-            self::method(8, 'Digital Wallet', true),
-        ]);
+        $paymentMethods->method('findAllActive')->willReturnCallback(
+            fn (): array => $this->activePaymentMethods,
+        );
         $pageServices = new GuestPaymentPageServiceProvider(
             fn (): GuestPaymentPageService => new GuestPaymentPageService(
                 $bookings,
@@ -202,6 +208,8 @@ final class PublicPaymentPageTest extends TestCase
         self::assertStringContainsString('Digital Wallet — proof required', $response->body());
         self::assertStringContainsString('Use the configured account.', $response->body());
         self::assertStringContainsString('TGH-ACCOUNT-8', $response->body());
+        self::assertStringContainsString('src="/payment-methods/wallet.png"', $response->body());
+        self::assertStringNotContainsString('storage/private/secret.png', $response->body());
         self::assertStringContainsString(
             'value="' . $this->tokens->token() . '"',
             $response->body(),
@@ -213,6 +221,24 @@ final class PublicPaymentPageTest extends TestCase
         self::assertStringNotContainsString('name="amount"', $response->body());
         self::assertStringNotContainsString('payment_status', $response->body());
         self::assertStringNotContainsString('guest@example.test', $response->body());
+    }
+
+    public function testPaymentPageWithNoActiveMethodsShowsExplicitNonSubmittableState(): void
+    {
+        $this->activePaymentMethods = [];
+        $this->storeContinuation();
+
+        $response = $this->router->dispatch(
+            Request::create('GET', '/booking/payment'),
+        );
+
+        self::assertSame(200, $response->statusCode());
+        self::assertStringContainsString('Payment instructions are unavailable', $response->body());
+        self::assertStringContainsString('TGH-7F3A9C2D', $response->body());
+        self::assertStringContainsString('/contact', $response->body());
+        self::assertStringNotContainsString('name="payment_method_id"', $response->body());
+        self::assertStringNotContainsString('Submit payment for review', $response->body());
+        self::assertStringNotContainsString($this->bookingAccessToken, $response->body());
     }
 
     public function testPostRequiresCsrfBeforeConsumingPaymentRateLimit(): void
@@ -282,6 +308,9 @@ final class PublicPaymentPageTest extends TestCase
         self::assertStringContainsString('TGH-7F3A9C2D', $success->body());
         self::assertStringContainsString('submitted', $success->body());
         self::assertStringContainsString('NPR 18000.00', $success->body());
+        self::assertStringContainsString('does not confirm or guarantee the room', $success->body());
+        self::assertStringNotContainsString('booking confirmed', strtolower($success->body()));
+        self::assertStringNotContainsString('payment verified', strtolower($success->body()));
         self::assertStringNotContainsString($this->bookingAccessToken, $success->body());
         self::assertStringNotContainsString('BANK-001', $success->body());
         self::assertStringNotContainsString('Transferred today', $success->body());
@@ -424,6 +453,7 @@ final class PublicPaymentPageTest extends TestCase
         int $id,
         string $name,
         bool $requiresProof,
+        ?string $qrImagePath = null,
     ): PaymentMethod {
         $timestamp = self::timestamp('2026-07-28 06:00:00');
 
@@ -432,7 +462,7 @@ final class PublicPaymentPageTest extends TestCase
             $name,
             'Use the configured account.',
             'TGH-ACCOUNT-' . $id,
-            null,
+            $qrImagePath,
             $requiresProof,
             true,
             $timestamp,

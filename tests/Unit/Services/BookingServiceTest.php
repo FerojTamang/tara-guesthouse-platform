@@ -276,4 +276,12 @@ final class BookingServiceAvailabilityFake implements AvailabilityRepository
 
         return $this->blocking;
     }
+
+    public function findBlockingStayPeriods(
+        int $roomId,
+        StayPeriod $window,
+        DateTimeImmutable $asOf,
+    ): array {
+        return [];
+    }
 }

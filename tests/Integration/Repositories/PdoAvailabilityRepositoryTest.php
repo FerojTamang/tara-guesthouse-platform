@@ -212,6 +212,38 @@ final class PdoAvailabilityRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $this->repository->findAvailableRoomIds($period, 1, 0, $asOf));
     }
 
+    public function testCalendarRangesUseTheCanonicalBlockingStatusesAndExclusiveBoundaries(): void
+    {
+        $roomId = $this->insertRoom('350');
+        $asOf = self::timestamp('2026-08-01 12:00:00');
+        $window = self::period('2026-08-10', '2026-08-20');
+
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CONFIRMED, '2026-08-09', '2026-08-11', '2026-07-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CHECKED_IN, '2026-08-12', '2026-08-14', '2026-07-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_PENDING, '2026-08-15', '2026-08-16', '2026-08-01 12:00:01');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_PENDING, '2026-08-16', '2026-08-17', '2026-08-01 12:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CHECKED_OUT, '2026-08-17', '2026-08-18', '2026-09-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CANCELLED, '2026-08-18', '2026-08-19', '2026-09-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_REJECTED, '2026-08-19', '2026-08-20', '2026-09-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CONFIRMED, '2026-08-08', '2026-08-10', '2026-07-01 00:00:00');
+        $this->insertBookingForRoom($roomId, Booking::STATUS_CONFIRMED, '2026-08-20', '2026-08-21', '2026-07-01 00:00:00');
+
+        $periods = $this->repository->findBlockingStayPeriods($roomId, $window, $asOf);
+
+        self::assertSame([
+            ['2026-08-09', '2026-08-11'],
+            ['2026-08-12', '2026-08-14'],
+            ['2026-08-15', '2026-08-16'],
+        ], array_map(
+            static fn (StayPeriod $period): array => [
+                $period->checkIn()->format('Y-m-d'),
+                $period->checkOut()->format('Y-m-d'),
+            ],
+            $periods,
+        ));
+        self::assertSame([], $this->repository->findBlockingStayPeriods(0, $window, $asOf));
+    }
+
     public function testNonUtcClockAndDatabaseFailuresExposeOnlyStableMessages(): void
     {
         $roomId = $this->insertRoom('401');
@@ -230,6 +262,13 @@ final class PdoAvailabilityRepositoryTest extends DatabaseTestCase
             self::fail('Expected a sanitized non-UTC overlap failure.');
         } catch (DatabaseException $exception) {
             self::assertSame('The booking overlap lookup failed.', $exception->getMessage());
+        }
+
+        try {
+            $this->repository->findBlockingStayPeriods($roomId, $period, $nonUtc);
+            self::fail('Expected a sanitized non-UTC calendar failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The availability calendar lookup failed.', $exception->getMessage());
         }
 
         $this->dropTables(['booking_rooms']);
@@ -256,6 +295,19 @@ final class PdoAvailabilityRepositoryTest extends DatabaseTestCase
             self::fail('Expected a sanitized overlap database failure.');
         } catch (DatabaseException $exception) {
             self::assertSame('The booking overlap lookup failed.', $exception->getMessage());
+            self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
+        }
+
+
+        try {
+            $this->repository->findBlockingStayPeriods(
+                $roomId,
+                $period,
+                self::timestamp('2026-08-01 12:00:00'),
+            );
+            self::fail('Expected a sanitized calendar database failure.');
+        } catch (DatabaseException $exception) {
+            self::assertSame('The availability calendar lookup failed.', $exception->getMessage());
             self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
         }
     }

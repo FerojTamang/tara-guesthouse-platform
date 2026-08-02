@@ -13,6 +13,8 @@ use App\Requests\GuestBookingRequest;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
 use App\Services\GuestPaymentContinuation;
+use App\Services\PublicRoomCatalogServiceProvider;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
@@ -26,6 +28,8 @@ final readonly class PublicBookingPageController
         private BookingSuccessFlash $successFlash,
         private GuestPaymentContinuation $paymentContinuation,
         private CsrfTokenManager $csrfTokens,
+        private ?PublicRoomCatalogServiceProvider $roomCatalog = null,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -73,6 +77,7 @@ final readonly class PublicBookingPageController
                     $values,
                     $exception->getMessage(),
                     422,
+                    $this->errorField($exception->getMessage()),
                 );
             }
 
@@ -92,12 +97,16 @@ final readonly class PublicBookingPageController
                 );
             }
 
+            $this->logUnexpectedFailure($exception);
+
             return Response::text(
                 'Internal Server Error',
                 500,
                 ['Cache-Control' => 'no-store'],
             );
-        } catch (Throwable) {
+        } catch (Throwable $failure) {
+            $this->logUnexpectedFailure($failure);
+
             return Response::text(
                 'Internal Server Error',
                 500,
@@ -124,6 +133,7 @@ final readonly class PublicBookingPageController
             [
                 'title' => 'Booking received | Tara Guest House',
                 'booking' => $booking,
+                'isBookingFlow' => true,
             ],
             'layouts.base',
         );
@@ -200,7 +210,9 @@ final readonly class PublicBookingPageController
         array $values,
         ?string $error,
         int $statusCode = 200,
+        ?string $errorField = null,
     ): Response {
+        $room = $this->roomSummary($values['roomId'] ?? '');
         $html = $this->views->render(
             'public.booking.form',
             [
@@ -208,6 +220,9 @@ final readonly class PublicBookingPageController
                 'csrfToken' => $this->csrfTokens->token(),
                 'values' => $values,
                 'error' => $error,
+                'errorField' => $errorField,
+                'room' => $room,
+                'isBookingFlow' => true,
             ],
             'layouts.base',
         );
@@ -217,5 +232,57 @@ final readonly class PublicBookingPageController
             $statusCode,
             ['Cache-Control' => 'no-store'],
         );
+    }
+
+    private function errorField(string $message): string
+    {
+        return match (true) {
+            str_contains($message, 'full name') => 'guest_full_name',
+            str_contains($message, 'email') => 'guest_email',
+            str_contains($message, 'phone') => 'guest_phone',
+            str_contains($message, 'Check-in') => 'check_in',
+            str_contains($message, 'Check-out') => 'check_out',
+            str_contains($message, 'Adult') => 'adults',
+            str_contains($message, 'Children') => 'children',
+            str_contains($message, 'Special request') => 'special_request',
+            str_contains($message, 'Terms') => 'terms_accepted',
+            default => 'check_in',
+        };
+    }
+
+    private function logUnexpectedFailure(Throwable $failure): void
+    {
+        if ($this->logger === null) {
+            error_log('Public booking submission failed.');
+
+            return;
+        }
+
+        try {
+            $this->logger->error(
+                'Public booking submission failed.',
+                ['exception' => $failure],
+            );
+        } catch (Throwable) {
+            error_log('Public booking submission failure logging failed.');
+        }
+    }
+
+    /** @return ?array<string, mixed> */
+    private function roomSummary(string $roomId): ?array
+    {
+        if (
+            $this->roomCatalog === null
+            || preg_match('/\A[1-9][0-9]*\z/D', $roomId) !== 1
+            || strlen($roomId) > 10
+        ) {
+            return null;
+        }
+
+        try {
+            return $this->roomCatalog->service()->getById((int) $roomId);
+        } catch (\App\Exceptions\PublicRoomCatalogException) {
+            return null;
+        }
     }
 }

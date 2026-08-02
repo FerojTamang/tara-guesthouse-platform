@@ -197,4 +197,12 @@ final class AvailabilityServiceRepositoryFake implements AvailabilityRepository
     ): bool {
         return false;
     }
+
+    public function findBlockingStayPeriods(
+        int $roomId,
+        StayPeriod $window,
+        DateTimeImmutable $asOf,
+    ): array {
+        return [];
+    }
 }

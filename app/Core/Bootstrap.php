@@ -686,12 +686,20 @@ final class Bootstrap
         );
         $publicAvailabilityController = new PublicAvailabilityController(
             new PublicAvailabilityServiceProvider(
-                static fn (): PublicAvailabilityService => new PublicAvailabilityService(
-                    new AvailabilityService(
-                        new PdoAvailabilityRepository($catalogConnectionProvider()),
-                    ),
-                    new RoomRepository($catalogConnectionProvider()),
-                ),
+                static function () use (
+                    $catalogConnectionProvider,
+                    $publicRoomServices,
+                ): PublicAvailabilityService {
+                    $connection = $catalogConnectionProvider();
+                    $availability = new PdoAvailabilityRepository($connection);
+
+                    return new PublicAvailabilityService(
+                        new AvailabilityService($availability),
+                        new RoomRepository($connection),
+                        $publicRoomServices,
+                        $availability,
+                    );
+                },
             ),
             $viewRenderer,
         );
@@ -753,6 +761,8 @@ final class Bootstrap
             new BookingSuccessFlash($session, $responseTimezone),
             $paymentContinuation,
             $csrfTokens,
+            $publicRoomServices,
+            $logger,
         );
         $publicPaymentServices = new GuestPaymentSubmissionServiceProvider(
             static function () use (

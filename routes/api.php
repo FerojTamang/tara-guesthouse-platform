@@ -260,6 +260,10 @@ return static function (
 
     if ($publicAvailability !== null) {
         $router->get('/api/v1/availability', $publicAvailability->index(...));
+        $router->get(
+            '/api/v1/rooms/{slug}/availability-calendar',
+            $publicAvailability->calendar(...),
+        );
     }
 
     if ($publicPaymentMethods !== null) {

@@ -33,4 +33,15 @@ interface AvailabilityRepository
         StayPeriod $stayPeriod,
         DateTimeImmutable $asOf,
     ): bool;
+
+    /**
+     * Returns ordered blocking stay ranges overlapping one bounded public calendar window.
+     *
+     * @return list<StayPeriod>
+     */
+    public function findBlockingStayPeriods(
+        int $roomId,
+        StayPeriod $window,
+        DateTimeImmutable $asOf,
+    ): array;
 }

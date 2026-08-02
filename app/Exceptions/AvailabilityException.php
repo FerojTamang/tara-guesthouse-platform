@@ -30,6 +30,11 @@ final class AvailabilityException extends RuntimeException
         return new self('Availability operation failed.', 'system', $previous);
     }
 
+    public static function notFound(): self
+    {
+        return new self('The requested room was not found.', 'not_found');
+    }
+
     public function isValidationFailure(): bool
     {
         return $this->category === 'validation';
@@ -38,5 +43,10 @@ final class AvailabilityException extends RuntimeException
     public function isSystemFailure(): bool
     {
         return $this->category === 'system';
+    }
+
+    public function isNotFound(): bool
+    {
+        return $this->category === 'not_found';
     }
 }

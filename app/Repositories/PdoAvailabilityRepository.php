@@ -125,6 +125,61 @@ final class PdoAvailabilityRepository implements AvailabilityRepository
         }
     }
 
+    public function findBlockingStayPeriods(
+        int $roomId,
+        StayPeriod $window,
+        DateTimeImmutable $asOf,
+    ): array {
+        if ($roomId <= 0) {
+            return [];
+        }
+
+        $this->assertUtc($asOf, 'The availability calendar lookup failed.');
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT b.check_in, b.check_out '
+                . 'FROM booking_rooms br '
+                . 'INNER JOIN bookings b ON b.id = br.booking_id '
+                . 'WHERE br.room_id = :room_id AND '
+                . self::BLOCKING_BOOKING_FILTER
+                . ' ORDER BY b.check_in ASC, b.check_out ASC, b.id ASC',
+            );
+            $statement->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            $this->bindPeriod($statement, $window, $asOf);
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The availability calendar ranges could not be mapped.');
+            }
+
+            $periods = [];
+
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The availability calendar ranges could not be mapped.');
+                }
+
+                $checkIn = $row['check_in'] ?? null;
+                $checkOut = $row['check_out'] ?? null;
+
+                if (!is_string($checkIn) || !is_string($checkOut)) {
+                    throw new RuntimeException('The availability calendar ranges could not be mapped.');
+                }
+
+                $periods[] = new StayPeriod(
+                    new DateTimeImmutable($checkIn . ' 00:00:00 UTC'),
+                    new DateTimeImmutable($checkOut . ' 00:00:00 UTC'),
+                );
+            }
+
+            return $periods;
+        } catch (Throwable) {
+            throw new DatabaseException('The availability calendar lookup failed.');
+        }
+    }
+
     private function bindPeriod(
         \PDOStatement $statement,
         StayPeriod $stayPeriod,

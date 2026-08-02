@@ -33,10 +33,12 @@ final readonly class PublicAvailabilityController
                 $request->query('children'),
             );
 
+            $roomSlug = $this->roomSlug($request->query('room'));
+
             return Response::json(
                 [
                     'success' => true,
-                    'data' => $this->services->service()->search($validated),
+                    'data' => $this->services->service()->search($validated, $roomSlug),
                 ],
                 200,
                 ['Cache-Control' => 'no-store'],
@@ -68,6 +70,47 @@ final readonly class PublicAvailabilityController
     }
 
     /** @param array<string, string> $parameters */
+    public function calendar(Request $request, array $parameters): Response
+    {
+        try {
+            return Response::json(
+                $this->services->service()->calendar(
+                    $parameters['slug'] ?? '',
+                    $request->query('from'),
+                    $request->query('to'),
+                ),
+                200,
+                ['Cache-Control' => 'no-store'],
+            );
+        } catch (AvailabilityException $exception) {
+            if ($exception->isNotFound()) {
+                return Response::json(
+                    ['message' => 'Not Found.'],
+                    404,
+                    ['Cache-Control' => 'no-store'],
+                );
+            }
+
+            if ($exception->isValidationFailure()) {
+                return Response::json(
+                    [
+                        'message' => 'Validation failed.',
+                        'errors' => ['calendar' => [$exception->getMessage()]],
+                    ],
+                    422,
+                    ['Cache-Control' => 'no-store'],
+                );
+            }
+
+            return Response::json(
+                ['message' => 'Internal Server Error.'],
+                500,
+                ['Cache-Control' => 'no-store'],
+            );
+        }
+    }
+
+    /** @param array<string, string> $parameters */
     public function page(Request $request, array $parameters): Response
     {
         if ($this->views === null) {
@@ -92,7 +135,10 @@ final readonly class PublicAvailabilityController
                 $request->query('adults'),
                 $request->query('children'),
             );
+            $roomSlug = $this->roomSlug($request->query('room'));
+            $context = $this->services->service()->searchContext($validated, $roomSlug);
             $values = [
+                'room' => $roomSlug ?? '',
                 'checkIn' => $validated->checkIn()->format('Y-m-d'),
                 'checkOut' => $validated->checkOut()->format('Y-m-d'),
                 'adults' => (string) $validated->adults(),
@@ -101,9 +147,11 @@ final readonly class PublicAvailabilityController
 
             return $this->pageResponse(
                 $values,
-                $this->services->service()->search($validated),
+                $context['rooms'],
                 null,
                 true,
+                200,
+                $context['selectedRoom'],
             );
         } catch (AvailabilityException $exception) {
             if ($exception->isValidationFailure()) {
@@ -125,16 +173,30 @@ final readonly class PublicAvailabilityController
     }
 
     /**
-     * @return array{checkIn: string, checkOut: string, adults: string, children: string}
+     * @return array{room: string, checkIn: string, checkOut: string, adults: string, children: string}
      */
     private function pageValues(Request $request): array
     {
         return [
+            'room' => $this->displayValue($request->query('room')),
             'checkIn' => $this->displayValue($request->query('check_in')),
             'checkOut' => $this->displayValue($request->query('check_out')),
             'adults' => $this->displayValue($request->query('adults', '1')),
             'children' => $this->displayValue($request->query('children', '0')),
         ];
+    }
+
+    private function roomSlug(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_string($value)) {
+            throw AvailabilityException::invalidInput('The selected room is unavailable.');
+        }
+
+        return $value;
     }
 
     private function displayValue(mixed $value): string
@@ -147,7 +209,7 @@ final readonly class PublicAvailabilityController
     }
 
     /**
-     * @param array{checkIn: string, checkOut: string, adults: string, children: string} $values
+     * @param array{room: string, checkIn: string, checkOut: string, adults: string, children: string} $values
      * @param list<array<string, mixed>> $rooms
      */
     private function pageResponse(
@@ -156,6 +218,7 @@ final readonly class PublicAvailabilityController
         ?string $error,
         bool $submitted,
         int $statusCode = 200,
+        ?array $selectedRoom = null,
     ): Response {
         if ($this->views === null) {
             return Response::text(
@@ -173,6 +236,8 @@ final readonly class PublicAvailabilityController
                 'rooms' => $rooms,
                 'error' => $error,
                 'submitted' => $submitted,
+                'selectedRoom' => $selectedRoom,
+                'isBookingFlow' => true,
             ],
             'layouts.base',
         );

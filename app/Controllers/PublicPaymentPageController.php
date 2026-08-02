@@ -178,6 +178,7 @@ final class PublicPaymentPageController
                 [
                     'title' => 'Payment submitted | Tara Guest House',
                     'payment' => $payment,
+                    'isBookingFlow' => true,
                 ],
                 'layouts.base',
             );
@@ -324,6 +325,7 @@ final class PublicPaymentPageController
                 'name' => $method->name(),
                 'instructions' => $method->instructions(),
                 'accountReference' => $method->accountReference(),
+                'qrImageUrl' => $this->qrImageUrl($method->qrImagePath()),
                 'requiresProof' => $method->requiresProof(),
             ];
         }
@@ -347,6 +349,7 @@ final class PublicPaymentPageController
                     'values' => $values,
                     'error' => $error,
                     'fieldErrors' => $this->fieldErrors($error),
+                    'isBookingFlow' => true,
                 ],
                 'layouts.base',
             );
@@ -359,6 +362,21 @@ final class PublicPaymentPageController
         } catch (Throwable) {
             return $this->failure();
         }
+    }
+
+    private function qrImageUrl(?string $path): ?string
+    {
+        if (
+            $path === null
+            || preg_match(
+                '#\Apayment-methods/[a-zA-Z0-9][a-zA-Z0-9._/-]*\z#D',
+                $path,
+            ) !== 1
+        ) {
+            return null;
+        }
+
+        return '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
     }
 
     /** @return array<string, string> */
