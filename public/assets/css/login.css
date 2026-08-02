@@ -1,0 +1,224 @@
+/* =====================================
+   Login Page
+===================================== */
+
+body{
+    margin:0;
+    padding:0;
+    background:#ffffff;
+    font-family:"Inter",sans-serif;
+}
+
+/* =====================================
+   Page wrapper (centers the card)
+===================================== */
+
+.login-page{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.login-wrapper{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+/* =====================================
+   Card (image + shadow + content live here)
+===================================== */
+
+.login-card{
+    position:relative;
+    width:min(92vw,950px);
+    min-height:500px;
+    background:url("../images/login-background-for-pc.svg") center/cover no-repeat;
+    border-radius:5px;
+    overflow:hidden;
+    box-shadow: 10px 25px 60px rgba(0, 0, 0, 0.25);
+}
+
+/* =====================================
+   Header
+===================================== */
+.login-form{
+
+    position:absolute;
+
+    top:50%;
+    right:15%;
+
+    transform:translateY(-50%);
+
+    width:380px;
+}
+
+.login-header{
+    text-align:left;
+    margin-bottom:35px;
+}
+/* 
+.login-logo{
+    width:85px;
+    margin-bottom:18px;
+} */
+
+.login-header h1{
+    font-size:2.5rem;
+    font-weight:700;
+    color: #09493f;
+    text-shadow:0 2px 8px rgba(41, 107, 84, 0.5);
+}
+
+.login-header p{
+    margin-top:10px;
+    color: #101010;
+    font-size:.95rem;
+}
+
+/* =====================================
+   Labels
+===================================== */
+
+.form-label{
+    font-weight:550;
+    color:#101010;
+    margin-bottom:8px;
+}
+
+/* =====================================
+   Inputs
+===================================== */
+
+.form-control{
+    height:38px;
+    width: 20rem;
+    background:rgba(255,255,255,.95);
+    border-radius: 0 !important;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom:1px solid #153e33;
+    padding:0 10px;
+    transition:.3s ease;
+}
+
+.form-control:focus{
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom:1px solid #153e33 !important;
+    box-shadow: none !important;
+}
+
+/* =====================================
+   Button
+===================================== */
+
+.login-btn{
+    margin-top: 20px;
+    height:38px;
+    width: 10rem !important;
+    border:none;
+    border-radius:30px;
+    background:#0B5D4F;
+    color:#ffffff;
+    font-weight:600;
+    transition:.25s ease;
+}
+
+.login-btn:hover{
+    background:#08493f;
+    transform:translateY(-2px);
+}
+
+.login-btn:active{
+    transform:translateY(0);
+}
+
+/* =====================================
+   Alert
+===================================== */
+
+.alert{
+    border-radius:12px;
+    margin-bottom:20px;
+}
+
+/* =====================================
+   Mobile
+===================================== */
+.mobile-banner{
+    display: none;
+}
+@media (max-width:576px){
+
+    .login-page{
+        padding:0;
+        min-height:100vh;
+    }
+
+    .login-wrapper{
+        width:100%;
+        padding:0;
+    }
+
+    .login-card{
+        width:100%;
+        border-radius:5px;
+        padding:0;
+        box-shadow:0 2px 8px rgba(41, 107, 84, 0.5);
+        background-image: none;
+        display: flex;
+        flex-direction: column;
+    }
+    .mobile-banner{
+        display:block;
+        height:800px;
+        background-image:url("../images/login-background-for-mobile.svg") !important;
+        background-size:cover;
+        background-position:center;
+        background-repeat:no-repeat;
+    }
+    .login-form{
+        position:absolute;
+        top: 23%;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        transform:none;
+        width:100%;
+        padding:30px 25px;
+    }
+    .login-header{
+        text-align:center;
+    }
+
+    .login-header h1{
+        font-size:2rem;
+    }
+    .form-control{
+        width:100%;
+    }
+
+    .login-btn{
+        width:100% !important;
+    }
+    
+}
+
+@media (max-width:991px) and (min-width:577px){
+
+    .login-page{
+        padding:35px 20px;
+    }
+
+    .login-form{
+        right:15%;
+        width:300px;
+    }
+}

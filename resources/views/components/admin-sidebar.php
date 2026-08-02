@@ -18,8 +18,14 @@
         ></button>
     </div>
 
-    <div class="offcanvas-body d-flex flex-column p-3 p-lg-4">
+    <div class="offcanvas-body d-flex flex-column py-3 py-lg-4">
         <nav aria-label="Administrator navigation">
+            <ul class="nav nav-pills flex-column gap-1">
+                <li class="nav-item d-flex flex-column align-items-center text-center">
+                    <img src="/assets/images/logo.png" alt="Tara Guest House logo" width="150px">
+                    <p class="fw-semibold mb-4 tara_logo" >Tara Guest house</p>
+                </li>
+            </ul>
             <p class="admin-navigation-heading">Workspace</p>
             <ul class="nav nav-pills flex-column gap-1">
                 <li class="nav-item">

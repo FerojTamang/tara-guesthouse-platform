@@ -15,6 +15,9 @@
     background: var(--admin-background);
     color: var(--admin-text);
 }
+.tara_logo{
+    color: #1f5b3d;
+}
 
 .admin-skip-link {
     position: fixed;
@@ -34,8 +37,9 @@
 
 .admin-sidebar {
     --bs-offcanvas-width: var(--admin-sidebar-width);
-    background: linear-gradient(180deg, var(--admin-brand-dark), #102f21);
-    color: #ffffff;
+    background: #f4f6f3;
+    border-right: 1px solid #153e2a52;
+    color: #111111 !important;
 }
 
 .admin-brand-kicker,
@@ -59,36 +63,42 @@
 
 .admin-navigation-heading {
     margin-bottom: 0.5rem;
-    color: rgb(255 255 255 / 58%);
+    color: rgba(0, 0, 0, 0.923);
+    padding: 0rem 1.5rem;
+    font-size: 16px;
 }
 
 .admin-navigation-link {
-    padding: 0.75rem 0.875rem;
-    color: rgb(255 255 255 / 78%);
-    border-radius: 0.625rem;
+    padding: 0.5rem 1.5rem;
+    color: rgba(26, 26, 26, 0.863);
+    border-left: 5px solid transparent;
+    border-radius: 0 !important;
+    transition:.25s ease;
 }
 
 .admin-navigation-link:hover,
 .admin-navigation-link:focus-visible {
-    color: #ffffff;
-    background: rgb(255 255 255 / 10%);
+    color: #111111;
+    background-color: #153e2a20;
+    border-left: 5px solid #153e2a;
 }
 
 .admin-navigation-link.active {
-    color: var(--admin-brand-dark);
-    background: #ffffff;
+    color: #111111 !important;
+    background-color: #153e2a20 !important;
+    border-left: 5px solid #153e2a;
     font-weight: 700;
 }
 
 .admin-navigation-link.disabled {
-    color: rgb(255 255 255 / 38%);
+    color: rgba(0, 0, 0, 0.195);
 }
 
 .admin-sidebar-note {
     padding: 0.875rem;
     border: 1px solid rgb(255 255 255 / 12%);
     border-radius: 0.75rem;
-    color: rgb(255 255 255 / 62%);
+    color: rgba(15, 15, 15, 0.203);
     font-size: 0.8125rem;
 }
 
@@ -111,6 +121,9 @@
 .admin-eyebrow,
 .admin-card-kicker {
     color: var(--admin-brand);
+}
+.admin-topbar-kicker{
+    font-size: 20px !important;    
 }
 
 .admin-topbar-title {
@@ -137,6 +150,36 @@
 
 .min-w-0 {
     min-width: 0;
+}
+
+.topbar-btn{
+    font-weight: 500;
+    font-size: large;
+    padding: 5px 20px;
+    border:none;
+    border-radius:30px;
+    background:#d71522;
+    color:#ffffff;
+    transition:.25s ease;
+    border: 1px solid #d71522;
+}
+.topbar-btn:hover{
+    background: transparent;
+    transform:translateY(-2px);
+    border: 1px solid #d71522;
+    color: #d71522;
+
+}
+.topbar-btn:active{
+    transform:translateY(0);
+    border: 1px solid #d71522;
+    color: #d71522;
+
+}
+@media (max-width:576px) {
+    .admin-topbar-kicker{
+        font-size: 15px !important;    
+    }
 }
 
 @media (min-width: 992px) {

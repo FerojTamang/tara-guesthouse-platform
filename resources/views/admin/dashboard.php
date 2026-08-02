@@ -1,7 +1,8 @@
+<link rel="stylesheet" href="/assets/css/adminDashboard.css">
 <section aria-labelledby="administrator-dashboard-heading">
     <div class="admin-page-heading mb-4">
-        <p class="admin-eyebrow mb-2">Overview</p>
-        <h1 id="administrator-dashboard-heading" class="h2 mb-2">Administrator dashboard</h1>
+        <h1 class="admin-eyebrow mb-2">Overview</h1>
+        <!-- <h1 id="administrator-dashboard-heading" class="h2 mb-2">Administrator dashboard</h1> -->
         <p class="text-secondary mb-0">
             The secure administration workspace is ready for the next management modules.
         </p>

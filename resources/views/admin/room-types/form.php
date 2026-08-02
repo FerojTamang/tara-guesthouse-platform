@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="/assets/css/adminRoomTypes.css">
+
 <section aria-labelledby="room-type-form-heading">
     <div class="admin-page-heading mb-4">
         <p class="admin-eyebrow mb-2">Room catalogue</p>

@@ -1,0 +1,99 @@
+/* =====================================
+   Dashboard
+===================================== */
+
+.admin-page-heading{
+    margin-bottom:2rem;
+}
+.admin-page-heading h1{
+    font-size: larger;
+    font-weight: 700;
+}
+
+.admin-eyebrow{
+    font-size:0.9rem;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    color:#0B5D4F;
+}
+
+.admin-page-heading p{
+    font-size:1rem;
+    color:#6c757d;
+}
+
+/* =====================================
+   Dashboard Cards
+===================================== */
+
+.admin-panel{
+    border:none;
+    border-radius:18px;
+    background:#ffffff;
+    box-shadow:
+        0 10px 35px rgba(0,0,0,.06);
+    transition:all .3s ease;
+}
+
+.admin-panel:hover{
+    box-shadow:
+        0 15px 40px rgba(0,0,0,.10);
+}
+
+.admin-panel .card-body{
+    padding:2rem;
+}
+
+/* =====================================
+   Card Heading
+===================================== */
+
+.admin-card-kicker{
+    display:inline-block;
+    padding:5px 12px;
+    background:#EAF6F4;
+    color:#0B5D4F;
+    border-radius:50px;
+    font-size:.8rem;
+    font-weight:600;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+}
+
+.admin-panel h2{
+    margin-top:1rem;
+    margin-bottom:.8rem;
+    font-size:1.45rem;
+    font-weight:700;
+    color:#212529;
+}
+
+.admin-panel p{
+    line-height:1.7;
+    color:#6c757d;
+}
+
+/* =====================================
+   Responsive
+===================================== */
+
+@media (max-width:768px){
+
+    .admin-page-heading{
+        text-align:center;
+    }
+
+    .admin-panel{
+        border-radius:14px;
+    }
+
+    .admin-panel .card-body{
+        padding:1.5rem;
+    }
+
+    .admin-panel h2{
+        font-size:1.25rem;
+    }
+
+}

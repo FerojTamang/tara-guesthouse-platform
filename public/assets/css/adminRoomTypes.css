@@ -1,0 +1,275 @@
+/* =====================================
+   Admin Page Heading
+===================================== */
+
+.admin-page-heading{
+    margin-bottom:2rem;
+}
+
+.admin-eyebrow{
+    font-size:.85rem;
+    font-weight:700;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:#0B5D4F;
+}
+
+.admin-page-heading h1{
+    font-size:2rem;
+    font-weight:700;
+    color:#0B5D4F;
+}
+
+.admin-page-heading p{
+    font-size:1rem;
+    color:#6c757d;
+    max-width:650px;
+}
+
+/* =====================================
+   Cards
+===================================== */
+
+.admin-panel{
+    border:none;
+    border-radius:5px;
+    background:#ffffff;
+    overflow:hidden;
+    box-shadow:0 8px 24px rgba(0,0,0,.05);
+}
+
+.admin-panel .card-body{
+    padding:2rem;
+}
+
+/* =====================================
+   Buttons
+===================================== */
+
+.btn-primary,
+.btn-success{
+    background:#0B5D4F;
+    border-color:#0B5D4F;
+    color:#ffffff;
+    border-radius:40px;
+    font-weight:600;
+    padding:.65rem 1.4rem;
+    transition:.25s ease;
+}
+
+.btn-primary:hover,
+.btn-success:hover{
+    background:#08493f;
+    border-color:#08493f;
+    color:#ffffff;
+}
+
+.btn-outline-primary{
+    color:#0B5D4F;
+    border-color:#0B5D4F;
+    border-radius:30px;
+    font-weight:500;
+}
+
+.btn-outline-primary:hover{
+    background:#0B5D4F;
+    border-color:#0B5D4F;
+    color:#ffffff;
+}
+
+.btn-outline-secondary{
+    border-radius:30px;
+    padding:.4rem 1rem;
+    font-weight:500;
+}
+
+.btn-outline-danger{
+    border-radius:30px;
+    padding:.4rem 1rem;
+    font-weight:500;
+}
+
+.btn-outline-success{
+    color:#0B5D4F;
+    border-color:#0B5D4F;
+    border-radius:30px;
+    font-weight:500;
+}
+
+.btn-outline-success:hover{
+    background:#0B5D4F;
+    color:#ffffff;
+}
+
+/* =====================================
+   Tables
+===================================== */
+
+.table{
+    margin-bottom:0;
+}
+
+.table thead{
+    background:#F8F9FA;
+}
+
+.table thead th{
+    font-size:.82rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    color:#495057;
+    border-bottom:none;
+}
+
+.table tbody td,
+.table tbody th{
+    vertical-align:middle;
+    padding:1rem;
+}
+
+.table-hover tbody tr:hover{
+    background:#F9FBFB;
+}
+
+/* =====================================
+   Forms
+===================================== */
+
+.form-label{
+    font-weight:600;
+    color:#495057;
+    margin-bottom:.5rem;
+}
+
+.form-control,
+.form-select{
+    border:1px solid #ced4da;
+    border-radius:5px;
+    padding:.65rem .9rem;
+    transition:.25s ease;
+}
+
+.form-control:focus,
+.form-select:focus{
+    border-color:#0B5D4F;
+    box-shadow:0 0 0 .15rem rgba(11,93,79,.15);
+}
+
+textarea.form-control{
+    resize:vertical;
+    min-height:140px;
+}
+
+.form-text{
+    font-size:.85rem;
+    color:#6c757d;
+}
+
+/* =====================================
+   Switch
+===================================== */
+
+.form-check{
+    margin-top:.5rem;
+}
+
+.form-check-input{
+    cursor:pointer;
+    border-color:#adb5bd;
+}
+
+.form-check-input:focus{
+    border-color:#0B5D4F;
+    box-shadow:0 0 0 .15rem rgba(11,93,79,.15);
+}
+
+.form-check-input:checked{
+    background-color:#0B5D4F;
+    border-color:#0B5D4F;
+}
+
+.form-check-label{
+    cursor:pointer;
+    font-weight:500;
+    color:#495057;
+}
+
+/* =====================================
+   Code Blocks
+===================================== */
+
+code{
+    color:#0B5D4F;
+    background:#F8F9FA;
+    padding:.2rem .45rem;
+    border-radius:4px;
+    font-size:.875rem;
+}
+
+/* =====================================
+   Badges
+===================================== */
+
+.badge{
+    font-weight:600;
+    padding:.55em .85em;
+    border-radius:30px;
+}
+
+/* =====================================
+   Alerts
+===================================== */
+
+.alert{
+    border:none;
+    border-radius:12px;
+}
+
+/* =====================================
+   Empty State
+===================================== */
+
+.admin-panel p.text-secondary{
+    color:#6c757d;
+}
+
+/* =====================================
+   Responsive
+===================================== */
+
+@media (max-width:768px){
+
+    .admin-page-heading{
+        text-align:center;
+    }
+
+    .admin-page-heading h1{
+        font-size:1.7rem;
+    }
+
+    .admin-panel{
+        border-radius:14px;
+    }
+
+    .admin-panel .card-body{
+        padding:1.5rem;
+    }
+
+    .table{
+        min-width:700px;
+    }
+
+    .btn-primary,
+    .btn-success{
+        width:100%;
+    }
+
+    .d-flex.flex-wrap.gap-2{
+        flex-direction:column;
+    }
+
+    .d-flex.flex-wrap.gap-2 .btn{
+        width:100%;
+    }
+}

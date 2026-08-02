@@ -1,8 +1,10 @@
+<link rel="stylesheet" href="/assets/css/adminRoomTypes.css">
+
 <section aria-labelledby="room-types-heading">
     <div class="admin-page-heading d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3 mb-4">
         <div>
             <p class="admin-eyebrow mb-2">Room catalogue</p>
-            <h1 id="room-types-heading" class="h2 mb-2">Room types</h1>
+            <!-- <h1 id="room-types-heading" class="h2 mb-2">Room types</h1> -->
             <p class="text-secondary mb-0">
                 Manage the pricing and occupancy templates available for guest-house rooms.
             </p>

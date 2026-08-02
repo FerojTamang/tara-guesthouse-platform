@@ -1,6 +1,8 @@
+<link rel="stylesheet" href="/assets/css/adminRooms.css">
+
 <section aria-labelledby="room-form-heading">
     <div class="admin-page-heading mb-4">
-        <p class="admin-eyebrow mb-2">Room catalogue</p>
+        <!-- <p class="admin-eyebrow mb-2">Room catalogue</p> -->
         <h1 id="room-form-heading" class="h2 mb-2"><?= $e($heading) ?></h1>
         <p class="text-secondary mb-0">
             Configure one physical guest-house room, its pricing, occupancy limits, operational state and amenities.

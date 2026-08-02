@@ -1,8 +1,10 @@
+<link rel="stylesheet" href="/assets/css/adminRooms.css">
+
 <section aria-labelledby="rooms-heading">
     <div class="admin-page-heading d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3 mb-4">
         <div>
-            <p class="admin-eyebrow mb-2">Room catalogue</p>
-            <h1 id="rooms-heading" class="h2 mb-2">Rooms</h1>
+            <h1 class="admin-eyebrow mb-2">Room catalogue</h1>
+            <!-- <h1 id="rooms-heading" class="h2 mb-2">Rooms</h1> -->
             <p class="text-secondary mb-0">
                 Manage physical rooms, pricing, occupancy limits, operational state and publication state.
             </p>

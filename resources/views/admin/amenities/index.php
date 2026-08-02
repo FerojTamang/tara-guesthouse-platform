@@ -1,8 +1,10 @@
+<link rel="stylesheet" href="/assets/css/adminAmenities.css">
+
 <section aria-labelledby="amenities-heading">
     <div class="admin-page-heading d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3 mb-4">
         <div>
             <p class="admin-eyebrow mb-2">Room catalogue</p>
-            <h1 id="amenities-heading" class="h2 mb-2">Amenities</h1>
+            <!-- <h1 id="amenities-heading" class="h2 mb-2">Amenities</h1> -->
             <p class="text-secondary mb-0">
                 Manage the reusable amenities that may be assigned to rooms.
             </p>

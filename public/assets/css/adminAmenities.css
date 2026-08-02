@@ -1,0 +1,187 @@
+/* =====================================
+   Admin Page Heading
+===================================== */
+
+.admin-page-heading{
+    margin-bottom:2rem;
+}
+
+.admin-eyebrow{
+    font-size:.85rem;
+    font-weight:700;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:#0B5D4F;
+}
+
+.admin-page-heading h1{
+    font-size:2rem;
+    font-weight:700;
+    color:#0B5D4F;
+}
+
+.admin-page-heading p{
+    font-size:1rem;
+    color:#6c757d;
+    max-width:650px;
+}
+
+/* =====================================
+   Cards
+===================================== */
+
+.admin-panel{
+    border:none;
+    border-radius:5px;
+    background:#ffffff;
+    overflow:hidden;
+}
+
+.admin-panel .card-body{
+    padding:2rem;
+}
+
+/* =====================================
+   Form
+===================================== */
+
+.form-label{
+    font-weight:600;
+    color:#495057;
+    margin-bottom:.5rem;
+}
+
+.form-control{
+    border-radius:5px;
+    border:1px solid #ced4da;
+    padding:.75rem 1rem;
+    transition:.25s ease;
+}
+
+.form-control:focus{
+    border-color:#0B5D4F;
+    box-shadow:0 0 0 .15rem rgba(11,93,79,.15);
+}
+
+.form-text{
+    color:#6c757d;
+    font-size:.875rem;
+}
+
+.form-check-input:checked{
+    background-color:#0B5D4F;
+    border-color:#0B5D4F;
+}
+
+/* =====================================
+   Buttons
+===================================== */
+
+.btn-primary{
+    background:#0B5D4F;
+    border-color:#0B5D4F;
+    border-radius:30px;
+    padding:.65rem 1.4rem;
+    font-weight:600;
+}
+
+.btn-primary:hover{
+    background:#08493f;
+    border-color:#08493f;
+}
+
+.btn-outline-primary{
+    color:#0B5D4F;
+    border-color:#0B5D4F;
+    border-radius:30px;
+}
+
+.btn-outline-primary:hover{
+    background:#0B5D4F;
+    color:#ffffff;
+}
+
+.btn-outline-secondary,
+.btn-outline-danger{
+    border-radius:30px;
+    padding:.45rem 1rem;
+    font-weight:500;
+}
+
+/* =====================================
+   Table
+===================================== */
+
+.table{
+    margin-bottom:0;
+}
+
+.table thead{
+    background:#F8F9FA;
+}
+
+.table thead th{
+    border-bottom:none;
+    text-transform:uppercase;
+    font-size:.82rem;
+    letter-spacing:.5px;
+    font-weight:700;
+    color:#495057;
+}
+
+.table tbody td,
+.table tbody th{
+    padding:1rem;
+    vertical-align:middle;
+}
+
+.table-hover tbody tr:hover{
+    background:#F9FBFB;
+}
+
+/* =====================================
+   Badges
+===================================== */
+
+.badge{
+    padding:.55em .9em;
+    border-radius:30px;
+    font-weight:600;
+}
+
+/* =====================================
+   Alerts
+===================================== */
+
+.alert{
+    border:none;
+    border-radius:12px;
+}
+
+/* =====================================
+   Responsive
+===================================== */
+
+@media (max-width:768px){
+
+    .admin-page-heading{
+        text-align:center;
+    }
+
+    .admin-page-heading h1{
+        font-size:1.7rem;
+    }
+
+    .admin-panel{
+        border-radius:14px;
+    }
+
+    .admin-panel .card-body{
+        padding:1.5rem;
+    }
+
+    .table{
+        min-width:650px;
+    }
+
+}
