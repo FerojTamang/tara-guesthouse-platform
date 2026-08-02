@@ -63,14 +63,16 @@ final class ViewFoundationTest extends TestCase
         self::assertStringStartsWith('<!doctype html>', $response->body());
         self::assertStringContainsString('<html lang="en">', $response->body());
         self::assertStringContainsString(
-            '<a class="visually-hidden-focusable" href="#main-content">Skip to main content</a>',
+            '<a class="tg-skip-link" href="#main-content">Skip to main content</a>',
             $response->body(),
         );
-        self::assertStringContainsString('<nav class="navbar navbar-expand-md" aria-label="Primary navigation">', $response->body());
+        self::assertStringContainsString('<nav class="tg-public-nav tg-container" aria-label="Primary navigation">', $response->body());
+        self::assertStringContainsString('aria-controls="public-navigation"', $response->body());
+        self::assertStringContainsString('aria-expanded="false"', $response->body());
         self::assertStringContainsString('href="/rooms"', $response->body());
         self::assertStringContainsString('href="/activities"', $response->body());
         self::assertStringContainsString('href="/availability"', $response->body());
-        self::assertStringContainsString('<main id="main-content" class="container py-4" tabindex="-1">', $response->body());
+        self::assertStringContainsString('<main id="main-content" class="tg-main tg-container tg-page-shell" tabindex="-1">', $response->body());
         self::assertStringContainsString('Application foundation is running', $response->body());
         self::assertStringContainsString('The PHP view renderer is operational.', $response->body());
         self::assertStringNotContainsString('Book now', $response->body());

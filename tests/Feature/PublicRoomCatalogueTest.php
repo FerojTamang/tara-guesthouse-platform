@@ -45,14 +45,90 @@ final class PublicRoomCatalogueTest extends TestCase
         $response = $this->router->dispatch(Request::create('GET', '/rooms'));
         self::assertSame(200, $response->statusCode()); self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertStringContainsString('&lt;script&gt;Garden&lt;/script&gt;', $response->body()); self::assertStringNotContainsString('101', $response->body());
+        self::assertStringContainsString('Description &lt;b&gt;x&lt;/b&gt;', $response->body());
+        self::assertStringContainsString('&lt;i&gt;Wi-Fi&lt;/i&gt;', $response->body());
+        self::assertStringNotContainsString('Description <b>x</b>', $response->body());
+        self::assertStringNotContainsString('<i>Wi-Fi</i>', $response->body());
         self::assertStringNotContainsString('operational_status', $response->body()); self::assertStringNotContainsString('is_published', $response->body());
         self::assertStringContainsString('/uploads/rooms/' . str_repeat('a', 64) . '.png', $response->body());
+        self::assertStringContainsString('/assets/css/pages/rooms.css', $response->body());
+        self::assertStringContainsString('<body class="tg-page-rooms">', $response->body());
+        self::assertStringContainsString('class="tg-public-header tg-public-header--overlay"', $response->body());
+        self::assertSame(1, substr_count($response->body(), '<h1'));
+        self::assertStringContainsString('method="get" action="/availability"', $response->body());
+        foreach (['check_in', 'check_out', 'adults', 'children'] as $field) {
+            self::assertStringContainsString('name="' . $field . '"', $response->body());
+        }
+        self::assertStringNotContainsString('name="sort"', $response->body());
+        self::assertStringNotContainsString('name="filter"', $response->body());
+        self::assertStringContainsString('<footer class="tg-public-footer">', $response->body());
     }
 
     public function testListingUsesPlaceholderWithoutPrimaryImage(): void
     {
         $this->rooms->method('findAllPublic')->willReturn([$this->room('Garden', 'garden-room', null)]); $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]); $this->images->method('findPrimaryByRoomId')->willReturn(null);
-        self::assertStringContainsString('/assets/images/room-placeholder.svg', $this->router->dispatch(Request::create('GET', '/rooms'))->body());
+        $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
+        self::assertStringContainsString('/assets/images/room-placeholder.svg', $body);
+        self::assertStringContainsString('/assets/images/home/home-hero-sauraha-jungle-lodge.webp', $body);
+        self::assertStringContainsString('/assets/images/home/home-hero-sauraha-jungle-lodge.png', $body);
+    }
+
+    public function testListingUsesFirstRoomAsLeadAndRendersEveryRemainingRoomOnce(): void
+    {
+        $this->rooms->method('findAllPublic')->willReturn([
+            $this->room('First Room', 'first-room', 'First description', 1),
+            $this->room('Second Room', 'second-room', 'Second description', 2),
+            $this->room('Third Room', 'third-room', 'Third description', 3),
+        ]);
+        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
+        $this->images->method('findPrimaryByRoomId')->willReturnCallback(
+            fn (int $roomId): RoomImage => $this->image($roomId, dechex($roomId)),
+        );
+
+        $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
+
+        self::assertStringContainsString('3 rooms', $body);
+        self::assertSame(1, substr_count($body, 'class="tg-card tg-rooms-lead"'));
+        self::assertSame(2, substr_count($body, 'class="tg-card tg-room-card tg-room-card--listing"'));
+        foreach (['first-room', 'second-room', 'third-room'] as $slug) {
+            self::assertSame(1, substr_count($body, 'data-room-slug="' . $slug . '"'));
+        }
+        self::assertStringContainsString('<img src="/uploads/rooms/' . str_repeat('1', 64) . '.png" alt="" decoding="async">', $body);
+    }
+
+    public function testEmptyListingRetainsSearchAndRendersPolishedFallbackWithoutFakeCards(): void
+    {
+        $this->rooms->method('findAllPublic')->willReturn([]);
+
+        $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
+
+        self::assertStringContainsString('0 rooms', $body);
+        self::assertStringContainsString('No rooms are currently available to display.', $body);
+        self::assertStringContainsString('method="get" action="/availability"', $body);
+        self::assertStringContainsString('href="/contact"', $body);
+        self::assertStringNotContainsString('data-room-slug=', $body);
+    }
+
+    public function testHeroUsesFirstValidPrimaryImageInExistingRoomOrder(): void
+    {
+        $this->rooms->method('findAllPublic')->willReturn([
+            $this->room('Room Without Image', 'room-without-image', null, 1),
+            $this->room('Room With Image', 'room-with-image', null, 2),
+        ]);
+        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
+        $this->images->method('findPrimaryByRoomId')->willReturnCallback(
+            fn (int $roomId): ?RoomImage => $roomId === 2 ? $this->image(2, 'b') : null,
+        );
+
+        $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
+
+        self::assertStringContainsString('<img src="/uploads/rooms/' . str_repeat('b', 64) . '.png" alt="" decoding="async">', $body);
+        self::assertStringContainsString('<img src="/assets/images/room-placeholder.svg" alt="Room Without Image"', $body);
+    }
+
+    public function testRoomsDesignStylesheetExists(): void
+    {
+        self::assertFileExists(dirname(__DIR__, 2) . '/public/assets/css/pages/rooms.css');
     }
 
     public function testDetailAndAllIneligibleSlugsReturnSafeExpectedResponses(): void
@@ -64,7 +140,7 @@ final class PublicRoomCatalogueTest extends TestCase
         self::assertSame(405, $this->router->dispatch(Request::create('POST', '/rooms'))->statusCode());
     }
 
-    private function room(string $name, string $slug, ?string $description): Room { $t = new DateTimeImmutable('2026-07-23 UTC'); return new Room(1, new RoomType(1, 'Deluxe', 'deluxe', null, '5000.00', 2, 1, true, $t, $t), '101', $name, $slug, $description, '6200.00', 2, 1, Room::STATUS_ACTIVE, true, $t, $t, null); }
+    private function room(string $name, string $slug, ?string $description, int $id = 1): Room { $t = new DateTimeImmutable('2026-07-23 UTC'); return new Room($id, new RoomType(1, 'Deluxe', 'deluxe', null, '5000.00', 2, 1, true, $t, $t), '101', $name, $slug, $description, '6200.00', 2, 1, Room::STATUS_ACTIVE, true, $t, $t, null); }
     private function amenity(string $name): Amenity { $t = new DateTimeImmutable('2026-07-23 UTC'); return new Amenity(1, $name, null, true, $t, $t); }
-    private function image(): RoomImage { return new RoomImage(1, 1, 'uploads/rooms/' . str_repeat('a', 64) . '.png', null, 0, true, new DateTimeImmutable('2026-07-23 UTC')); }
+    private function image(int $roomId = 1, string $hashCharacter = 'a'): RoomImage { return new RoomImage($roomId, $roomId, 'uploads/rooms/' . str_repeat($hashCharacter, 64) . '.png', null, 0, true, new DateTimeImmutable('2026-07-23 UTC')); }
 }

@@ -1,0 +1,790 @@
+.tg-main--home {
+    background: var(--tg-cream-light);
+}
+
+.tg-hero {
+    position: relative;
+    display: grid;
+    min-height: clamp(720px, 78vh, 820px);
+    align-items: center;
+    overflow: hidden;
+    padding: calc(var(--tg-header-height) + 3rem) 0 5rem;
+    background-image:
+        linear-gradient(90deg, rgba(3, 47, 40, 0.92) 0%, rgba(3, 47, 40, 0.62) 42%, rgba(3, 47, 40, 0.2) 72%, rgba(3, 47, 40, 0.38) 100%),
+        url("../../images/home/home-hero-sauraha-jungle-lodge.png");
+    background-position: center;
+    background-size: cover;
+    isolation: isolate;
+}
+
+@supports (background-image: image-set(url("x.webp") type("image/webp"))) {
+    .tg-hero {
+        background-image:
+            linear-gradient(90deg, rgba(3, 47, 40, 0.92) 0%, rgba(3, 47, 40, 0.62) 42%, rgba(3, 47, 40, 0.2) 72%, rgba(3, 47, 40, 0.38) 100%),
+            image-set(
+                url("../../images/home/home-hero-sauraha-jungle-lodge.webp") type("image/webp"),
+                url("../../images/home/home-hero-sauraha-jungle-lodge.png") type("image/png")
+            );
+    }
+}
+
+.tg-hero::after {
+    position: absolute;
+    z-index: -1;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 9rem;
+    background: linear-gradient(180deg, transparent, rgba(3, 47, 40, 0.2));
+    content: "";
+}
+
+.tg-hero__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(340px, 410px);
+    align-items: center;
+    gap: clamp(3rem, 7vw, 7rem);
+}
+
+.tg-hero__copy {
+    max-width: 47rem;
+    padding-top: 2rem;
+    color: rgba(255, 255, 255, 0.84);
+}
+
+.tg-hero h1 {
+    max-width: 48rem;
+    margin-bottom: 1.5rem;
+    color: var(--tg-white);
+    font-size: clamp(3.35rem, 6.3vw, 6.25rem);
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+
+.tg-hero h1 span {
+    color: var(--tg-mint);
+}
+
+.tg-hero__lead {
+    max-width: 38rem;
+    margin-bottom: 2.1rem;
+    font-size: clamp(1.05rem, 1.5vw, 1.24rem);
+    line-height: 1.7;
+}
+
+.tg-availability-card {
+    padding: clamp(1.6rem, 3vw, 2.15rem);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: var(--tg-radius-lg);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 28px 70px rgba(3, 47, 40, 0.35);
+}
+
+@supports (backdrop-filter: blur(12px)) {
+    .tg-availability-card {
+        background: rgba(255, 255, 255, 0.91);
+        backdrop-filter: blur(12px);
+    }
+}
+
+.tg-availability-card h2 {
+    margin-bottom: 0.7rem;
+    font-size: clamp(1.85rem, 2.4vw, 2.35rem);
+}
+
+.tg-availability-card__intro {
+    margin-bottom: 1.35rem;
+    color: var(--tg-muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.tg-availability-form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.tg-trust {
+    position: relative;
+    z-index: 2;
+    margin-top: -1.75rem;
+}
+
+.tg-trust__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-md);
+    background: var(--tg-white);
+    box-shadow: var(--tg-shadow-md);
+}
+
+.tg-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1.5rem 1.2rem;
+}
+
+.tg-trust-item + .tg-trust-item {
+    border-left: 1px solid var(--tg-border);
+}
+
+.tg-trust-item h2 {
+    margin-bottom: 0.25rem;
+    font-family: var(--tg-font-body);
+    font-size: 0.88rem;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.tg-trust-item p {
+    margin: 0;
+    color: var(--tg-muted);
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
+.tg-home-content {
+    background:
+        radial-gradient(circle at 8% 18%, rgba(167, 243, 208, 0.16), transparent 24rem),
+        var(--tg-cream-light);
+}
+
+.tg-discovery,
+.tg-story {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    gap: clamp(3rem, 5vw, 5rem);
+    padding-block: var(--tg-space-section);
+}
+
+.tg-story {
+    padding-top: 0;
+}
+
+.tg-room-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.tg-room-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.tg-room-card .tg-card__media {
+    aspect-ratio: 3 / 2;
+}
+
+.tg-room-card .tg-card__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.tg-room-card .tg-card__description {
+    flex: 1;
+}
+
+.tg-room-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    margin-bottom: 1rem;
+    color: var(--tg-muted);
+    font-size: 0.76rem;
+}
+
+.tg-room-card__meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.tg-room-card__meta .tg-icon {
+    color: var(--tg-emerald);
+}
+
+.tg-activity-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.tg-activity-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.tg-activity-card__media {
+    aspect-ratio: 16 / 9;
+}
+
+.tg-image-placeholder {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    background:
+        radial-gradient(circle at 25% 25%, rgba(167, 243, 208, 0.8), transparent 35%),
+        var(--tg-sage);
+    color: var(--tg-emerald);
+}
+
+.tg-image-placeholder .tg-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+.tg-activity-card .tg-card__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.tg-activity-card__meta {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: auto;
+    color: var(--tg-muted);
+    font-size: 0.75rem;
+}
+
+.tg-activity-card__meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.tg-activity-card__meta .tg-icon {
+    color: var(--tg-emerald);
+}
+
+.tg-activity-card__price {
+    margin: 0.8rem 0 0;
+    color: var(--tg-emerald);
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.tg-gallery-mosaic {
+    display: grid;
+    min-height: 35rem;
+    grid-template-columns: 1.2fr 0.9fr 0.9fr;
+    grid-template-rows: 1.15fr 0.85fr;
+    gap: 0.75rem;
+}
+
+.tg-gallery-tile {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    margin: 0;
+    border-radius: var(--tg-radius-sm);
+    background: var(--tg-sage);
+}
+
+.tg-gallery-tile--1 {
+    grid-row: 1 / 3;
+}
+
+.tg-gallery-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--tg-transition-normal);
+}
+
+.tg-gallery-tile::after {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 45%, rgba(3, 47, 40, 0.82));
+    content: "";
+    opacity: 0.75;
+    transition: opacity var(--tg-transition-normal);
+}
+
+.tg-gallery-tile figcaption {
+    position: absolute;
+    z-index: 1;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    gap: 0.15rem;
+    padding: 1rem;
+    color: var(--tg-white);
+    line-height: 1.3;
+}
+
+.tg-gallery-tile figcaption strong {
+    font-size: 0.84rem;
+}
+
+.tg-gallery-tile figcaption span {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.7rem;
+    opacity: 0.78;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.tg-gallery-tile:hover img {
+    transform: scale(1.03);
+}
+
+.tg-gallery-tile:hover::after {
+    opacity: 1;
+}
+
+.tg-about {
+    position: relative;
+    display: grid;
+    align-content: center;
+    overflow: hidden;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-lg);
+    background: linear-gradient(145deg, var(--tg-sage), var(--tg-cream));
+}
+
+.tg-about::before {
+    position: absolute;
+    top: -7rem;
+    right: -7rem;
+    width: 18rem;
+    height: 18rem;
+    border: 1px solid rgba(6, 95, 70, 0.12);
+    border-radius: 50%;
+    content: "";
+}
+
+.tg-about__image-wrap {
+    position: relative;
+    width: min(78%, 24rem);
+    margin: 0 auto clamp(2rem, 4vw, 3rem);
+}
+
+.tg-about__image-wrap picture {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border: 8px solid rgba(255, 255, 255, 0.72);
+    border-radius: 50% 50% 46% 54%;
+    box-shadow: var(--tg-shadow-md);
+}
+
+.tg-about__image-wrap img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+}
+
+.tg-about__line {
+    position: absolute;
+    right: -1.2rem;
+    bottom: -1.2rem;
+    width: 55%;
+    aspect-ratio: 1;
+    border: 1px solid rgba(6, 95, 70, 0.24);
+    border-radius: 50%;
+}
+
+.tg-about__content {
+    position: relative;
+    z-index: 1;
+    max-width: 36rem;
+    margin-inline: auto;
+}
+
+.tg-about h2 {
+    margin-bottom: 1rem;
+    font-size: clamp(2.1rem, 3.2vw, 3.4rem);
+}
+
+.tg-about__lead {
+    color: var(--tg-muted);
+    font-size: 1rem;
+}
+
+.tg-feature-list {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tg-feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.tg-feature-list li > span {
+    display: inline-grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(167, 243, 208, 0.65);
+    color: var(--tg-emerald);
+}
+
+.tg-reviews {
+    padding-block: var(--tg-space-section);
+    background:
+        linear-gradient(rgba(234, 245, 238, 0.94), rgba(234, 245, 238, 0.94)),
+        radial-gradient(circle at 80% 20%, var(--tg-mint), transparent 20rem);
+}
+
+.tg-review-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+.tg-review-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    padding: clamp(1.5rem, 2.5vw, 2rem);
+    border: 1px solid var(--tg-border);
+    border-radius: var(--tg-radius-md);
+    background: var(--tg-white);
+    box-shadow: var(--tg-shadow-sm);
+}
+
+.tg-rating {
+    margin-bottom: 1rem;
+    color: var(--tg-gold);
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+}
+
+.tg-review-card h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+}
+
+.tg-review-card blockquote {
+    flex: 1;
+    margin: 0;
+    color: var(--tg-muted);
+    font-family: var(--tg-font-display);
+    font-size: 1.03rem;
+    line-height: 1.7;
+}
+
+.tg-review-card blockquote p::before {
+    content: "\201C";
+}
+
+.tg-review-card blockquote p::after {
+    content: "\201D";
+}
+
+.tg-review-card footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--tg-border);
+}
+
+.tg-review-card__avatar {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--tg-emerald);
+    color: var(--tg-white);
+    font-family: var(--tg-font-display);
+    font-weight: 700;
+}
+
+.tg-review-card footer div {
+    display: grid;
+}
+
+.tg-review-card footer strong {
+    font-size: 0.86rem;
+}
+
+.tg-review-card footer span:last-child {
+    color: var(--tg-muted);
+    font-size: 0.72rem;
+}
+
+.tg-empty-state--reviews {
+    max-width: 44rem;
+    min-height: 15rem;
+    margin-inline: auto;
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.tg-reviews__link {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.tg-booking-cta {
+    position: relative;
+    display: grid;
+    min-height: 31rem;
+    place-items: center;
+    overflow: hidden;
+    padding-block: 5rem;
+    background-image:
+        linear-gradient(rgba(3, 47, 40, 0.76), rgba(3, 47, 40, 0.84)),
+        url("../../images/home/home-booking-cta-jungle.png");
+    background-position: center;
+    background-size: cover;
+}
+
+@supports (background-image: image-set(url("x.webp") type("image/webp"))) {
+    .tg-booking-cta {
+        background-image:
+            linear-gradient(rgba(3, 47, 40, 0.76), rgba(3, 47, 40, 0.84)),
+            image-set(
+                url("../../images/home/home-booking-cta-jungle.webp") type("image/webp"),
+                url("../../images/home/home-booking-cta-jungle.png") type("image/png")
+            );
+    }
+}
+
+.tg-booking-cta__content {
+    max-width: 52rem;
+    color: rgba(255, 255, 255, 0.82);
+    text-align: center;
+}
+
+.tg-booking-cta h2 {
+    margin-bottom: 1rem;
+    color: var(--tg-white);
+    font-size: clamp(2.7rem, 5vw, 5rem);
+    letter-spacing: -0.035em;
+}
+
+.tg-booking-cta__content > p:not(.tg-eyebrow) {
+    margin-bottom: 2rem;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+}
+
+@media (max-width: 1199.98px) {
+    .tg-hero {
+        min-height: clamp(690px, 78vh, 760px);
+        background-position: 58% center;
+    }
+
+    .tg-hero__inner {
+        gap: 3rem;
+    }
+
+    .tg-discovery,
+    .tg-story {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-story__gallery {
+        order: 1;
+    }
+
+    .tg-about {
+        grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.2fr);
+        align-items: center;
+        gap: 3rem;
+    }
+
+    .tg-about__image-wrap {
+        width: 100%;
+        margin-bottom: 0;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .tg-hero {
+        min-height: auto;
+        padding-block: calc(var(--tg-header-height) + 4rem) 5rem;
+        background-position: 50% center;
+    }
+
+    .tg-hero__inner {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-hero__copy {
+        max-width: 42rem;
+        padding-top: 0;
+    }
+
+    .tg-availability-card {
+        width: min(100%, 44rem);
+    }
+
+    .tg-trust {
+        margin-top: -1.25rem;
+    }
+
+    .tg-trust__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tg-trust-item:nth-child(3) {
+        border-left: 0;
+    }
+
+    .tg-trust-item:nth-child(n + 3) {
+        border-top: 1px solid var(--tg-border);
+    }
+
+    .tg-room-grid,
+    .tg-review-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tg-gallery-mosaic {
+        min-height: 42rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+
+    .tg-gallery-tile--1 {
+        grid-row: 1 / 3;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .tg-hero h1 {
+        font-size: clamp(3rem, 12vw, 4.8rem);
+    }
+
+    .tg-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .tg-section-heading--center {
+        align-items: center;
+    }
+
+    .tg-room-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-activity-grid,
+    .tg-review-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-about {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .tg-about__image-wrap {
+        width: min(78%, 24rem);
+        margin-bottom: 2rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .tg-hero {
+        padding-block: calc(var(--tg-header-height) + 3rem) 4rem;
+        background-position: 38% center;
+    }
+
+    .tg-hero__lead {
+        font-size: 1rem;
+    }
+
+    .tg-button-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tg-button-row .tg-button {
+        width: 100%;
+    }
+
+    .tg-hero__copy .tg-text-link {
+        justify-content: center;
+    }
+
+    .tg-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-trust__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tg-trust-item + .tg-trust-item {
+        border-top: 1px solid var(--tg-border);
+        border-left: 0;
+    }
+
+    .tg-discovery,
+    .tg-story {
+        gap: 4rem;
+    }
+
+    .tg-card__footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .tg-gallery-mosaic {
+        min-height: auto;
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+    }
+
+    .tg-gallery-tile,
+    .tg-gallery-tile--1 {
+        min-height: 15rem;
+        grid-row: auto;
+    }
+
+    .tg-about {
+        padding: 1.25rem;
+    }
+
+    .tg-about__image-wrap {
+        width: 88%;
+    }
+
+    .tg-booking-cta {
+        min-height: 34rem;
+        background-position: 43% center;
+    }
+}
+
+@media (max-width: 374.98px) {
+    .tg-trust-item {
+        align-items: flex-start;
+        padding-inline: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tg-gallery-tile img,
+    .tg-gallery-tile::after {
+        transition: none;
+        transform: none;
+    }
+}

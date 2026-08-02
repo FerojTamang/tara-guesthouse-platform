@@ -11,6 +11,9 @@ use App\Core\ViewRenderer;
 use App\Models\Activity;
 use App\Models\CmsPage;
 use App\Models\GalleryItem;
+use App\Models\Room;
+use App\Models\RoomImage;
+use App\Models\RoomType;
 use App\Models\SettingDefinition;
 use App\Models\SiteSetting;
 use App\Presentation\RoomImageUrl;
@@ -78,7 +81,48 @@ final class PublicCmsExperienceTest extends TestCase
         self::assertStringContainsString('mailto:hello@example.test', $response->body());
         self::assertStringNotContainsString('private.note', $response->body());
         self::assertStringNotContainsString('secret', $response->body());
-        self::assertStringContainsString('row-cols-1 row-cols-md-2 row-cols-xl-3', $response->body());
+        self::assertStringContainsString('Nature&rsquo;s Luxury.', $response->body());
+        self::assertStringContainsString('class="tg-room-grid"', $response->body());
+        self::assertStringContainsString('Garden Room', $response->body());
+        self::assertSame(3, substr_count($response->body(), 'class="tg-card tg-room-card"'));
+        self::assertStringNotContainsString('Fourth Room', $response->body());
+        self::assertStringContainsString('<span>NPR</span> 2500.00', $response->body());
+        self::assertStringContainsString('src="/uploads/rooms/', $response->body());
+        self::assertStringNotContainsString('R-PRIVATE-01', $response->body());
+        self::assertStringContainsString('src="/activities?image=1"', $response->body());
+        self::assertStringContainsString('src="/gallery?image=1"', $response->body());
+        self::assertStringContainsString('method="get" action="/availability"', $response->body());
+        self::assertStringContainsString('name="check_in"', $response->body());
+        self::assertStringContainsString('name="check_out"', $response->body());
+        self::assertStringContainsString('name="adults"', $response->body());
+        self::assertStringContainsString('name="children"', $response->body());
+        self::assertStringContainsString('/assets/css/pages/home.css', $response->body());
+        self::assertStringContainsString('/assets/js/pages/home.js', $response->body());
+        self::assertStringContainsString('/assets/images/home/about-tara-guest-house.webp', $response->body());
+        self::assertStringContainsString('aria-expanded="false"', $response->body());
+    }
+
+    public function testHomepageDesignAssetsAreLocalAndAvailable(): void
+    {
+        $public = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'assets';
+
+        foreach ([
+            'css/tokens.css',
+            'css/base.css',
+            'css/components.css',
+            'css/public.css',
+            'css/pages/home.css',
+            'js/public.js',
+            'js/pages/home.js',
+            'images/home/home-hero-sauraha-jungle-lodge.png',
+            'images/home/home-hero-sauraha-jungle-lodge.webp',
+            'images/home/about-tara-guest-house.png',
+            'images/home/about-tara-guest-house.webp',
+            'images/home/home-booking-cta-jungle.png',
+            'images/home/home-booking-cta-jungle.webp',
+        ] as $asset) {
+            self::assertFileExists($public . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $asset));
+        }
     }
 
     public function testPublishedPageRendersEscapedContentAndPageSeo(): void
@@ -193,7 +237,14 @@ final class PublicCmsExperienceTest extends TestCase
             'created_at' => '2026-08-01T00:30:00+00:00',
         ]];
         $roomRepository = $this->createStub(RoomCatalogRepository::class);
-        $roomRepository->method('findAllPublic')->willReturn([]);
+        $roomRepository->method('findAllPublic')->willReturn([
+            self::room(),
+            self::room(2, 'River Room', 'river-room', 'R-PRIVATE-02'),
+            self::room(3, 'Courtyard Room', 'courtyard-room', 'R-PRIVATE-03'),
+            self::room(4, 'Fourth Room', 'fourth-room', 'R-PRIVATE-04'),
+        ]);
+        $roomImages = $this->createStub(RoomImageCatalogRepository::class);
+        $roomImages->method('findPrimaryByRoomId')->willReturn(self::roomImage());
         $activityRepository = $this->createMock(ActivityCatalogRepository::class);
         $activityRepository->method('findHomepageActivities')->with(4)->willReturn([self::activity()]);
         $galleryRepository = $this->createMock(GalleryCatalogRepository::class);
@@ -204,7 +255,7 @@ final class PublicCmsExperienceTest extends TestCase
             $definitions,
             new PublicRoomCatalogService(
                 $roomRepository,
-                $this->createStub(RoomImageCatalogRepository::class),
+                $roomImages,
                 new RoomImageUrl(),
             ),
             new PublicActivityService($activityRepository),
@@ -266,7 +317,77 @@ final class PublicCmsExperienceTest extends TestCase
     private static function activity(): Activity
     {
         $timestamp = new DateTimeImmutable('2026-07-31 04:00:00 UTC');
-        return new Activity(1, 'Village Walk', 'village-walk', 'Explore nearby paths.', '500.00', true, true, 1, $timestamp, $timestamp);
+        return new Activity(
+            1,
+            'Village Walk',
+            'village-walk',
+            'Explore nearby paths.',
+            '500.00',
+            true,
+            true,
+            1,
+            $timestamp,
+            $timestamp,
+            'Explore nearby paths.',
+            'gallery/' . str_repeat('a', 64) . '.webp',
+            'per person',
+            '2 hours',
+            'Sauraha',
+            true,
+            1,
+        );
+    }
+
+    private static function room(
+        int $id = 1,
+        string $name = 'Garden Room',
+        string $slug = 'garden-room',
+        string $number = 'R-PRIVATE-01',
+    ): Room
+    {
+        $timestamp = new DateTimeImmutable('2026-07-31 04:00:00 UTC');
+        $type = new RoomType(
+            $id,
+            'Garden Suite ' . (string) $id,
+            'garden-suite-' . (string) $id,
+            null,
+            '2500.00',
+            2,
+            1,
+            true,
+            $timestamp,
+            $timestamp,
+        );
+
+        return new Room(
+            $id,
+            $type,
+            $number,
+            $name,
+            $slug,
+            'A quiet room beside the garden.',
+            '2500.00',
+            2,
+            1,
+            Room::STATUS_ACTIVE,
+            true,
+            $timestamp,
+            $timestamp,
+            null,
+        );
+    }
+
+    private static function roomImage(): RoomImage
+    {
+        return new RoomImage(
+            1,
+            1,
+            'uploads/rooms/' . str_repeat('b', 64) . '.webp',
+            'Garden room',
+            0,
+            true,
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+        );
     }
 
     private static function gallery(): GalleryItem

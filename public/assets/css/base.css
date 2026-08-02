@@ -1,0 +1,134 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+
+body {
+    min-width: 320px;
+    margin: 0;
+    overflow-x: hidden;
+    background: var(--tg-cream-light);
+    color: var(--tg-text);
+    font-family: var(--tg-font-body);
+    font-size: 1rem;
+    line-height: 1.65;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+body.tg-nav-open {
+    overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin-top: 0;
+    color: var(--tg-emerald-deep);
+    font-family: var(--tg-font-display);
+    font-weight: 600;
+    line-height: 1.08;
+}
+
+p {
+    margin-top: 0;
+}
+
+a {
+    color: var(--tg-emerald);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+a:hover {
+    color: var(--tg-emerald-dark);
+}
+
+img,
+picture,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+    color: inherit;
+    font: inherit;
+}
+
+button,
+input,
+select,
+textarea,
+a {
+    -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+    outline: 3px solid rgba(6, 95, 70, 0.42);
+    outline-offset: 3px;
+}
+
+::selection {
+    background: var(--tg-mint);
+    color: var(--tg-emerald-deep);
+}
+
+.tg-container {
+    width: min(calc(100% - clamp(2rem, 6vw, 6rem)), var(--tg-container));
+    margin-inline: auto;
+}
+
+.tg-main:focus {
+    outline: none;
+}
+
+.tg-page-shell {
+    min-height: 65vh;
+    padding-block: clamp(7rem, 10vw, 9rem) var(--tg-space-section);
+}
+
+.tg-skip-link {
+    position: fixed;
+    z-index: 1200;
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--tg-radius-sm);
+    background: var(--tg-white);
+    color: var(--tg-emerald-deep);
+    font-weight: 700;
+    transform: translateY(-180%);
+    transition: transform var(--tg-transition-fast);
+}
+
+.tg-skip-link:focus {
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}

@@ -39,6 +39,7 @@ final readonly class PublicCmsController
                     'activities' => $home['activities'],
                     'galleryItems' => $home['gallery'],
                     'reviews' => $home['reviews'],
+                    'isHome' => true,
                 ],
                 'layouts.base',
             );

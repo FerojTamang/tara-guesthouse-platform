@@ -1,115 +1,283 @@
-<section class="py-4 py-lg-5" aria-labelledby="home-heading">
-    <div class="row align-items-center g-4">
-        <div class="col-lg-7">
-            <p class="text-uppercase fw-semibold text-secondary mb-2">Welcome</p>
-            <h1 id="home-heading" class="display-4 fw-semibold mb-3"><?= $e($siteName) ?></h1>
-            <p class="lead mb-4">A comfortable base for exploring Dhulikhel and the surrounding hills.</p>
-            <div class="d-flex flex-wrap gap-2">
-                <a class="btn btn-primary btn-lg" href="/availability">Check availability</a>
-                <a class="btn btn-outline-primary btn-lg" href="/rooms">Explore rooms</a>
+<div class="tg-home">
+    <section class="tg-hero" aria-labelledby="home-heading">
+        <div class="tg-container tg-hero__inner">
+            <div class="tg-hero__copy">
+                <p class="tg-eyebrow tg-eyebrow--light">Sauraha, Nepal</p>
+                <h1 id="home-heading">Nature&rsquo;s Luxury.<br><span>Your Jungle Retreat.</span></h1>
+                <p class="tg-hero__lead">Experience warm hospitality, peaceful stays, and memorable moments in the heart of Sauraha.</p>
+                <div class="tg-button-row">
+                    <a class="tg-button tg-button--mint" href="/availability" data-ripple>
+                        Check Availability
+                        <?= $partial('components.public-icon', ['name' => 'arrow']) ?>
+                    </a>
+                    <a class="tg-text-link tg-text-link--light" href="/rooms">
+                        Explore our rooms
+                        <?= $partial('components.public-icon', ['name' => 'arrow']) ?>
+                    </a>
+                </div>
             </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="p-4 rounded-3 bg-body-tertiary border">
-                <h2 class="h4">Plan your stay</h2>
-                <p class="mb-0">Browse published rooms, activities, and gallery images before choosing your dates.</p>
-            </div>
-        </div>
-    </div>
-</section>
 
-<section class="py-4" aria-labelledby="home-rooms-heading">
-    <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
-        <div><p class="text-uppercase fw-semibold text-secondary mb-1">Stay</p><h2 id="home-rooms-heading" class="h1 mb-0">Rooms</h2></div>
-        <a href="/rooms">View all rooms</a>
-    </div>
-    <?php if ($rooms === []): ?>
-        <p class="text-secondary">No rooms are currently published.</p>
-    <?php else: ?>
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
-            <?php foreach ($rooms as $room): ?>
-                <div class="col"><article class="card h-100 shadow-sm">
-                    <img class="card-img-top" src="<?= $e($room['primaryImageUrl']) ?>" alt="<?= $e($room['name']) ?>" loading="lazy" decoding="async">
-                    <div class="card-body d-flex flex-column">
-                        <h3 class="h4"><a href="/rooms/<?= $e($room['slug']) ?>"><?= $e($room['name']) ?></a></h3>
-                        <p class="flex-grow-1"><?= $e($room['description']) ?></p>
-                        <p class="fw-semibold mb-0">NPR <?= $e($room['pricePerNight']) ?> per night</p>
+            <aside class="tg-availability-card" aria-labelledby="home-availability-heading">
+                <p class="tg-eyebrow">Plan your stay</p>
+                <h2 id="home-availability-heading">Find your room</h2>
+                <p class="tg-availability-card__intro">Choose your dates and guest count to see rooms available for your complete stay.</p>
+                <form class="tg-availability-form" method="get" action="/availability">
+                    <div class="tg-form-field">
+                        <label for="home-check-in">Check-in</label>
+                        <input id="home-check-in" name="check_in" type="date" required>
                     </div>
-                </article></div>
-            <?php endforeach; ?>
+                    <div class="tg-form-field">
+                        <label for="home-check-out">Check-out</label>
+                        <input id="home-check-out" name="check_out" type="date" required>
+                    </div>
+                    <div class="tg-form-grid">
+                        <div class="tg-form-field">
+                            <label for="home-adults">Adults</label>
+                            <input id="home-adults" name="adults" type="number" min="1" step="1" value="1" required>
+                        </div>
+                        <div class="tg-form-field">
+                            <label for="home-children">Children</label>
+                            <input id="home-children" name="children" type="number" min="0" step="1" value="0" required>
+                        </div>
+                    </div>
+                    <button class="tg-button tg-button--emerald tg-button--block" type="submit" data-ripple>
+                        Check Availability
+                        <?= $partial('components.public-icon', ['name' => 'arrow']) ?>
+                    </button>
+                </form>
+            </aside>
         </div>
-    <?php endif; ?>
-</section>
+    </section>
 
-<section class="py-4" aria-labelledby="home-activities-heading">
-    <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
-        <div><p class="text-uppercase fw-semibold text-secondary mb-1">Explore</p><h2 id="home-activities-heading" class="h1 mb-0">Activities</h2></div>
-        <a href="/activities">View all activities</a>
-    </div>
-    <?php if ($activities === []): ?>
-        <p class="text-secondary">No activities are currently published.</p>
-    <?php else: ?>
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
-            <?php foreach ($activities as $activity): ?>
-                <div class="col"><article class="card h-100 shadow-sm">
-                    <?php if ($activity['image_url'] !== null): ?><img class="card-img-top" src="<?= $e($activity['image_url']) ?>" alt="<?= $e($activity['title']) ?>" loading="lazy" decoding="async"><?php endif; ?>
-                    <div class="card-body d-flex flex-column">
-                    <h3 class="h4"><?= $e($activity['title']) ?></h3>
-                    <p class="flex-grow-1"><?= $e($activity['summary']) ?></p>
-                    <?php if ($activity['duration'] !== null): ?><p class="mb-1"><?= $e($activity['duration']) ?></p><?php endif; ?>
-                    <?php if ($activity['location'] !== null): ?><p class="mb-1"><?= $e($activity['location']) ?></p><?php endif; ?>
-                    <?php if ($activity['price'] !== null): ?><p class="fw-semibold mb-0">NPR <?= $e($activity['price']) ?><?= $activity['price_unit'] === null ? '' : ' ' . $e($activity['price_unit']) ?></p><?php endif; ?>
-                </div></article></div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</section>
-
-<section class="py-4" aria-labelledby="home-gallery-heading">
-    <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
-        <div><p class="text-uppercase fw-semibold text-secondary mb-1">See</p><h2 id="home-gallery-heading" class="h1 mb-0">Gallery</h2></div>
-        <a href="/gallery">View the gallery</a>
-    </div>
-    <?php if ($galleryItems === []): ?>
-        <p class="text-secondary">No gallery images are currently published.</p>
-    <?php else: ?>
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4">
-            <?php foreach ($galleryItems as $item): ?>
-                <div class="col"><article class="card h-100 shadow-sm">
-                    <img class="card-img-top" src="<?= $e($item['image_url']) ?>" alt="<?= $e($item['alt_text']) ?>" loading="lazy" decoding="async">
-                    <div class="card-body"><h3 class="h5 mb-0"><?= $e($item['title']) ?></h3></div>
-                </article></div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</section>
-
-<?php if ($reviews !== []): ?>
-<section class="py-4" aria-labelledby="home-reviews-heading">
-    <div class="d-flex justify-content-between align-items-end gap-3 mb-3">
-        <div>
-            <p class="text-uppercase fw-semibold text-secondary mb-1">Verified stays</p>
-            <h2 id="home-reviews-heading" class="h1 mb-0">Guest reviews</h2>
-        </div>
-        <a href="/reviews">Read all reviews</a>
-    </div>
-    <div class="row g-4">
-        <?php foreach ($reviews as $review): ?>
-            <div class="col-lg-4">
-                <article class="card h-100 shadow-sm">
-                    <div class="card-body">
-                        <p aria-label="<?= $e((string) $review['rating']) ?> out of 5 stars">
-                            <span aria-hidden="true"><?= str_repeat('★', $review['rating']) ?><?= str_repeat('☆', 5 - $review['rating']) ?></span>
-                        </p>
-                        <?php if ($review['title'] !== null): ?>
-                            <h3 class="h5"><?= $e($review['title']) ?></h3>
-                        <?php endif; ?>
-                        <p><?= nl2br($e($review['comment']), false) ?></p>
-                        <p class="text-secondary mb-0"><?= $e($review['guest_name']) ?></p>
+    <section class="tg-trust" aria-label="Why guests choose Tara Guest House">
+        <div class="tg-container tg-trust__grid">
+            <?php foreach ([
+                ['bed', 'Comfortable Rooms', 'Well-prepared spaces for a restful stay'],
+                ['calendar', 'Easy Direct Booking', 'Check availability through the official website'],
+                ['compass', 'Sauraha Experiences', 'Discover nearby nature and culture'],
+                ['heart', 'Warm Local Hospitality', 'A welcoming base for your visit'],
+            ] as [$icon, $heading, $copy]): ?>
+                <article class="tg-trust-item">
+                    <span class="tg-icon-circle"><?= $partial('components.public-icon', ['name' => $icon]) ?></span>
+                    <div>
+                        <h2><?= $e($heading) ?></h2>
+                        <p><?= $e($copy) ?></p>
                     </div>
                 </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <div class="tg-home-content">
+        <section class="tg-discovery tg-container" aria-label="Rooms and Sauraha activities">
+            <div class="tg-discovery__rooms">
+                <div class="tg-section-heading">
+                    <div>
+                        <p class="tg-eyebrow">Rest well</p>
+                        <h2 id="home-rooms-heading">Featured Rooms</h2>
+                    </div>
+                    <a class="tg-text-link" href="/rooms">View all rooms <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                </div>
+
+                <?php if ($rooms === []): ?>
+                    <div class="tg-empty-state">
+                        <span class="tg-icon-circle"><?= $partial('components.public-icon', ['name' => 'bed']) ?></span>
+                        <h3>Rooms are being prepared</h3>
+                        <p>No rooms are currently published. Please check again soon.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="tg-room-grid" aria-labelledby="home-rooms-heading">
+                        <?php foreach (array_slice($rooms, 0, 3) as $room): ?>
+                            <article class="tg-card tg-room-card">
+                                <a class="tg-card__media" href="/rooms/<?= $e($room['slug']) ?>" aria-label="View details for <?= $e($room['name']) ?>">
+                                    <img
+                                        src="<?= $e($room['primaryImageUrl']) ?>"
+                                        alt="<?= $e($room['name']) ?>"
+                                        loading="lazy"
+                                        decoding="async"
+                                    >
+                                </a>
+                                <div class="tg-card__body">
+                                    <p class="tg-card__kicker"><?= $e($room['roomTypeName']) ?></p>
+                                    <h3><a href="/rooms/<?= $e($room['slug']) ?>"><?= $e($room['name']) ?></a></h3>
+                                    <p class="tg-card__description"><?= $e($room['description']) ?></p>
+                                    <div class="tg-room-card__meta">
+                                        <span><?= $partial('components.public-icon', ['name' => 'users']) ?> <?= $e((string) $room['capacityAdults']) ?> adult<?= $room['capacityAdults'] === 1 ? '' : 's' ?></span>
+                                        <span><?= $e((string) $room['capacityChildren']) ?> child<?= $room['capacityChildren'] === 1 ? '' : 'ren' ?></span>
+                                    </div>
+                                    <div class="tg-card__footer">
+                                        <p class="tg-price"><span>NPR</span> <?= $e($room['pricePerNight']) ?><small>/ night</small></p>
+                                        <a class="tg-button tg-button--outline tg-button--small" href="/rooms/<?= $e($room['slug']) ?>" data-ripple>View Room</a>
+                                    </div>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php endforeach; ?>
+
+            <div class="tg-discovery__activities">
+                <div class="tg-section-heading">
+                    <div>
+                        <p class="tg-eyebrow">Explore nearby</p>
+                        <h2 id="home-activities-heading">Popular Activities</h2>
+                    </div>
+                    <a class="tg-text-link" href="/activities">All activities <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                </div>
+
+                <?php if ($activities === []): ?>
+                    <div class="tg-empty-state">
+                        <span class="tg-icon-circle"><?= $partial('components.public-icon', ['name' => 'compass']) ?></span>
+                        <h3>Experiences are being curated</h3>
+                        <p>No activities are currently published.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="tg-activity-grid" aria-labelledby="home-activities-heading">
+                        <?php foreach ($activities as $activity): ?>
+                            <article class="tg-card tg-activity-card">
+                                <div class="tg-card__media tg-activity-card__media">
+                                    <?php if ($activity['image_url'] !== null): ?>
+                                        <img src="<?= $e($activity['image_url']) ?>" alt="<?= $e($activity['title']) ?>" loading="lazy" decoding="async">
+                                    <?php else: ?>
+                                        <span class="tg-image-placeholder" aria-hidden="true"><?= $partial('components.public-icon', ['name' => 'leaf']) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="tg-card__body">
+                                    <h3><?= $e($activity['title']) ?></h3>
+                                    <p class="tg-card__description"><?= $e($activity['summary']) ?></p>
+                                    <?php if ($activity['duration'] !== null || $activity['location'] !== null): ?>
+                                        <div class="tg-activity-card__meta">
+                                            <?php if ($activity['duration'] !== null): ?><span><?= $partial('components.public-icon', ['name' => 'calendar']) ?> <?= $e($activity['duration']) ?></span><?php endif; ?>
+                                            <?php if ($activity['location'] !== null): ?><span><?= $partial('components.public-icon', ['name' => 'pin']) ?> <?= $e($activity['location']) ?></span><?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if ($activity['price'] !== null): ?>
+                                        <p class="tg-activity-card__price">NPR <?= $e($activity['price']) ?><?= $activity['price_unit'] === null ? '' : ' ' . $e($activity['price_unit']) ?></p>
+                                    <?php endif; ?>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <section class="tg-story tg-container" aria-label="Gallery and guest house story">
+            <div class="tg-story__gallery">
+                <div class="tg-section-heading">
+                    <div>
+                        <p class="tg-eyebrow">A glimpse of Tara</p>
+                        <h2 id="home-gallery-heading">Gallery Preview</h2>
+                    </div>
+                    <a class="tg-text-link" href="/gallery">View gallery <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                </div>
+
+                <?php if ($galleryItems === []): ?>
+                    <div class="tg-empty-state">
+                        <span class="tg-icon-circle"><?= $partial('components.public-icon', ['name' => 'leaf']) ?></span>
+                        <h3>The gallery is being prepared</h3>
+                        <p>No gallery images are currently published.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="tg-gallery-mosaic" aria-labelledby="home-gallery-heading">
+                        <?php foreach ($galleryItems as $index => $item): ?>
+                            <figure class="tg-gallery-tile tg-gallery-tile--<?= $e((string) ($index + 1)) ?>">
+                                <img
+                                    src="<?= $e($item['image_url']) ?>"
+                                    alt="<?= $e($item['alt_text']) ?>"
+                                    loading="lazy"
+                                    decoding="async"
+                                >
+                                <figcaption>
+                                    <strong><?= $e($item['title']) ?></strong>
+                                    <?php if ($item['caption'] !== null): ?><span><?= $e($item['caption']) ?></span><?php endif; ?>
+                                </figcaption>
+                            </figure>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <article class="tg-about" aria-labelledby="home-about-heading">
+                <div class="tg-about__image-wrap">
+                    <picture>
+                        <source srcset="/assets/images/home/about-tara-guest-house.webp" type="image/webp">
+                        <img
+                            src="/assets/images/home/about-tara-guest-house.png"
+                            width="1254"
+                            height="1254"
+                            alt="Tara Guest House courtyard surrounded by tropical greenery"
+                            loading="lazy"
+                            decoding="async"
+                        >
+                    </picture>
+                    <span class="tg-about__line" aria-hidden="true"></span>
+                </div>
+                <div class="tg-about__content">
+                    <p class="tg-eyebrow">A thoughtful stay</p>
+                    <h2 id="home-about-heading">Why Stay With Us</h2>
+                    <p class="tg-about__lead">Tara Guest House offers a calm and welcoming base for discovering the natural rhythm of Sauraha.</p>
+                    <ul class="tg-feature-list">
+                        <?php foreach ([
+                            'Relaxed, comfortable stays',
+                            'Thoughtful local hospitality',
+                            'Convenient access to Sauraha experiences',
+                            'A peaceful setting for rest and exploration',
+                        ] as $feature): ?>
+                            <li><span><?= $partial('components.public-icon', ['name' => 'check']) ?></span><?= $e($feature) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <a class="tg-text-link" href="/contact">Plan your visit <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                </div>
+            </article>
+        </section>
     </div>
-</section>
-<?php endif; ?>
+
+    <section class="tg-reviews" aria-labelledby="home-reviews-heading">
+        <div class="tg-container">
+            <div class="tg-section-heading tg-section-heading--center">
+                <div>
+                    <p class="tg-eyebrow">From verified stays</p>
+                    <h2 id="home-reviews-heading">Guest Reviews</h2>
+                    <p>Reflections shared by guests after their stay.</p>
+                </div>
+            </div>
+            <?php if ($reviews === []): ?>
+                <div class="tg-empty-state tg-empty-state--reviews">
+                    <span class="tg-icon-circle"><?= $partial('components.public-icon', ['name' => 'heart']) ?></span>
+                    <h3>Guest stories will appear here</h3>
+                    <p>Approved reviews from verified stays have not been published yet.</p>
+                </div>
+            <?php else: ?>
+                <div class="tg-review-grid">
+                    <?php foreach ($reviews as $review): ?>
+                        <article class="tg-review-card">
+                            <div class="tg-rating" aria-label="<?= $e((string) $review['rating']) ?> out of 5 stars">
+                                <span aria-hidden="true"><?= str_repeat('&#9733;', $review['rating']) ?><?= str_repeat('&#9734;', 5 - $review['rating']) ?></span>
+                            </div>
+                            <?php if ($review['title'] !== null): ?><h3><?= $e($review['title']) ?></h3><?php endif; ?>
+                            <blockquote><p><?= nl2br($e($review['comment']), false) ?></p></blockquote>
+                            <footer>
+                                <span class="tg-review-card__avatar" aria-hidden="true"><?= $e(mb_strtoupper(mb_substr($review['guest_name'], 0, 1, 'UTF-8'), 'UTF-8')) ?></span>
+                                <div><strong><?= $e($review['guest_name']) ?></strong><span>Verified stay</span></div>
+                            </footer>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <div class="tg-reviews__link"><a class="tg-text-link" href="/reviews">Read all guest reviews <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a></div>
+        </div>
+    </section>
+
+    <section class="tg-booking-cta" aria-labelledby="home-cta-heading">
+        <div class="tg-container tg-booking-cta__content">
+            <p class="tg-eyebrow tg-eyebrow--light">Your Sauraha stay</p>
+            <h2 id="home-cta-heading">Ready for Your Jungle Escape?</h2>
+            <p>Plan your stay and discover the natural character of Sauraha.</p>
+            <div class="tg-button-row tg-button-row--center">
+                <a class="tg-button tg-button--mint" href="/availability" data-ripple>Check Availability <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                <a class="tg-button tg-button--light-outline" href="/contact" data-ripple>Contact Us</a>
+            </div>
+        </div>
+    </section>
+</div>
