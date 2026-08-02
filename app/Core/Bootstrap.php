@@ -440,7 +440,10 @@ final class Bootstrap
         $administratorActivityController = new AdministratorActivityController(
             $viewRenderer,
             new ActivityManagementServiceProvider(
-                static function () use ($catalogConnectionProvider): AdministratorActivityService {
+                static function () use (
+                    $catalogConnectionProvider,
+                    $galleryImageStorage,
+                ): AdministratorActivityService {
                     $connection = $catalogConnectionProvider();
 
                     return new AdministratorActivityService(
