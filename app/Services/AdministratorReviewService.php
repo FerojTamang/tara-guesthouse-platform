@@ -227,7 +227,13 @@ final readonly class AdministratorReviewService
             throw ReviewException::failure();
         }
 
-        return $value;
+        // MariaDB DATETIME stores whole seconds, while PHP's live clock includes
+        // microseconds. Normalize before persistence and post-write verification.
+        return $value->setTime(
+            (int) $value->format('H'),
+            (int) $value->format('i'),
+            (int) $value->format('s'),
+        );
     }
 
     private function auditEventType(string $status): string

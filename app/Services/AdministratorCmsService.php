@@ -7,10 +7,15 @@ namespace App\Services;
 use App\Exceptions\CmsException;
 use App\Models\AuditLogEntry;
 use App\Models\CmsPage;
+use App\Models\ContentMedia;
+use App\Models\PageContentProfile;
 use App\Models\SettingDefinition;
 use App\Models\SiteSetting;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\ContentMediaRepository;
+use App\Repositories\PageContentProfileRepository;
 use App\Requests\CmsPageContentRequest;
+use App\Requests\CmsPagePublishingRequest;
 use App\Requests\CmsSettingsUpdateRequest;
 use Closure;
 use DateTimeImmutable;
@@ -32,6 +37,8 @@ final readonly class AdministratorCmsService
         private AuditLogWriteRepository $auditLogs,
         private CmsTransaction $transaction,
         ?callable $clock = null,
+        private ?PageContentProfileRepository $profiles = null,
+        private ?ContentMediaRepository $contentMedia = null,
     ) {
         $this->clock = Closure::fromCallable(
             $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now', new DateTimeZone('UTC')),
@@ -59,6 +66,15 @@ final readonly class AdministratorCmsService
     public function getPage(int $id): CmsPage
     {
         return $this->executeRead(fn (): CmsPage => $this->pages->get($id));
+    }
+
+    public function pageProfile(int $pageId): ?PageContentProfile
+    {
+        if ($pageId <= 0 || !$this->profiles instanceof PageContentProfileRepository) {
+            return null;
+        }
+
+        return $this->executeRead(fn (): ?PageContentProfile => $this->profiles?->findByPageId($pageId));
     }
 
     /** @return list<SiteSetting> */
@@ -101,11 +117,13 @@ final readonly class AdministratorCmsService
         int $administratorId,
         ?string $ipAddress,
         ?string $userAgent,
+        ?CmsPagePublishingRequest $publishing = null,
     ): CmsPage {
         $this->assertAdministrator($administratorId);
+        $this->assertPublicSlugAvailable($request->slug());
         $content = $this->contentSanitizer->sanitize($request->content());
 
-        return $this->transact(function () use ($request, $content, $administratorId, $ipAddress, $userAgent): CmsPage {
+        return $this->transact(function () use ($request, $content, $administratorId, $ipAddress, $userAgent, $publishing): CmsPage {
             $page = $this->pages->createDraft(
                 $request->title(),
                 $request->slug(),
@@ -114,6 +132,8 @@ final readonly class AdministratorCmsService
                 $request->metaDescription(),
                 $administratorId,
             );
+            $this->syncStructuredContent($page->id(), $content, $administratorId);
+            $this->syncPublishingProfile($page->id(), $publishing, $administratorId);
 
             $this->appendAudit(
                 $administratorId,
@@ -140,11 +160,13 @@ final readonly class AdministratorCmsService
         int $administratorId,
         ?string $ipAddress,
         ?string $userAgent,
+        ?CmsPagePublishingRequest $publishing = null,
     ): CmsPage {
         $this->assertAdministrator($administratorId);
+        $this->assertPublicSlugAvailable($request->slug());
         $content = $this->contentSanitizer->sanitize($request->content());
 
-        return $this->transact(function () use ($id, $request, $content, $administratorId, $ipAddress, $userAgent): CmsPage {
+        return $this->transact(function () use ($id, $request, $content, $administratorId, $ipAddress, $userAgent, $publishing): CmsPage {
             $previous = $this->pages->get($id);
             $page = $this->pages->updateContent(
                 $id,
@@ -155,6 +177,8 @@ final readonly class AdministratorCmsService
                 $request->metaDescription(),
                 $administratorId,
             );
+            $this->syncStructuredContent($page->id(), $content, $administratorId);
+            $this->syncPublishingProfile($page->id(), $publishing, $administratorId);
 
             $this->appendAudit(
                 $administratorId,
@@ -182,12 +206,33 @@ final readonly class AdministratorCmsService
         int $administratorId,
         ?string $ipAddress,
         ?string $userAgent,
+        ?DateTimeImmutable $publishAt = null,
     ): CmsPage {
         $this->assertAdministrator($administratorId);
 
-        return $this->transact(function () use ($id, $status, $administratorId, $ipAddress, $userAgent): CmsPage {
+        return $this->transact(function () use ($id, $status, $administratorId, $ipAddress, $userAgent, $publishAt): CmsPage {
             $previous = $this->pages->get($id);
-            $page = $this->pages->transitionStatus($id, $status, $administratorId);
+            $transitionedAt = $this->now();
+            $profile = $this->profiles?->findByPageId($id);
+            if ($status === CmsPage::SCHEDULED && !$publishAt instanceof DateTimeImmutable) {
+                $publishAt = $profile?->publishAt();
+            }
+            $targetPublication = $status === CmsPage::PUBLISHED ? $transitionedAt : $publishAt;
+            if (
+                $profile instanceof PageContentProfile
+                && $profile->expiresAt() instanceof DateTimeImmutable
+                && $targetPublication instanceof DateTimeImmutable
+                && $profile->expiresAt() <= $targetPublication
+            ) {
+                throw CmsException::invalidInput('The publication date must be earlier than the notice expiry date.');
+            }
+            $page = $this->pages->transitionStatus($id, $status, $administratorId, $publishAt);
+            if (
+                $this->profiles instanceof PageContentProfileRepository
+                && $page->publishedAt() instanceof DateTimeImmutable
+            ) {
+                $this->profiles->updatePublication($page->id(), $page->publishedAt(), $administratorId);
+            }
 
             $this->appendAudit(
                 $administratorId,
@@ -197,8 +242,8 @@ final readonly class AdministratorCmsService
                 'Administrator changed CMS page publication status.',
                 [
                     'slug' => $page->slug(),
-                    'from' => $previous->status(),
-                    'to' => $page->status(),
+                    'from' => $previous->publicationState($transitionedAt),
+                    'to' => $page->publicationState($transitionedAt),
                 ],
                 $ipAddress,
                 $userAgent,
@@ -206,6 +251,13 @@ final readonly class AdministratorCmsService
 
             return $page;
         });
+    }
+
+    private function assertPublicSlugAvailable(string $slug): void
+    {
+        if ((new NavigationRouteCatalog())->isReservedPageSlug($slug)) {
+            throw CmsException::invalidInput('The page address is reserved by a public website route.');
+        }
     }
 
     public function contentFormat(): string
@@ -216,6 +268,169 @@ final readonly class AdministratorCmsService
     public function contentMaximumLength(): int
     {
         return $this->contentSanitizer->maximumLength();
+    }
+
+    private function syncStructuredContent(int $pageId, string $content, int $administratorId): void
+    {
+        if (!$this->profiles instanceof PageContentProfileRepository) {
+            return;
+        }
+
+        $contentType = 'page';
+        $summary = null;
+        $usages = [];
+
+        try {
+            $document = json_decode($content, true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            $document = null;
+        }
+
+        if (is_array($document) && ($document['format'] ?? null) === 'tara-blocks-v1') {
+            $type = $document['type'] ?? null;
+            $rawSummary = $document['summary'] ?? null;
+            $blocks = $document['blocks'] ?? null;
+
+            if (
+                ($document['version'] ?? null) !== 1
+                || !is_string($type)
+                || !in_array($type, PageContentProfile::TYPES, true)
+                || !is_string($rawSummary)
+                || !is_array($blocks)
+                || !array_is_list($blocks)
+                || count($blocks) > 100
+            ) {
+                throw CmsException::invalidInput('The structured page content is invalid.');
+            }
+
+            $contentType = $type;
+            $summary = trim($rawSummary);
+            if ($summary === '') {
+                $summary = null;
+            } elseif (!mb_check_encoding($summary, 'UTF-8') || str_contains($summary, "\0") || mb_strlen($summary, 'UTF-8') > 500) {
+                throw CmsException::invalidInput('The page summary is invalid.');
+            }
+
+            foreach ($blocks as $index => $block) {
+                if (!is_array($block) || !is_string($block['type'] ?? null)) {
+                    throw CmsException::invalidInput('The structured page blocks are invalid.');
+                }
+
+                if (!in_array($block['type'], ['image', 'image_text'], true) || !array_key_exists('media_id', $block)) {
+                    continue;
+                }
+
+                $mediaId = $block['media_id'];
+                $url = $block['url'] ?? null;
+                $width = $block['width'] ?? null;
+                $height = $block['height'] ?? null;
+
+                if (
+                    !is_int($mediaId)
+                    || $mediaId <= 0
+                    || !is_string($url)
+                    || !is_int($width)
+                    || !is_int($height)
+                ) {
+                    throw CmsException::invalidInput('A selected content image is invalid.');
+                }
+
+                if (!$this->contentMedia instanceof ContentMediaRepository) {
+                    throw CmsException::failure();
+                }
+
+                $media = $this->contentMedia->findActiveByIdForShare($mediaId);
+                if (
+                    !$media instanceof ContentMedia
+                    || $url !== $media->publicUrl()
+                    || $width !== $media->width()
+                    || $height !== $media->height()
+                ) {
+                    throw CmsException::invalidInput('A selected content image is unavailable.');
+                }
+
+                $altText = $block['alt'] ?? null;
+                if (
+                    !is_string($altText)
+                    || !mb_check_encoding($altText, 'UTF-8')
+                    || str_contains($altText, "\0")
+                    || trim($altText) === ''
+                    || mb_strlen(trim($altText), 'UTF-8') > 255
+                ) {
+                    throw CmsException::invalidInput('Selected content images require valid alternative text.');
+                }
+
+                if (array_key_exists('caption', $block)) {
+                    $caption = $block['caption'];
+                    if (
+                        !is_string($caption)
+                        || !mb_check_encoding($caption, 'UTF-8')
+                        || str_contains($caption, "\0")
+                        || mb_strlen(trim($caption), 'UTF-8') > 500
+                    ) {
+                        throw CmsException::invalidInput('The selected content image caption is invalid.');
+                    }
+                }
+
+                $usages[] = [
+                    'media_id' => $media->id(),
+                    'block_key' => 'block-' . ($index + 1),
+                    'sort_order' => $index,
+                ];
+            }
+        }
+
+        $this->profiles->upsertCore($pageId, $contentType, $summary, $administratorId);
+        $this->profiles->replaceBlockMedia($pageId, $usages);
+    }
+
+    private function syncPublishingProfile(
+        int $pageId,
+        ?CmsPagePublishingRequest $publishing,
+        int $administratorId,
+    ): void {
+        if (!$publishing instanceof CmsPagePublishingRequest || !$this->profiles instanceof PageContentProfileRepository) {
+            return;
+        }
+
+        $profile = $this->profiles->findByPageId($pageId);
+        if (!$profile instanceof PageContentProfile) {
+            throw CmsException::failure();
+        }
+
+        if (
+            $profile->contentType() !== 'notice'
+            && ($publishing->noticeStyle() !== null || $publishing->expiresAt() !== null)
+        ) {
+            throw CmsException::invalidInput('Notice style and expiry are available only for notices.');
+        }
+
+        foreach ([$publishing->featuredMediaId(), $publishing->socialMediaId()] as $mediaId) {
+            if ($mediaId === null) {
+                continue;
+            }
+            if (!$this->contentMedia instanceof ContentMediaRepository) {
+                throw CmsException::failure();
+            }
+            if (!$this->contentMedia->findActiveByIdForShare($mediaId) instanceof ContentMedia) {
+                throw CmsException::invalidInput('A selected publishing image is unavailable.');
+            }
+        }
+
+        $this->profiles->updatePublishing(
+            $pageId,
+            $publishing->noticeStyle(),
+            $publishing->publishAt(),
+            $publishing->expiresAt(),
+            $publishing->isFeatured(),
+            $publishing->isPinned(),
+            $publishing->featuredMediaId(),
+            $publishing->socialTitle(),
+            $publishing->socialDescription(),
+            $publishing->socialMediaId(),
+            $publishing->seoNoindex(),
+            $administratorId,
+        );
     }
 
     /** @param array<string, bool|int|string|null> $metadata */

@@ -136,6 +136,52 @@ final class PageRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testPublicQueriesExcludeFutureScheduledAndExpiredContent(): void
+    {
+        $futureId = CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Future update',
+            'slug' => 'future-update',
+            'status' => CmsPage::PUBLISHED,
+            'published_at' => '2099-01-01 00:00:00',
+        ]);
+        $expiredId = CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Expired notice',
+            'slug' => 'expired-notice',
+            'status' => CmsPage::PUBLISHED,
+            'published_at' => '2026-07-31 01:00:00',
+        ]);
+        $activeId = CmsFixture::insertPage($this->connection, $this->actorId, [
+            'title' => 'Active notice',
+            'slug' => 'active-notice',
+            'status' => CmsPage::PUBLISHED,
+            'published_at' => '2026-07-31 01:00:00',
+        ]);
+
+        $insert = $this->connection->prepare(
+            'INSERT INTO page_content_profiles '
+            . '(page_id, content_type, summary, notice_style, publish_at, expires_at, is_featured, is_pinned, seo_noindex, updated_by) '
+            . "VALUES (:page_id, 'notice', NULL, 'information', :publish_at, :expires_at, 0, 0, 0, :updated_by)",
+        );
+        $insert->execute([
+            'page_id' => $expiredId,
+            'publish_at' => '2026-07-31 01:00:00',
+            'expires_at' => '2026-08-01 00:00:00',
+            'updated_by' => $this->actorId,
+        ]);
+        $insert->execute([
+            'page_id' => $activeId,
+            'publish_at' => '2026-07-31 01:00:00',
+            'expires_at' => '2099-01-01 00:00:00',
+            'updated_by' => $this->actorId,
+        ]);
+
+        self::assertNull($this->repository->findPublishedBySlug('future-update'));
+        self::assertNull($this->repository->findPublishedBySlug('expired-notice'));
+        self::assertSame($activeId, $this->repository->findPublishedBySlug('active-notice')?->id());
+        self::assertNotContains($futureId, array_map(static fn (CmsPage $page): int => $page->id(), $this->repository->findAllPublished()));
+        self::assertNotContains($expiredId, array_map(static fn (CmsPage $page): int => $page->id(), $this->repository->findAllPublished()));
+    }
+
     public function testDuplicateSlugsReturnSafeConflict(): void
     {
         $this->repository->createDraft('About', 'about', 'Body.', null, null, $this->actorId);
@@ -152,7 +198,7 @@ final class PageRepositoryTest extends DatabaseTestCase
 
     public function testRepositoryFailuresAreSanitized(): void
     {
-        $this->connection->exec('DROP TABLE pages');
+        $this->dropTables(['pages']);
 
         try {
             $this->repository->findAll();

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Exceptions\MailException;
 use App\Models\Booking;
+use App\Models\ContactMessage;
 use App\Models\IssuedReviewInvitation;
 use App\Models\MailMessage;
 use App\Models\Payment;
@@ -139,9 +140,55 @@ final readonly class TransactionalMailService
         );
     }
 
+    public function sendContactReply(
+        ContactMessage $contact,
+        #[SensitiveParameter] string $replyBody,
+    ): void {
+        if (
+            $contact->isClosed()
+            || $replyBody === ''
+            || $replyBody !== trim($replyBody)
+            || !mb_check_encoding($replyBody, 'UTF-8')
+            || mb_strlen($replyBody, 'UTF-8') > 5000
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\p{Cf}/u', $replyBody) === 1
+        ) {
+            throw MailException::failure();
+        }
+
+        $subject = 'Re: ' . mb_substr($contact->subject(), 0, 190, 'UTF-8');
+        $this->sendTo(
+            $contact->email(),
+            $contact->name(),
+            $subject,
+            'contact-reply',
+            [
+                'guestName' => $contact->name(),
+                'originalSubject' => $contact->subject(),
+                'replyBody' => $replyBody,
+            ],
+        );
+    }
+
     /** @param array<string, mixed> $data */
     private function send(
         Booking $booking,
+        string $subject,
+        string $template,
+        array $data,
+    ): void {
+        $this->sendTo(
+            $booking->guestEmail(),
+            $booking->guestFullName(),
+            $subject,
+            $template,
+            $data,
+        );
+    }
+
+    /** @param array<string, mixed> $data */
+    private function sendTo(
+        string $recipientAddress,
+        string $recipientName,
         string $subject,
         string $template,
         array $data,
@@ -152,14 +199,13 @@ final readonly class TransactionalMailService
                 'applicationName' => $this->applicationName,
                 'baseUrl' => $this->baseUrl,
             ]);
-            $message = new MailMessage(
-                $booking->guestEmail(),
-                $booking->guestFullName(),
+            $this->transport->send(new MailMessage(
+                $recipientAddress,
+                $recipientName,
                 $subject,
                 $rendered['text'],
                 $rendered['html'],
-            );
-            $this->transport->send($message);
+            ));
         } catch (MailException $exception) {
             throw $exception;
         } catch (Throwable) {

@@ -44,6 +44,9 @@ final class ViewRenderer
 
     private int $renderDepth = 0;
 
+    /** @var array<string, Closure(): mixed> */
+    private array $layoutDataProviders = [];
+
     public function __construct(string $viewsPath)
     {
         $inputPath = rtrim($viewsPath, '/\\');
@@ -66,6 +69,18 @@ final class ViewRenderer
         $this->viewsPath = rtrim($resolvedPath, '/\\');
     }
 
+    /** Register one trusted data provider for a specific layout. */
+    public function registerLayoutDataProvider(string $layout, callable $provider): void
+    {
+        $this->validateTemplateName($layout, 'layouts.');
+
+        if (isset($this->layoutDataProviders[$layout])) {
+            throw new ViewException('The layout data provider is already configured.');
+        }
+
+        $this->layoutDataProviders[$layout] = Closure::fromCallable($provider);
+    }
+
     /**
      * @param array<string, mixed> $data
      */
@@ -81,8 +96,9 @@ final class ViewRenderer
         }
 
         $this->validateTemplateName($layout, 'layouts.');
+        $layoutData = $this->layoutData($layout, $data);
 
-        return $this->execute($layout, [...$data, 'content' => $content]);
+        return $this->execute($layout, [...$layoutData, ...$data, 'content' => $content]);
     }
 
     /**
@@ -94,6 +110,30 @@ final class ViewRenderer
         $this->validateData($data);
 
         return $this->execute($view, $data);
+    }
+
+
+    /** @return array<string, mixed> */
+    private function layoutData(string $layout, array $renderData): array
+    {
+        $provider = $this->layoutDataProviders[$layout] ?? null;
+        if (!$provider instanceof Closure) {
+            return [];
+        }
+
+        try {
+            $data = $provider($renderData);
+        } catch (Throwable) {
+            throw new ViewException('The layout data could not be prepared.');
+        }
+
+        if (!is_array($data)) {
+            throw new ViewException('The layout data could not be prepared.');
+        }
+
+        $this->validateData($data);
+
+        return $data;
     }
 
     /**

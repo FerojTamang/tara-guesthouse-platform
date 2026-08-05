@@ -18,7 +18,7 @@ final class ContactFixture
             'phone' => '+977 9800000000',
             'subject' => 'Airport transfer question',
             'message' => 'Could you please help arrange an airport transfer?',
-            'status' => null,
+            'status' => 'new',
             'created_at' => '2026-07-31 12:00:00',
             'updated_at' => '2026-07-31 12:00:00',
         ], $overrides);

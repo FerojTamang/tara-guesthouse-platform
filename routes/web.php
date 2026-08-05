@@ -167,6 +167,10 @@ return static function (Router $router, ViewRenderer $viewRenderer, mixed ...$de
     }
 
     if ($publicCms !== null) {
+        $router->get('/news', $publicCms->newsIndex(...));
+        $router->get('/news/{slug}', $publicCms->newsArticle(...));
+        $router->get('/notices', $publicCms->noticesIndex(...));
+        $router->get('/notices/{slug}', $publicCms->notice(...));
         $router->get('/{slug}', $publicCms->page(...));
     }
 };

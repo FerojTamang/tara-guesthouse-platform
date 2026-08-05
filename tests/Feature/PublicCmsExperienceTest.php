@@ -11,6 +11,7 @@ use App\Core\ViewRenderer;
 use App\Models\Activity;
 use App\Models\CmsPage;
 use App\Models\GalleryItem;
+use App\Models\PageContentProfile;
 use App\Models\Room;
 use App\Models\RoomImage;
 use App\Models\RoomType;
@@ -19,6 +20,7 @@ use App\Models\SiteSetting;
 use App\Presentation\RoomImageUrl;
 use App\Repositories\ActivityCatalogRepository;
 use App\Repositories\GalleryCatalogRepository;
+use App\Repositories\PageContentProfileRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\RoomCatalogRepository;
 use App\Repositories\RoomImageCatalogRepository;
@@ -38,6 +40,7 @@ final class PublicCmsExperienceTest extends TestCase
 {
     private PublicCmsPageRepositoryFake $pages;
     private PublicCmsSettingRepositoryFake $settings;
+    private PublicCmsProfileRepositoryFake $profiles;
     private Router $router;
 
     protected function setUp(): void
@@ -46,10 +49,34 @@ final class PublicCmsExperienceTest extends TestCase
 
         $this->pages = new PublicCmsPageRepositoryFake();
         $this->settings = new PublicCmsSettingRepositoryFake();
+        $this->profiles = new PublicCmsProfileRepositoryFake();
         $this->pages->pages = [
             1 => self::page(1, 'about', CmsPage::PUBLISHED, "Welcome <script>alert(1)</script>.\nSecond line."),
             2 => self::page(2, 'private-draft', CmsPage::DRAFT, 'Draft content.'),
             3 => self::page(3, 'rooms', CmsPage::PUBLISHED, 'Reserved route content.'),
+            4 => self::page(4, 'garden-news', CmsPage::PUBLISHED, json_encode([
+                'format' => 'tara-blocks-v1',
+                'version' => 1,
+                'type' => 'news',
+                'summary' => 'A fresh update from the Tara Guest House garden.',
+                'blocks' => [[
+                    'type' => 'image',
+                    'media_id' => 12,
+                    'media_title' => 'Garden view',
+                    'url' => '/uploads/content/' . str_repeat('a', 64) . '.webp',
+                    'width' => 1600,
+                    'height' => 900,
+                    'alt' => 'Garden terrace <script>alert(1)</script>',
+                    'caption' => 'Morning in the garden.',
+                ]],
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)),
+            5 => self::page(5, 'arrival-notice', CmsPage::PUBLISHED, 'Please use the east entrance after 8 PM.'),
+        ];
+        $this->profiles->profiles = [
+            1 => self::profile(1, 'page', 'About Tara Guest House.'),
+            3 => self::profile(3, 'page', null),
+            4 => self::profile(4, 'news', 'A fresh update from the Tara Guest House garden.', featured: true),
+            5 => self::profile(5, 'notice', 'Please use the east entrance after 8 PM.', 'important', pinned: true),
         ];
         $this->settings->settings = [
             'contact.email' => self::setting(1, 'contact.email', 'hello@example.test', 'email', true),
@@ -100,6 +127,11 @@ final class PublicCmsExperienceTest extends TestCase
         self::assertStringContainsString('/assets/js/pages/home.js', $response->body());
         self::assertStringContainsString('/assets/images/home/about-tara-guest-house.webp', $response->body());
         self::assertStringContainsString('aria-expanded="false"', $response->body());
+        self::assertStringContainsString('News &amp; stories', $response->body());
+        self::assertStringContainsString('Garden News', $response->body());
+        self::assertStringContainsString('Arrival Notice', $response->body());
+        self::assertStringContainsString('href="/news/garden-news"', $response->body());
+        self::assertStringContainsString('href="/notices/arrival-notice"', $response->body());
     }
 
     public function testHomepageDesignAssetsAreLocalAndAvailable(): void
@@ -112,6 +144,7 @@ final class PublicCmsExperienceTest extends TestCase
             'css/components.css',
             'css/public.css',
             'css/pages/home.css',
+            'css/pages/publishing.css',
             'js/public.js',
             'js/pages/home.js',
             'images/home/home-hero-sauraha-jungle-lodge.png',
@@ -136,6 +169,56 @@ final class PublicCmsExperienceTest extends TestCase
         self::assertStringContainsString('Welcome &lt;script&gt;alert(1)&lt;/script&gt;.<br', $response->body());
         self::assertStringNotContainsString('<script>alert(1)</script>', $response->body());
         self::assertStringContainsString('mailto:hello@example.test', $response->body());
+        self::assertStringContainsString('/assets/css/pages/publishing.css', $response->body());
+    }
+
+    public function testStructuredPageKeepsSharedShellAndRendersManagedMediaSafely(): void
+    {
+        $response = $this->router->dispatch(Request::create('GET', '/news/garden-news'));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertStringContainsString('class="tg-public-header', $response->body());
+        self::assertStringContainsString('class="tg-public-footer"', $response->body());
+        self::assertStringContainsString('A fresh update from the Tara Guest House garden.', $response->body());
+        self::assertStringContainsString(
+            'src="/uploads/content/' . str_repeat('a', 64) . '.webp"',
+            $response->body(),
+        );
+        self::assertStringContainsString('width="1600" height="900"', $response->body());
+        self::assertStringContainsString(
+            'alt="Garden terrace &lt;script&gt;alert(1)&lt;/script&gt;"',
+            $response->body(),
+        );
+        self::assertStringNotContainsString('<script>alert(1)</script>', $response->body());
+        self::assertStringContainsString('/assets/css/public.css', $response->body());
+        self::assertStringContainsString('/assets/css/pages/publishing.css', $response->body());
+        self::assertStringContainsString('href="/news"', $response->body());
+    }
+
+    public function testNewsAndNoticeIndexesExposeOnlyTypedPublishedContentAndLegacyPathsRedirect(): void
+    {
+        $news = $this->router->dispatch(Request::create('GET', '/news'));
+        $notices = $this->router->dispatch(Request::create('GET', '/notices'));
+        $notice = $this->router->dispatch(Request::create('GET', '/notices/arrival-notice'));
+        $wrongCollection = $this->router->dispatch(Request::create('GET', '/news/arrival-notice'));
+        $legacyNews = $this->router->dispatch(Request::create('GET', '/garden-news'));
+        $legacyNotice = $this->router->dispatch(Request::create('GET', '/arrival-notice'));
+
+        self::assertSame(200, $news->statusCode());
+        self::assertStringContainsString('News &amp; stories', $news->body());
+        self::assertStringContainsString('Garden News', $news->body());
+        self::assertStringNotContainsString('Arrival Notice', $news->body());
+        self::assertSame(200, $notices->statusCode());
+        self::assertStringContainsString('Current notices', $notices->body());
+        self::assertStringContainsString('Arrival Notice', $notices->body());
+        self::assertStringNotContainsString('Garden News', $notices->body());
+        self::assertSame(200, $notice->statusCode());
+        self::assertStringContainsString('Important notice', $notice->body());
+        self::assertSame(404, $wrongCollection->statusCode());
+        self::assertSame(301, $legacyNews->statusCode());
+        self::assertSame('/news/garden-news', $legacyNews->headers()['Location']);
+        self::assertSame(301, $legacyNotice->statusCode());
+        self::assertSame('/notices/arrival-notice', $legacyNotice->headers()['Location']);
     }
 
     public function testPageAndPublicSettingsApisExposeOnlyApprovedFields(): void
@@ -266,6 +349,8 @@ final class PublicCmsExperienceTest extends TestCase
             'Tara Guest House',
             'https://example.test',
             $reviews,
+            $this->profiles,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC'),
         );
 
         return new PublicCmsController(
@@ -302,6 +387,36 @@ final class PublicCmsExperienceTest extends TestCase
             $status,
             $status === CmsPage::PUBLISHED ? $timestamp : null,
             1,
+            1,
+            $timestamp,
+            $timestamp,
+        );
+    }
+
+    private static function profile(
+        int $pageId,
+        string $contentType,
+        ?string $summary,
+        ?string $noticeStyle = null,
+        bool $featured = false,
+        bool $pinned = false,
+    ): PageContentProfile {
+        $timestamp = new DateTimeImmutable('2026-07-31 04:00:00 UTC');
+
+        return new PageContentProfile(
+            $pageId,
+            $contentType,
+            $summary,
+            $noticeStyle,
+            $timestamp,
+            $contentType === 'notice' ? new DateTimeImmutable('2026-08-31 04:00:00 UTC') : null,
+            $featured,
+            $pinned,
+            null,
+            null,
+            null,
+            null,
+            false,
             1,
             $timestamp,
             $timestamp,
@@ -413,6 +528,16 @@ final class PublicCmsPageRepositoryFake implements PageRepository
     public function createDraft(string $title, string $slug, string $content, ?string $metaTitle, ?string $metaDescription, int $actorId): CmsPage { throw new RuntimeException('Not supported.'); }
     public function updateContent(int $id, string $title, string $slug, string $content, ?string $metaTitle, ?string $metaDescription, int $actorId): ?CmsPage { throw new RuntimeException('Not supported.'); }
     public function transitionStatus(int $id, string $expectedStatus, string $newStatus, ?DateTimeImmutable $publishedAt, int $actorId): ?CmsPage { throw new RuntimeException('Not supported.'); }
+}
+
+final class PublicCmsProfileRepositoryFake implements PageContentProfileRepository
+{
+    /** @var array<int, PageContentProfile> */ public array $profiles = [];
+    public function findByPageId(int $pageId): ?PageContentProfile { return $this->profiles[$pageId] ?? null; }
+    public function upsertCore(int $pageId, string $contentType, ?string $summary, int $updatedBy): PageContentProfile { throw new RuntimeException('Not supported.'); }
+    public function updatePublishing(int $pageId, ?string $noticeStyle, ?DateTimeImmutable $publishAt, ?DateTimeImmutable $expiresAt, bool $featured, bool $pinned, ?int $featuredMediaId, ?string $socialTitle, ?string $socialDescription, ?int $socialMediaId, bool $seoNoindex, int $updatedBy): PageContentProfile { throw new RuntimeException('Not supported.'); }
+    public function updatePublication(int $pageId, DateTimeImmutable $publishAt, int $updatedBy): void { throw new RuntimeException('Not supported.'); }
+    public function replaceBlockMedia(int $pageId, array $usages): void { throw new RuntimeException('Not supported.'); }
 }
 
 final class PublicCmsSettingRepositoryFake implements SettingRepository

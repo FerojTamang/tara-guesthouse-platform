@@ -1,3 +1,20 @@
+<?php
+$homeLatestNews = is_array($latestNews ?? null) && array_is_list($latestNews) ? $latestNews : [];
+$homeActiveNotice = is_array($activeNotice ?? null) ? $activeNotice : null;
+$homeDate = static function (mixed $value): ?string {
+    if (!is_string($value) || $value === '') {
+        return null;
+    }
+
+    try {
+        return (new DateTimeImmutable($value))
+            ->setTimezone(new DateTimeZone(date_default_timezone_get()))
+            ->format('F j, Y');
+    } catch (Throwable) {
+        return null;
+    }
+};
+?>
 <div class="tg-home">
     <section class="tg-hero" aria-labelledby="home-heading">
         <div class="tg-container tg-hero__inner">
@@ -67,6 +84,69 @@
             <?php endforeach; ?>
         </div>
     </section>
+
+    <?php if ($homeActiveNotice !== null || $homeLatestNews !== []): ?>
+        <section class="tg-home-updates" aria-label="Latest news and guest notices">
+            <div class="tg-container">
+                <?php if ($homeActiveNotice !== null): ?>
+                    <?php $noticeStyle = is_string($homeActiveNotice['notice_style'] ?? null) ? $homeActiveNotice['notice_style'] : 'information'; ?>
+                    <article class="tg-home-notice tg-home-notice--<?= $e($noticeStyle) ?>">
+                        <div class="tg-home-notice__icon" aria-hidden="true"><?= $partial('components.public-icon', ['name' => $noticeStyle === 'event' ? 'calendar' : 'leaf']) ?></div>
+                        <div class="tg-home-notice__body">
+                            <p class="tg-eyebrow mb-2"><?= $e(ucfirst($noticeStyle)) ?> notice</p>
+                            <h2><?= $e((string) $homeActiveNotice['title']) ?></h2>
+                            <p><?= $e((string) $homeActiveNotice['summary']) ?></p>
+                        </div>
+                        <a class="tg-button tg-button--outline tg-button--small" href="<?= $e((string) $homeActiveNotice['href']) ?>">Read notice</a>
+                    </article>
+                <?php endif; ?>
+
+                <?php if ($homeLatestNews !== []): ?>
+                    <div class="tg-home-news">
+                        <div class="tg-section-heading">
+                            <div>
+                                <p class="tg-eyebrow">Latest from Tara</p>
+                                <h2 id="home-news-heading">News &amp; stories</h2>
+                            </div>
+                            <a class="tg-text-link" href="/news">View all news <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                        </div>
+                        <div class="tg-home-news__grid" aria-labelledby="home-news-heading">
+                            <?php foreach ($homeLatestNews as $newsItem): ?>
+                                <?php
+                                $newsImage = is_array($newsItem['featured_image'] ?? null) ? $newsItem['featured_image'] : null;
+                                $newsDate = $homeDate($newsItem['published_at'] ?? null);
+                                ?>
+                                <article class="tg-card tg-home-news-card">
+                                    <?php if ($newsImage !== null): ?>
+                                        <a class="tg-card__media tg-home-news-card__media" href="<?= $e((string) $newsItem['href']) ?>">
+                                            <img
+                                                src="<?= $e((string) ($newsImage['url'] ?? '')) ?>"
+                                                alt="<?= $e((string) ($newsImage['alt_text'] ?? '')) ?>"
+                                                width="<?= $e((int) ($newsImage['width'] ?? 0)) ?>"
+                                                height="<?= $e((int) ($newsImage['height'] ?? 0)) ?>"
+                                                loading="lazy"
+                                                decoding="async"
+                                            >
+                                        </a>
+                                    <?php endif; ?>
+                                    <div class="tg-card__body">
+                                        <?php if ($newsDate !== null): ?><p class="tg-card__kicker"><time datetime="<?= $e((string) $newsItem['published_at']) ?>"><?= $e($newsDate) ?></time></p><?php endif; ?>
+                                        <h3><a href="<?= $e((string) $newsItem['href']) ?>"><?= $e((string) $newsItem['title']) ?></a></h3>
+                                        <p class="tg-card__description"><?= $e((string) $newsItem['summary']) ?></p>
+                                        <a class="tg-text-link" href="<?= $e((string) $newsItem['href']) ?>">Read story <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($homeActiveNotice !== null): ?>
+                    <p class="tg-home-updates__notices-link"><a class="tg-text-link" href="/notices">View all notices <?= $partial('components.public-icon', ['name' => 'arrow']) ?></a></p>
+                <?php endif; ?>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <div class="tg-home-content">
         <section class="tg-discovery tg-container" aria-label="Rooms and Sauraha activities">

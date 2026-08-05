@@ -41,6 +41,11 @@ final class CmsMigrationTest extends DatabaseTestCase
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
         '20260802000100_add_activity_catalogue_homepage_curation',
+        '20260804000100_add_contact_reply_workflow',
+        '20260804220000_create_professional_content_foundation',
+        '20260805000100_create_navigation_items_table',
+        '20260805000200_add_advanced_publishing_controls',
+        '20260805000300_expand_navigation_routes_for_publishing',
     ];
 
     private MigrationRunner $runner;
@@ -76,6 +81,53 @@ final class CmsMigrationTest extends DatabaseTestCase
         self::assertSame('users', $this->foreignReference('pages', 'fk_pages_updated_by'));
         self::assertSame('InnoDB', $this->tableOption('settings', 'ENGINE'));
         self::assertSame('utf8mb4_unicode_ci', $this->tableOption('pages', 'TABLE_COLLATION'));
+
+        self::assertSame([
+            'id', 'storage_path', 'original_name', 'mime_type', 'file_extension',
+            'file_size_bytes', 'width_pixels', 'height_pixels', 'checksum_sha256',
+            'title', 'alt_text', 'caption', 'uploaded_by', 'created_at', 'updated_at', 'deleted_at',
+            'active_checksum_sha256',
+        ], $this->columns('content_media'));
+        self::assertSame(['storage_path'], $this->indexColumns('content_media', 'uq_content_media_storage_path'));
+        self::assertSame(['active_checksum_sha256'], $this->indexColumns('content_media', 'uq_content_media_active_checksum'));
+        self::assertSame('users', $this->foreignReference('content_media', 'fk_content_media_uploaded_by'));
+
+        self::assertSame([
+            'page_id', 'content_type', 'summary', 'notice_style', 'publish_at', 'expires_at',
+            'is_featured', 'is_pinned', 'featured_media_id', 'social_title', 'social_description',
+            'social_media_id', 'seo_noindex', 'updated_by', 'created_at', 'updated_at',
+        ], $this->columns('page_content_profiles'));
+        self::assertSame(
+            ['content_type', 'is_pinned', 'is_featured', 'publish_at', 'expires_at', 'page_id'],
+            $this->indexColumns('page_content_profiles', 'idx_page_content_publishing'),
+        );
+        self::assertSame('pages', $this->foreignReference('page_content_profiles', 'fk_page_content_profile_page'));
+        self::assertSame('content_media', $this->foreignReference('page_content_profiles', 'fk_page_content_profile_featured_media'));
+        self::assertSame('CASCADE', $this->foreignDeleteRule('page_content_profiles', 'fk_page_content_profile_page'));
+
+        self::assertSame(['page_id', 'media_id', 'block_key', 'sort_order', 'created_at'], $this->columns('page_block_media'));
+        self::assertSame('pages', $this->foreignReference('page_block_media', 'fk_page_block_media_page'));
+        self::assertSame('content_media', $this->foreignReference('page_block_media', 'fk_page_block_media_asset'));
+
+        self::assertSame([
+            'id', 'location', 'label', 'link_type', 'route_key', 'page_id', 'parent_id',
+            'sort_order', 'is_active', 'created_by', 'updated_by', 'created_at', 'updated_at',
+        ], $this->columns('navigation_items'));
+        self::assertSame(
+            ['location', 'is_active', 'parent_id', 'sort_order', 'id'],
+            $this->indexColumns('navigation_items', 'idx_navigation_items_public'),
+        );
+        self::assertSame('pages', $this->foreignReference('navigation_items', 'fk_navigation_items_page'));
+        self::assertSame('navigation_items', $this->foreignReference('navigation_items', 'fk_navigation_items_parent'));
+        self::assertSame(7, (int) $this->connection->query('SELECT COUNT(*) FROM navigation_items')->fetchColumn());
+        $this->connection->exec(
+            "INSERT INTO navigation_items (location, label, link_type, route_key, sort_order, is_active) VALUES "
+            . "('main', 'News', 'route', 'news', 80, 1), "
+            . "('main', 'Notices', 'route', 'notices', 90, 1)",
+        );
+        self::assertSame(2, (int) $this->connection->query(
+            "SELECT COUNT(*) FROM navigation_items WHERE route_key IN ('news', 'notices')",
+        )->fetchColumn());
     }
 
     public function testCmsConstraintsStatusPublicationAndActorRetentionAreEnforced(): void
@@ -95,6 +147,10 @@ final class CmsMigrationTest extends DatabaseTestCase
             fn () => CmsFixture::insertPage($this->connection, $actorId, ['slug' => 'Bad Slug']),
             fn () => CmsFixture::insertPage($this->connection, $actorId, ['slug' => 'published-without-time', 'status' => 'published']),
             fn () => CmsFixture::insertPage($this->connection, $actorId, ['slug' => 'unknown-status', 'status' => 'scheduled']),
+            fn () => $this->connection->exec(
+                "INSERT INTO navigation_items (location, label, link_type, route_key, sort_order, is_active) "
+                . "VALUES ('main', 'Unknown', 'route', 'unknown', 100, 1)",
+            ),
         ] as $operation) {
             $this->assertPdoFailure($operation);
         }
@@ -108,6 +164,10 @@ final class CmsMigrationTest extends DatabaseTestCase
     {
         $this->runner->migrate();
         self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
+        self::assertSame(0, $this->tableCount('navigation_items'));
+        self::assertSame(0, $this->tableCount('page_block_media'));
+        self::assertSame(0, $this->tableCount('page_content_profiles'));
+        self::assertSame(0, $this->tableCount('content_media'));
         self::assertSame(0, $this->tableCount('pages'));
         self::assertSame(0, $this->tableCount('settings'));
     }

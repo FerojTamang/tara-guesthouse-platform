@@ -39,4 +39,19 @@ return [
         'filesystem_root' => 'storage/private/gallery',
         'database_path_prefix' => 'gallery/',
     ],
+    'content_media' => [
+        'allowed_mime_extensions' => [
+            'image/jpeg' => ['jpg', 'jpeg'],
+            'image/png' => ['png'],
+            'image/webp' => ['webp'],
+        ],
+        'maximum_file_size_bytes' => 5 * 1024 * 1024,
+        'minimum_width_pixels' => 320,
+        'minimum_height_pixels' => 180,
+        'maximum_width_pixels' => 6000,
+        'maximum_height_pixels' => 6000,
+        'require_decodability' => true,
+        'filesystem_root' => 'public/uploads/content',
+        'database_path_prefix' => 'uploads/content/',
+    ],
 ];

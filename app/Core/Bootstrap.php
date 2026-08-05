@@ -52,9 +52,13 @@ use App\Repositories\PdoAvailabilityRepository;
 use App\Repositories\PdoBookingStatusWriteRepository;
 use App\Repositories\PdoBookingWriteRepository;
 use App\Repositories\PdoContactMessageRepository;
+use App\Repositories\PdoContentMediaRepository;
 use App\Repositories\PdoInvoiceRepository;
 use App\Repositories\PdoNotificationRepository;
+use App\Repositories\PdoNavigationRepository;
 use App\Repositories\PdoPageRepository;
+use App\Repositories\PdoPublicContentCatalogRepository;
+use App\Repositories\PdoPageContentProfileRepository;
 use App\Repositories\PdoSettingRepository;
 use App\Repositories\PaymentMethodRepository;
 use App\Repositories\PdoAdministratorPaymentRepository;
@@ -66,6 +70,7 @@ use App\Repositories\RoomTypeRepository;
 use App\Repositories\UserRepository;
 use App\Services\AdministratorActivityService;
 use App\Services\AdministratorCmsService;
+use App\Services\AdministratorContentMediaService;
 use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
 use App\Services\AdministratorDashboardMetricsService;
@@ -80,6 +85,7 @@ use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
 use App\Services\AdministratorNotificationService;
 use App\Services\AdministratorNotificationServiceProvider;
+use App\Services\AdministratorNavigationService;
 use App\Services\BookingAccessToken;
 use App\Services\BookingCreationService;
 use App\Services\BookingDeadlinePolicy;
@@ -90,12 +96,17 @@ use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmissionWorkflowProvider;
 use App\Services\BookingSuccessFlash;
 use App\Services\CmsManagementServiceProvider;
+use App\Services\NavigationManagementServiceProvider;
+use App\Services\NavigationRouteCatalog;
+use App\Services\ContentMediaManagementServiceProvider;
+use App\Services\ContentMediaStorageProvider;
 use App\Services\CmsPageContentPolicyProvider;
 use App\Services\CmsPageService;
 use App\Services\CmsSettingsService;
 use App\Services\CmsSettingsServiceProvider;
 use App\Services\ContactMessageService;
 use App\Services\ContactMessageServiceProvider;
+use App\Services\ContactReplyMailSender;
 use App\Services\ContactSubmissionFlash;
 use App\Services\GuestPaymentAccessValidator;
 use App\Services\GuestPaymentContinuation;
@@ -120,8 +131,10 @@ use App\Services\VerifiedPaymentBookingConfirmationService;
 use App\Services\LazyAdministratorAuthenticator;
 use App\Services\LazyCmsPageContentSanitizer;
 use App\Services\LoggingTransactionalMailDispatcher;
+use App\Services\LoggingContactReplyMailSender;
 use App\Services\MailTemplateRenderer;
 use App\Services\NullTransactionalMailDispatcher;
+use App\Services\NullContactReplyMailSender;
 use App\Services\ReviewInvitationMailDelivery;
 use App\Services\SmtpMailTransport;
 use App\Services\TransactionalMailDispatcher;
@@ -161,6 +174,8 @@ use App\Services\PublicGalleryServiceProvider;
 use App\Services\PublicBookingRateLimiter;
 use App\Services\PublicCmsService;
 use App\Services\PublicCmsServiceProvider;
+use App\Services\PublicNavigationService;
+use App\Services\PublicNavigationServiceProvider;
 use App\Services\PublicContactRateLimiter;
 use App\Services\PublicPaymentMethodService;
 use App\Services\PublicPaymentMethodServiceProvider;
@@ -172,6 +187,8 @@ use App\Services\PublicRoomCatalogService;
 use App\Services\PublicRoomCatalogServiceProvider;
 use App\Repositories\RoomImageRepository;
 use App\Storage\LazyGalleryImageReader;
+use App\Storage\LocalPaymentMethodQrStorage;
+use App\Storage\LocalSiteLogoStorage;
 use App\Storage\LazyGalleryImageStorage;
 use SensitiveParameter;
 
@@ -239,7 +256,7 @@ final class Bootstrap
             throw new ConfigurationException('Application mail configuration is invalid.');
         }
 
-        $mail = self::mailDispatcher(
+        $mailServices = self::mailServices(
             $mailConfiguration,
             $applicationName,
             $applicationUrl,
@@ -247,6 +264,8 @@ final class Bootstrap
             $viewRenderer,
             $logger,
         );
+        $mail = $mailServices['dispatcher'];
+        $contactReplyMail = $mailServices['contact_replies'];
         $csrfTokens = new CsrfTokenManager($session);
         $administratorSession = new AdministratorSession($session, $csrfTokens);
         $databaseConfiguration = $config->require('database');
@@ -431,6 +450,9 @@ final class Bootstrap
             new PaymentMethodManagementServiceProvider(
                 static fn (): PaymentMethodManagementService => new PaymentMethodManagementService(
                     new PaymentMethodRepository($catalogConnectionProvider()),
+                    new LocalPaymentMethodQrStorage(
+                        PUBLIC_PATH . DIRECTORY_SEPARATOR . 'payment-methods',
+                    ),
                 ),
             ),
             $csrfTokens,
@@ -483,6 +505,31 @@ final class Bootstrap
         );
         $settingDefinitions = new SettingDefinitionRegistryProvider($resolvedBasePath);
         $pageContentPolicy = new CmsPageContentPolicyProvider($resolvedBasePath);
+        $contentMediaStorage = new ContentMediaStorageProvider($resolvedBasePath);
+        $contentMediaServices = new ContentMediaManagementServiceProvider(
+            static function () use ($catalogConnectionProvider, $contentMediaStorage): AdministratorContentMediaService {
+                $connection = $catalogConnectionProvider();
+
+                return new AdministratorContentMediaService(
+                    new PdoContentMediaRepository($connection),
+                    $contentMediaStorage->storage(),
+                    new PdoAuditLogRepository($connection),
+                    new PdoCmsTransaction($connection),
+                );
+            },
+        );
+        $navigationServices = new NavigationManagementServiceProvider(
+            static function () use ($catalogConnectionProvider): AdministratorNavigationService {
+                $connection = $catalogConnectionProvider();
+
+                return new AdministratorNavigationService(
+                    new PdoNavigationRepository($connection),
+                    new PdoPageRepository($connection),
+                    new PdoAuditLogRepository($connection),
+                    new PdoCmsTransaction($connection),
+                );
+            },
+        );
         $administratorCmsController = new AdministratorCmsController(
             $viewRenderer,
             new CmsManagementServiceProvider(
@@ -503,27 +550,37 @@ final class Bootstrap
                         new LazyCmsPageContentSanitizer($pageContentPolicy->sanitizer(...)),
                         new PdoAuditLogRepository($connection),
                         new PdoCmsTransaction($connection),
+                        profiles: new PdoPageContentProfileRepository($connection),
+                        contentMedia: new PdoContentMediaRepository($connection),
                     );
                 },
             ),
             $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
+            new LocalSiteLogoStorage(
+                PUBLIC_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'branding',
+            ),
+            $contentMediaServices,
+            $contentMediaStorage,
+            $navigationServices,
         );
         $contactServices = new ContactMessageServiceProvider(
-            static function () use ($catalogConnectionProvider): ContactMessageService {
+            static function () use ($catalogConnectionProvider, $contactReplyMail): ContactMessageService {
                 $connection = $catalogConnectionProvider();
 
                 return new ContactMessageService(
                     new PdoContactMessageRepository($connection),
                     new PdoAuditLogRepository($connection),
                     new PdoContactTransaction($connection),
+                    $contactReplyMail,
                 );
             },
         );
         $administratorContactController = new AdministratorContactController(
             $viewRenderer,
             $contactServices,
+            $administratorSession,
             $csrfTokens,
             new \DateTimeZone($timezone),
         );
@@ -668,21 +725,59 @@ final class Bootstrap
             new ReviewSubmissionFlash($session),
             $csrfTokens,
         );
+        $publicCmsServices = new PublicCmsServiceProvider(
+            static fn (): PublicCmsService => new PublicCmsService(
+                new PdoPageRepository($catalogConnectionProvider()),
+                new PdoSettingRepository($catalogConnectionProvider()),
+                $settingDefinitions->registry(...),
+                $publicRoomServices->service(),
+                $publicActivityServices->service(),
+                $publicGalleryServices->service(),
+                $applicationName,
+                $applicationUrl,
+                static fn (): array => array_slice($publicReviewServices->service()->approved(), 0, 3),
+                new PdoPageContentProfileRepository($catalogConnectionProvider()),
+                new PdoContentMediaRepository($catalogConnectionProvider()),
+                publicContent: new PdoPublicContentCatalogRepository($catalogConnectionProvider()),
+            ),
+        );
+        $publicNavigationServices = new PublicNavigationServiceProvider(
+            static fn (): PublicNavigationService => new PublicNavigationService(
+                new PdoNavigationRepository($catalogConnectionProvider()),
+                new PdoPageRepository($catalogConnectionProvider()),
+                new NavigationRouteCatalog(),
+                new PdoPageContentProfileRepository($catalogConnectionProvider()),
+            ),
+        );
+        $viewRenderer->registerLayoutDataProvider(
+            'layouts.base',
+            static function (array $renderData = []) use (
+                $applicationName,
+                $publicCmsServices,
+                $publicNavigationServices,
+            ): array {
+                if (($renderData['showPublicNavigation'] ?? true) !== true) {
+                    return [
+                        'siteName' => $applicationName,
+                        'navigationItems' => [],
+                        'footerNavigationItems' => [],
+                        'footerSettings' => [],
+                    ];
+                }
+
+                $navigation = $publicNavigationServices->service()->layout();
+
+                return [
+                    'siteName' => $applicationName,
+                    'navigationItems' => $navigation['main'],
+                    'footerNavigationItems' => $navigation['footer'],
+                    'footerSettings' => $publicCmsServices->service()->footerLayoutSettings(),
+                ];
+            },
+        );
         $publicCmsController = new PublicCmsController(
             $viewRenderer,
-            new PublicCmsServiceProvider(
-                static fn (): PublicCmsService => new PublicCmsService(
-                    new PdoPageRepository($catalogConnectionProvider()),
-                    new PdoSettingRepository($catalogConnectionProvider()),
-                    $settingDefinitions->registry(...),
-                    $publicRoomServices->service(),
-                    $publicActivityServices->service(),
-                    $publicGalleryServices->service(),
-                    $applicationName,
-                    $applicationUrl,
-                    static fn (): array => array_slice($publicReviewServices->service()->approved(), 0, 3),
-                ),
-            ),
+            $publicCmsServices,
         );
         $publicAvailabilityController = new PublicAvailabilityController(
             new PublicAvailabilityServiceProvider(
@@ -925,15 +1020,18 @@ final class Bootstrap
         return new Application($router, $errorHandler, $session);
     }
 
-    /** @param array<string, mixed> $configuration */
-    private static function mailDispatcher(
+    /**
+     * @param array<string, mixed> $configuration
+     * @return array{dispatcher: TransactionalMailDispatcher, contact_replies: ContactReplyMailSender}
+     */
+    private static function mailServices(
         #[SensitiveParameter] array $configuration,
         string $applicationName,
         ?string $applicationUrl,
         string $timezone,
         ViewRenderer $views,
         \Psr\Log\LoggerInterface $logger,
-    ): TransactionalMailDispatcher {
+    ): array {
         $expectedKeys = [
             'enabled',
             'host',
@@ -953,7 +1051,10 @@ final class Bootstrap
         }
 
         if ($configuration['enabled'] === false) {
-            return new NullTransactionalMailDispatcher();
+            return [
+                'dispatcher' => new NullTransactionalMailDispatcher(),
+                'contact_replies' => new NullContactReplyMailSender(),
+            ];
         }
 
         if (!is_string($applicationUrl) || $applicationUrl === '') {
@@ -989,7 +1090,10 @@ final class Bootstrap
             },
         );
 
-        return new LoggingTransactionalMailDispatcher($provider, $logger);
+        return [
+            'dispatcher' => new LoggingTransactionalMailDispatcher($provider, $logger),
+            'contact_replies' => new LoggingContactReplyMailSender($provider, $logger),
+        ];
     }
 
     /** @param array<string, mixed> $configuration */

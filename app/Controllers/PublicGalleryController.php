@@ -36,6 +36,7 @@ final readonly class PublicGalleryController
                 [
                     'title' => 'Gallery | Tara Guest House',
                     'galleryItems' => $this->services->service()->list(),
+                    'isGallery' => true,
                 ],
                 'layouts.base',
             );

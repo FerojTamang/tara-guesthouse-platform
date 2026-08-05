@@ -33,6 +33,16 @@ final class CmsException extends RuntimeException
         return new self('The requested page was not found.', 'not_found', $previous);
     }
 
+    public static function navigationItemNotFound(?Throwable $previous = null): self
+    {
+        return new self('The requested navigation item was not found.', 'not_found', $previous);
+    }
+
+    public static function navigationConflict(string $message, ?Throwable $previous = null): self
+    {
+        return new self($message, 'conflict', $previous);
+    }
+
     public static function duplicatePageSlug(?Throwable $previous = null): self
     {
         return new self('A page with this slug already exists.', 'conflict', $previous);

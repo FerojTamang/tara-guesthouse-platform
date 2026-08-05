@@ -3,8 +3,7 @@
         <p class="admin-eyebrow mb-2">Guest communication</p>
         <h1 id="contact-messages-heading" class="h2 mb-2">Contact messages</h1>
         <p class="text-secondary mb-0">
-            Read retained Guest inquiries. Status and assignment actions remain unavailable
-            until the approved workflow policy is supplied.
+            Review Guest inquiries, send email replies, and keep a retained communication history.
         </p>
     </div>
 
@@ -64,7 +63,7 @@
                                     <td class="py-3"><?= $e($contact['subject']) ?></td>
                                     <td class="py-3"><?= $e($contact['createdAt']) ?></td>
                                     <td class="py-3">
-                                        <span class="badge text-bg-secondary">
+                                        <span class="badge <?= $e($contact['statusBadge']) ?>">
                                             <?= $e($contact['statusLabel']) ?>
                                         </span>
                                     </td>
@@ -72,7 +71,7 @@
                                         <a
                                             class="btn btn-sm btn-outline-primary"
                                             href="/admin/contact-messages/<?= $e($contact['id']) ?>"
-                                        >View</a>
+                                        >Open</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

@@ -7,9 +7,21 @@ namespace App\Models;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
-/** Represents one retained Guest inquiry. */
+/** Represents one retained Guest inquiry and its controlled workflow state. */
 final readonly class ContactMessage
 {
+    public const STATUS_NEW = 'new';
+    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_REPLIED = 'replied';
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUSES = [
+        self::STATUS_NEW,
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_REPLIED,
+        self::STATUS_CLOSED,
+    ];
+
     public function __construct(
         private int $id,
         private string $name,
@@ -17,7 +29,7 @@ final readonly class ContactMessage
         private ?string $phone,
         private string $subject,
         private string $message,
-        private ?string $status,
+        private string $status,
         private DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
     ) {
@@ -28,9 +40,10 @@ final readonly class ContactMessage
             || !$this->optionalPhone($phone)
             || !$this->requiredSingleLine($subject, 200)
             || !$this->requiredMessage($message)
-            || !$this->optionalStatus($status)
+            || !in_array($status, self::STATUSES, true)
             || $createdAt->getOffset() !== 0
             || $updatedAt->getOffset() !== 0
+            || $updatedAt < $createdAt
         ) {
             throw new InvalidArgumentException('Contact message data is invalid.');
         }
@@ -42,9 +55,14 @@ final readonly class ContactMessage
     public function phone(): ?string { return $this->phone; }
     public function subject(): string { return $this->subject; }
     public function message(): string { return $this->message; }
-    public function status(): ?string { return $this->status; }
+    public function status(): string { return $this->status; }
     public function createdAt(): DateTimeImmutable { return $this->createdAt; }
     public function updatedAt(): DateTimeImmutable { return $this->updatedAt; }
+
+    public function isClosed(): bool
+    {
+        return $this->status === self::STATUS_CLOSED;
+    }
 
     private function requiredSingleLine(string $value, int $maximumLength): bool
     {
@@ -80,15 +98,5 @@ final readonly class ContactMessage
             && mb_check_encoding($value, 'UTF-8')
             && mb_strlen($value, 'UTF-8') <= 5000
             && preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\p{Cf}/u', $value) !== 1;
-    }
-
-    private function optionalStatus(?string $value): bool
-    {
-        return $value === null || (
-            $value !== ''
-            && $value === trim($value)
-            && strlen($value) <= 40
-            && preg_match('/^[a-z][a-z0-9_]*$/D', $value) === 1
-        );
     }
 }

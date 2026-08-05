@@ -11,15 +11,9 @@
         <div class="alert alert-danger" role="alert"><?= $e($error) ?></div>
     <?php endif; ?>
 
-    <?php if ($qrConfigured): ?>
-        <div class="alert alert-info" role="status">
-            An existing QR image is configured and will be preserved. QR-image upload management is not part of this workflow.
-        </div>
-    <?php endif; ?>
-
     <div class="card admin-panel">
         <div class="card-body p-4">
-            <form method="post" action="<?= $e($action) ?>">
+            <form method="post" action="<?= $e($action) ?>" enctype="multipart/form-data">
                 <input type="hidden" name="_csrf" value="<?= $e($csrfToken) ?>">
 
                 <div class="row g-3">
@@ -51,6 +45,53 @@
                         >
                         <div id="payment-method-account-reference-help" class="form-text">
                             Optional Guest-facing account, wallet or transfer reference.
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="border rounded-3 p-3 bg-light-subtle">
+                            <div class="row g-3 align-items-start">
+                                <div class="col-12 col-lg-8">
+                                    <label class="form-label" for="payment-method-qr-image">Payment QR image</label>
+                                    <input
+                                        id="payment-method-qr-image"
+                                        class="form-control"
+                                        type="file"
+                                        name="qr_image"
+                                        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                                        aria-describedby="payment-method-qr-help"
+                                    >
+                                    <div id="payment-method-qr-help" class="form-text">
+                                        Optional. Upload a JPG, PNG, or WebP QR image up to 5 MiB. The image is shown to Guests on the payment page.
+                                    </div>
+                                    <?php if ($qrConfigured): ?>
+                                        <div class="form-check mt-3">
+                                            <input
+                                                id="payment-method-remove-qr"
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="remove_qr_image"
+                                                value="1"
+                                            >
+                                            <label class="form-check-label" for="payment-method-remove-qr">
+                                                Remove the current QR image
+                                            </label>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($qrImageUrl !== null): ?>
+                                    <div class="col-12 col-lg-4">
+                                        <p class="form-label mb-2">Current QR image</p>
+                                        <img
+                                            class="img-fluid rounded border bg-white p-2"
+                                            src="<?= $e($qrImageUrl) ?>"
+                                            alt="Current payment QR image"
+                                            width="320"
+                                            height="320"
+                                        >
+                                    </div>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
 

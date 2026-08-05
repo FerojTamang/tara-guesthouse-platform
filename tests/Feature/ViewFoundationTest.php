@@ -84,6 +84,83 @@ final class ViewFoundationTest extends TestCase
         self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
+    public function testLayoutDataProviderSuppliesGlobalNavigationWithoutOverridingExplicitData(): void
+    {
+        $renderer = new ViewRenderer(
+            dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
+        );
+        $renderer->registerLayoutDataProvider('layouts.base', static fn (): array => [
+            'siteName' => 'Provider Guest House',
+            'navigationItems' => [
+                ['label' => 'About', 'href' => '/about', 'children' => []],
+            ],
+            'footerNavigationItems' => [
+                ['label' => 'Privacy', 'href' => '/privacy'],
+            ],
+            'footerSettings' => [],
+        ]);
+
+        $data = [
+            'title' => 'Provider page',
+            'page' => [
+                'title' => 'Provider page',
+                'content' => 'Safe page content.',
+            ],
+        ];
+        $provided = $renderer->render('public.pages.show', $data, 'layouts.base');
+
+        self::assertStringContainsString('Provider Guest House', $provided);
+        self::assertStringContainsString('data-nav-link href="/about">About</a>', $provided);
+        self::assertStringContainsString('href="/privacy">Privacy</a>', $provided);
+
+        $explicit = $renderer->render('public.pages.show', [
+            ...$data,
+            'siteName' => 'Explicit Guest House',
+            'navigationItems' => [
+                ['label' => 'Contact', 'href' => '/contact', 'children' => []],
+            ],
+        ], 'layouts.base');
+
+        self::assertStringContainsString('Explicit Guest House', $explicit);
+        self::assertStringContainsString('data-nav-link href="/contact">Contact</a>', $explicit);
+        self::assertStringNotContainsString('data-nav-link href="/about">About</a>', $explicit);
+    }
+
+
+    public function testLayoutDataProviderCanSkipPublicDependenciesWhenNavigationIsHidden(): void
+    {
+        $renderer = new ViewRenderer(
+            dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views',
+        );
+        $providerCalls = 0;
+        $renderer->registerLayoutDataProvider(
+            'layouts.base',
+            static function (array $renderData) use (&$providerCalls): array {
+                $providerCalls++;
+                self::assertFalse($renderData['showPublicNavigation']);
+
+                return [
+                    'siteName' => 'Provider Guest House',
+                    'navigationItems' => [],
+                    'footerNavigationItems' => [],
+                    'footerSettings' => [],
+                ];
+            },
+        );
+
+        $html = $renderer->render('auth.login', [
+            'title' => 'Administrator Login',
+            'csrfToken' => 'test-token',
+            'error' => null,
+            'identifier' => '',
+            'showPublicNavigation' => false,
+        ], 'layouts.base');
+
+        self::assertSame(1, $providerCalls);
+        self::assertStringContainsString('Administrator login', $html);
+        self::assertStringNotContainsString('tg-public-header', $html);
+    }
+
     public function testHeadRootReturnsHtmlHeadersWithoutABody(): void
     {
         $response = $this->application()->handle(Request::create('HEAD', '/'));

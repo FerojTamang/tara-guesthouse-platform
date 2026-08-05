@@ -7,15 +7,18 @@ namespace App\Services;
 use App\Exceptions\ContactException;
 use App\Models\AuditLogEntry;
 use App\Models\ContactMessage;
+use App\Models\ContactMessageReply;
 use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\ContactMessageRepository;
+use App\Requests\AdministratorContactReplyRequest;
+use App\Requests\AdministratorContactStatusRequest;
 use App\Requests\ContactMessageRequest;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
 
-/** Owns public inquiry submission and read-only Administrator access. */
+/** Owns public inquiry submission and controlled Administrator replies. */
 final readonly class ContactMessageService
 {
     private Closure $clock;
@@ -25,6 +28,7 @@ final readonly class ContactMessageService
         private ContactMessageRepository $contacts,
         private AuditLogWriteRepository $auditLogs,
         private ContactTransaction $transaction,
+        private ContactReplyMailSender $mail,
         ?callable $clock = null,
     ) {
         $this->clock = Closure::fromCallable(
@@ -99,6 +103,201 @@ final readonly class ContactMessageService
         }
     }
 
+    /** @return list<ContactMessageReply> */
+    public function replies(int $contactMessageId): array
+    {
+        if ($contactMessageId <= 0) {
+            throw ContactException::notFound();
+        }
+
+        try {
+            return $this->contacts->findRepliesByContactMessageId($contactMessageId);
+        } catch (Throwable $failure) {
+            throw ContactException::failure($failure);
+        }
+    }
+
+    public function reply(
+        int $contactMessageId,
+        AdministratorContactReplyRequest $request,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ContactMessageReply {
+        if ($contactMessageId <= 0 || $administratorId <= 0) {
+            throw ContactException::notFound();
+        }
+
+        /** @var array{contact: ContactMessage, reply: ContactMessageReply} $queued */
+        $queued = $this->transact(function () use (
+            $contactMessageId,
+            $request,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+        ): array {
+            $contact = $this->contacts->findByIdForUpdate($contactMessageId);
+
+            if (!$contact instanceof ContactMessage) {
+                throw ContactException::notFound();
+            }
+
+            if ($contact->isClosed()) {
+                throw ContactException::conflict(
+                    'Reopen this contact message before sending another reply.',
+                );
+            }
+
+            $now = $this->now();
+            $reply = $this->contacts->createReply(
+                $contact->id(),
+                $request->replyBody(),
+                $administratorId,
+                $now,
+            );
+            $contact = $this->contacts->updateStatus(
+                $contact->id(),
+                ContactMessage::STATUS_IN_PROGRESS,
+                $now,
+            );
+
+            $this->auditLogs->append(new AuditLogEntry(
+                $administratorId,
+                'contact_reply_queued',
+                'contact_message',
+                $contact->id(),
+                'Administrator queued a contact-message email reply.',
+                sprintf('{"reply_id":%d}', $reply->id()),
+                $ipAddress,
+                $this->normalizeUserAgent($userAgent),
+                $now,
+            ));
+
+            return ['contact' => $contact, 'reply' => $reply];
+        });
+
+        $delivered = $this->mail->send(
+            $queued['contact'],
+            $request->replyBody(),
+        );
+
+        $reply = $this->transact(function () use (
+            $queued,
+            $delivered,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+        ): ContactMessageReply {
+            $contact = $this->contacts->findByIdForUpdate($queued['contact']->id());
+
+            if (!$contact instanceof ContactMessage) {
+                throw ContactException::notFound();
+            }
+
+            $now = $this->now();
+
+            if ($delivered) {
+                $reply = $this->contacts->markReplySent($queued['reply']->id(), $now);
+
+                if (!$contact->isClosed()) {
+                    $this->contacts->updateStatus(
+                        $contact->id(),
+                        ContactMessage::STATUS_REPLIED,
+                        $now,
+                    );
+                }
+
+                $event = 'contact_reply_sent';
+                $description = 'Administrator sent a contact-message email reply.';
+            } else {
+                $reply = $this->contacts->markReplyFailed(
+                    $queued['reply']->id(),
+                    'mail_delivery_failed',
+                    $now,
+                );
+                $event = 'contact_reply_failed';
+                $description = 'Contact-message email reply delivery failed.';
+            }
+
+            $this->auditLogs->append(new AuditLogEntry(
+                $administratorId,
+                $event,
+                'contact_message',
+                $contact->id(),
+                $description,
+                sprintf('{"reply_id":%d}', $reply->id()),
+                $ipAddress,
+                $this->normalizeUserAgent($userAgent),
+                $now,
+            ));
+
+            return $reply;
+        });
+
+        if (!$delivered) {
+            throw ContactException::delivery();
+        }
+
+        return $reply;
+    }
+
+    public function transitionStatus(
+        int $contactMessageId,
+        AdministratorContactStatusRequest $request,
+        int $administratorId,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): ContactMessage {
+        if ($contactMessageId <= 0 || $administratorId <= 0) {
+            throw ContactException::notFound();
+        }
+
+        return $this->transact(function () use (
+            $contactMessageId,
+            $request,
+            $administratorId,
+            $ipAddress,
+            $userAgent,
+        ): ContactMessage {
+            $contact = $this->contacts->findByIdForUpdate($contactMessageId);
+
+            if (!$contact instanceof ContactMessage) {
+                throw ContactException::notFound();
+            }
+
+            $target = $request->targetStatus();
+            $allowed = $target === ContactMessage::STATUS_CLOSED
+                ? !$contact->isClosed()
+                : $contact->isClosed();
+
+            if (!$allowed) {
+                throw ContactException::conflict(
+                    'This contact message can no longer use that workflow action.',
+                );
+            }
+
+            $now = $this->now();
+            $updated = $this->contacts->updateStatus($contact->id(), $target, $now);
+            $this->auditLogs->append(new AuditLogEntry(
+                $administratorId,
+                $target === ContactMessage::STATUS_CLOSED
+                    ? 'contact_message_closed'
+                    : 'contact_message_reopened',
+                'contact_message',
+                $contact->id(),
+                $target === ContactMessage::STATUS_CLOSED
+                    ? 'Administrator closed a contact message.'
+                    : 'Administrator reopened a contact message.',
+                null,
+                $ipAddress,
+                $this->normalizeUserAgent($userAgent),
+                $now,
+            ));
+
+            return $updated;
+        });
+    }
+
     private function normalizeSearch(?string $search): ?string
     {
         if ($search === null) {
@@ -130,7 +329,11 @@ final readonly class ContactMessageService
             throw ContactException::failure();
         }
 
-        return $value;
+        return $value->setTime(
+            (int) $value->format('H'),
+            (int) $value->format('i'),
+            (int) $value->format('s'),
+        );
     }
 
     private function normalizeUserAgent(?string $userAgent): ?string

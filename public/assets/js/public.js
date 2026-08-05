@@ -7,6 +7,7 @@
     const toggle = document.querySelector('[data-nav-toggle]');
     const panel = document.querySelector('[data-nav-panel]');
     const links = Array.from(document.querySelectorAll('[data-nav-link]'));
+    const dropdowns = Array.from(document.querySelectorAll('.tg-nav-dropdown'));
 
     const normalizedPath = window.location.pathname.replace(/\/$/, '') || '/';
 
@@ -58,6 +59,7 @@
 
         panel.addEventListener('click', (event) => {
             if (event.target instanceof Element && event.target.closest('a')) {
+                dropdowns.forEach((dropdown) => dropdown.removeAttribute('open'));
                 closeMenu();
             }
         });
@@ -74,6 +76,13 @@
             }
         });
     }
+
+    document.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element) || event.target.closest('.tg-nav-dropdown')) {
+            return;
+        }
+        dropdowns.forEach((dropdown) => dropdown.removeAttribute('open'));
+    });
 
     document.addEventListener('pointerdown', (event) => {
         const button = event.target instanceof Element ? event.target.closest('[data-ripple]') : null;

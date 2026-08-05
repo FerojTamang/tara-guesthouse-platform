@@ -130,8 +130,19 @@
     box-shadow: var(--tg-shadow-sm);
 }
 
-.tg-search-card {
+.tg-availability-search-stage {
+    display: grid;
+    gap: 1rem;
     margin-top: -6rem;
+}
+
+.tg-availability-search-stage .tg-alert {
+    margin: 0;
+    box-shadow: var(--tg-shadow-sm);
+}
+
+.tg-search-card {
+    margin-top: 0;
     padding: clamp(1rem, 3vw, 1.75rem);
 }
 
@@ -411,28 +422,79 @@
 
 .tg-payment-method-list {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.8rem;
+    gap: 1rem;
 }
 
 .tg-payment-method-card,
 .tg-method-details {
-    padding: 1rem;
+    padding: clamp(1rem, 3vw, 1.35rem);
     border: 1px solid var(--tg-border);
-    border-radius: var(--tg-radius-sm);
-    background: var(--tg-sage);
+    border-radius: var(--tg-radius-md);
+    background: linear-gradient(145deg, var(--tg-sage), var(--tg-white));
+}
+
+.tg-payment-method-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.tg-payment-method-card--without-qr {
+    grid-template-columns: 1fr;
 }
 
 .tg-payment-method-card h3 {
-    font-size: 1.15rem;
+    margin-bottom: 0.75rem;
+    font-size: clamp(1.2rem, 2vw, 1.55rem);
 }
 
-.tg-payment-method-card img {
+.tg-payment-method-card__instructions {
+    color: var(--tg-muted);
+    line-height: 1.7;
+}
+
+.tg-payment-method-card__reference {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid rgba(6, 95, 70, 0.14);
+    border-radius: var(--tg-radius-sm);
+    background: var(--tg-white);
+    color: var(--tg-emerald-deep);
+}
+
+.tg-payment-method-card__qr {
+    display: grid;
+    gap: 0.6rem;
+    justify-items: center;
+    padding: 0.85rem;
+    border: 1px solid rgba(6, 95, 70, 0.14);
+    border-radius: var(--tg-radius-md);
+    background: var(--tg-white);
+    text-align: center;
+}
+
+.tg-payment-method-card__qr img {
     display: block;
     width: min(100%, 220px);
     aspect-ratio: 1;
-    margin: 1rem auto;
+    margin: 0;
     object-fit: contain;
+}
+
+.tg-payment-method-card__qr figcaption {
+    color: var(--tg-muted);
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.tg-payment-method-card__proof {
+    margin-bottom: 0;
+    color: var(--tg-emerald-deep);
+    font-size: 0.84rem;
+    font-weight: 750;
 }
 
 .tg-payment-empty {
@@ -496,7 +558,7 @@
         flex: 1 1 100%;
     }
 
-    .tg-payment-method-list {
+    .tg-payment-method-card {
         grid-template-columns: 1fr;
     }
 
@@ -504,7 +566,7 @@
 }
 
 @media (max-width: 575.98px) {
-    .tg-search-card {
+    .tg-availability-search-stage {
         margin-top: -4rem;
     }
 

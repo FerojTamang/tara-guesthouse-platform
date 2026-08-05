@@ -190,6 +190,8 @@ return static function (
 
     if ($cmsController !== null) {
         $router->get('/admin/settings', [$cmsController, 'settings'], [$requireAdministrator]);
+        $router->get('/admin/media', [$cmsController, 'mediaLibrary'], [$requireAdministrator]);
+        $router->get('/admin/navigation', [$cmsController, 'navigation'], [$requireAdministrator]);
         $router->get('/admin/pages', [$cmsController, 'pages'], [$requireAdministrator]);
         $router->get('/admin/pages/create', [$cmsController, 'createPageForm'], [$requireAdministrator]);
         $router->get('/admin/pages/{id}/edit', [$cmsController, 'editPageForm'], [$requireAdministrator]);

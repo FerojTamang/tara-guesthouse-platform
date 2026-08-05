@@ -10,7 +10,7 @@ use App\Core\ViewRenderer;
 use App\Exceptions\CmsException;
 use App\Services\PublicCmsServiceProvider;
 
-/** Handles public homepage, published CMS pages, and exact CMS read APIs. */
+/** Handles the public homepage, content collections, published CMS pages, and exact read APIs. */
 final readonly class PublicCmsController
 {
     public function __construct(
@@ -39,6 +39,8 @@ final readonly class PublicCmsController
                     'activities' => $home['activities'],
                     'galleryItems' => $home['gallery'],
                     'reviews' => $home['reviews'],
+                    'latestNews' => $home['latest_news'],
+                    'activeNotice' => $home['active_notice'],
                     'isHome' => true,
                 ],
                 'layouts.base',
@@ -51,38 +53,145 @@ final readonly class PublicCmsController
     }
 
     /** @param array<string, string> $parameters */
-    public function page(Request $request, array $parameters): Response
+    public function newsIndex(Request $request, array $parameters): Response
     {
         try {
-            $service = $this->services->service();
-            $page = $service->page($parameters['slug'] ?? '');
-            $layout = $service->layoutContext();
-            $title = $page['meta_title'] ?? $page['title'];
-            $description = $page['meta_description'];
+            $news = $this->services->service()->newsIndex();
             $html = $this->views->render(
-                'public.pages.show',
+                'public.news.index',
                 [
-                    'title' => $title,
-                    'page' => $page,
-                    'siteName' => $page['site_name'],
-                    'metaDescription' => $description,
-                    'canonicalUrl' => $page['canonical_url'],
-                    'openGraphTitle' => $title,
-                    'openGraphDescription' => $description,
-                    'navigationPages' => $layout['navigation_pages'],
-                    'footerSettings' => $layout['footer_settings'],
+                    'title' => $news['title'],
+                    'metaDescription' => $news['meta_description'],
+                    'canonicalUrl' => $news['canonical_url'],
+                    'openGraphTitle' => $news['title'],
+                    'openGraphDescription' => $news['meta_description'],
+                    'items' => $news['items'],
+                    'isPublishing' => true,
                 ],
                 'layouts.base',
             );
 
             return Response::html($html, 200, ['Cache-Control' => 'no-store']);
-        } catch (CmsException $exception) {
-            if ($exception->isNotFound()) {
-                return Response::text('Not Found', 404, ['Cache-Control' => 'no-store']);
-            }
-
+        } catch (CmsException) {
             return Response::text('Internal Server Error', 500, ['Cache-Control' => 'no-store']);
         }
+    }
+
+    /** @param array<string, string> $parameters */
+    public function noticesIndex(Request $request, array $parameters): Response
+    {
+        try {
+            $notices = $this->services->service()->noticesIndex();
+            $html = $this->views->render(
+                'public.notices.index',
+                [
+                    'title' => $notices['title'],
+                    'metaDescription' => $notices['meta_description'],
+                    'canonicalUrl' => $notices['canonical_url'],
+                    'openGraphTitle' => $notices['title'],
+                    'openGraphDescription' => $notices['meta_description'],
+                    'items' => $notices['items'],
+                    'isPublishing' => true,
+                ],
+                'layouts.base',
+            );
+
+            return Response::html($html, 200, ['Cache-Control' => 'no-store']);
+        } catch (CmsException) {
+            return Response::text('Internal Server Error', 500, ['Cache-Control' => 'no-store']);
+        }
+    }
+
+    /** @param array<string, string> $parameters */
+    public function newsArticle(Request $request, array $parameters): Response
+    {
+        try {
+            return $this->renderPage(
+                $this->services->service()->newsArticle($parameters['slug'] ?? ''),
+                '/news',
+                'All news',
+            );
+        } catch (CmsException $exception) {
+            return $this->contentFailure($exception);
+        }
+    }
+
+    /** @param array<string, string> $parameters */
+    public function notice(Request $request, array $parameters): Response
+    {
+        try {
+            return $this->renderPage(
+                $this->services->service()->notice($parameters['slug'] ?? ''),
+                '/notices',
+                'All notices',
+            );
+        } catch (CmsException $exception) {
+            return $this->contentFailure($exception);
+        }
+    }
+
+    /** @param array<string, string> $parameters */
+    public function page(Request $request, array $parameters): Response
+    {
+        try {
+            $page = $this->services->service()->page($parameters['slug'] ?? '');
+            $contentType = $page['content_type'] ?? 'page';
+            if ($contentType === 'news') {
+                return Response::redirect('/news/' . $page['slug'], 301, ['Cache-Control' => 'no-store']);
+            }
+            if ($contentType === 'notice') {
+                return Response::redirect('/notices/' . $page['slug'], 301, ['Cache-Control' => 'no-store']);
+            }
+
+            return $this->renderPage($page);
+        } catch (CmsException $exception) {
+            return $this->contentFailure($exception);
+        }
+    }
+
+    /** @param array<string, mixed> $page */
+    private function renderPage(array $page, ?string $indexHref = null, ?string $indexLabel = null): Response
+    {
+        $service = $this->services->service();
+        $layout = $service->layoutContext();
+        $title = $page['meta_title'] ?? $page['title'];
+        $description = $page['meta_description'] ?? $page['summary'];
+        $socialTitle = $page['social_title'] ?? $title;
+        $socialDescription = $page['social_description'] ?? $description;
+        $html = $this->views->render(
+            'public.pages.show',
+            [
+                'title' => $title,
+                'page' => $page,
+                'siteName' => $page['site_name'],
+                'metaDescription' => $description,
+                'canonicalUrl' => $page['canonical_url'],
+                'openGraphTitle' => $socialTitle,
+                'openGraphDescription' => $socialDescription,
+                'openGraphImage' => $page['social_image'],
+                'openGraphType' => in_array($page['content_type'] ?? null, ['news', 'notice'], true)
+                    ? 'article'
+                    : 'website',
+                'robotsNoindex' => $page['seo_noindex'],
+                'navigationPages' => $layout['navigation_pages'],
+                'footerSettings' => $layout['footer_settings'],
+                'contentIndexHref' => $indexHref,
+                'contentIndexLabel' => $indexLabel,
+                'isPublishing' => true,
+            ],
+            'layouts.base',
+        );
+
+        return Response::html($html, 200, ['Cache-Control' => 'no-store']);
+    }
+
+    private function contentFailure(CmsException $exception): Response
+    {
+        if ($exception->isNotFound()) {
+            return Response::text('Not Found', 404, ['Cache-Control' => 'no-store']);
+        }
+
+        return Response::text('Internal Server Error', 500, ['Cache-Control' => 'no-store']);
     }
 
     /** @param array<string, string> $parameters */

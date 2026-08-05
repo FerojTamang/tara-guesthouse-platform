@@ -79,7 +79,7 @@ $remainingRooms = array_slice($rooms, 1);
                 <div>
                     <p class="tg-eyebrow">Our accommodation</p>
                     <h2 id="rooms-listing-heading">Choose Your Room</h2>
-                    <p>Find the room that best fits your stay and continue to the existing room details page for complete information.</p>
+                    <p>Compare real room details, amenities, capacity, and nightly rates before checking your dates.</p>
                 </div>
                 <p class="tg-rooms-listing__count"><?= $e((string) $roomCount) ?> <?= $roomCount === 1 ? 'room' : 'rooms' ?></p>
             </header>
@@ -95,8 +95,13 @@ $remainingRooms = array_slice($rooms, 1);
                     </div>
                 </div>
             <?php else: ?>
+                <?php
+                $leadAmenities = array_slice($leadRoom['amenities'], 0, 6);
+                $leadAmenityRemainder = max(0, count($leadRoom['amenities']) - count($leadAmenities));
+                ?>
                 <article class="tg-card tg-rooms-lead" data-room-slug="<?= $e($leadRoom['slug']) ?>">
                     <a class="tg-rooms-lead__media" href="/rooms/<?= $e($leadRoom['slug']) ?>" aria-label="View details for <?= $e($leadRoom['name']) ?>">
+                        <span class="tg-rooms-lead__badge"><?= $partial('components.public-icon', ['name' => 'heart']) ?> Featured room</span>
                         <img src="<?= $e($leadRoom['primaryImageUrl']) ?>" alt="<?= $e($leadRoom['name']) ?>" loading="lazy" decoding="async">
                     </a>
                     <div class="tg-rooms-lead__body">
@@ -107,45 +112,63 @@ $remainingRooms = array_slice($rooms, 1);
                             <span><?= $partial('components.public-icon', ['name' => 'users']) ?> <?= $e((string) $leadRoom['capacityAdults']) ?> adult<?= $leadRoom['capacityAdults'] === 1 ? '' : 's' ?></span>
                             <span><?= $e((string) $leadRoom['capacityChildren']) ?> child<?= $leadRoom['capacityChildren'] === 1 ? '' : 'ren' ?></span>
                         </div>
-                        <?php if ($leadRoom['amenities'] !== []): ?>
+                        <?php if ($leadAmenities !== []): ?>
                             <ul class="tg-room-amenities" aria-label="Room amenities">
-                                <?php foreach ($leadRoom['amenities'] as $amenity): ?>
+                                <?php foreach ($leadAmenities as $amenity): ?>
                                     <li><?= $partial('components.public-icon', ['name' => 'check']) ?> <?= $e($amenity['name']) ?></li>
                                 <?php endforeach; ?>
+                                <?php if ($leadAmenityRemainder > 0): ?><li class="tg-room-amenities__more">+<?= $e((string) $leadAmenityRemainder) ?> more</li><?php endif; ?>
                             </ul>
                         <?php endif; ?>
                         <div class="tg-rooms-lead__footer">
-                            <p class="tg-price"><span>NPR</span> <?= $e($leadRoom['pricePerNight']) ?><small>per night</small></p>
+                            <p class="tg-price"><span>From NPR</span> <?= $e($leadRoom['pricePerNight']) ?><small>per night</small></p>
                             <div class="tg-button-row">
-                                <a class="tg-button tg-button--emerald" href="/rooms/<?= $e($leadRoom['slug']) ?>" data-ripple>View Room</a>
-                                <a class="tg-button tg-button--outline" href="/availability" data-ripple>Check Availability</a>
+                                <a class="tg-button tg-button--emerald" href="/availability?room=<?= $e(rawurlencode($leadRoom['slug'])) ?>" data-ripple>Check Availability</a>
+                                <a class="tg-button tg-button--outline" href="/rooms/<?= $e($leadRoom['slug']) ?>" data-ripple>View Room</a>
                             </div>
                         </div>
                     </div>
                 </article>
 
                 <?php if ($remainingRooms !== []): ?>
+                    <header class="tg-rooms-more-heading">
+                        <div>
+                            <p class="tg-eyebrow">Explore all rooms</p>
+                            <h3>Find the stay that fits you</h3>
+                        </div>
+                        <p>Every room includes its real capacity, description, amenities, and current nightly rate.</p>
+                    </header>
                     <div class="tg-rooms-grid" aria-label="More rooms">
                         <?php foreach ($remainingRooms as $room): ?>
+                            <?php
+                            $cardAmenities = array_slice($room['amenities'], 0, 4);
+                            $amenityRemainder = max(0, count($room['amenities']) - count($cardAmenities));
+                            ?>
                             <article class="tg-card tg-room-card tg-room-card--listing" data-room-slug="<?= $e($room['slug']) ?>">
                                 <a class="tg-card__media" href="/rooms/<?= $e($room['slug']) ?>" aria-label="View details for <?= $e($room['name']) ?>">
                                     <img src="<?= $e($room['primaryImageUrl']) ?>" alt="<?= $e($room['name']) ?>" loading="lazy" decoding="async">
                                 </a>
                                 <div class="tg-card__body">
-                                    <p class="tg-card__kicker"><?= $e($room['roomTypeName']) ?></p>
-                                    <h3><?= $e($room['name']) ?></h3>
+                                    <div class="tg-room-card__heading">
+                                        <div>
+                                            <p class="tg-card__kicker"><?= $e($room['roomTypeName']) ?></p>
+                                            <h3><?= $e($room['name']) ?></h3>
+                                        </div>
+                                        <p class="tg-price"><span>From NPR</span> <?= $e($room['pricePerNight']) ?><small>per night</small></p>
+                                    </div>
                                     <?php if ($room['description'] !== ''): ?><p class="tg-card__description"><?= $e($room['description']) ?></p><?php endif; ?>
                                     <div class="tg-room-facts" aria-label="Room capacity">
                                         <span><?= $partial('components.public-icon', ['name' => 'users']) ?> <?= $e((string) $room['capacityAdults']) ?> adult<?= $room['capacityAdults'] === 1 ? '' : 's' ?></span>
                                         <span><?= $e((string) $room['capacityChildren']) ?> child<?= $room['capacityChildren'] === 1 ? '' : 'ren' ?></span>
                                     </div>
-                                    <?php if ($room['amenities'] !== []): ?>
+                                    <?php if ($cardAmenities !== []): ?>
                                         <ul class="tg-room-amenities" aria-label="Room amenities">
-                                            <?php foreach ($room['amenities'] as $amenity): ?><li><?= $partial('components.public-icon', ['name' => 'check']) ?> <?= $e($amenity['name']) ?></li><?php endforeach; ?>
+                                            <?php foreach ($cardAmenities as $amenity): ?><li><?= $partial('components.public-icon', ['name' => 'check']) ?> <?= $e($amenity['name']) ?></li><?php endforeach; ?>
+                                            <?php if ($amenityRemainder > 0): ?><li class="tg-room-amenities__more">+<?= $e((string) $amenityRemainder) ?> more</li><?php endif; ?>
                                         </ul>
                                     <?php endif; ?>
-                                    <div class="tg-card__footer">
-                                        <p class="tg-price"><span>NPR</span> <?= $e($room['pricePerNight']) ?><small>per night</small></p>
+                                    <div class="tg-card__footer tg-room-card__actions">
+                                        <a class="tg-button tg-button--emerald tg-button--small" href="/availability?room=<?= $e(rawurlencode($room['slug'])) ?>" data-ripple>Check Availability</a>
                                         <a class="tg-button tg-button--outline tg-button--small" href="/rooms/<?= $e($room['slug']) ?>" data-ripple>View Room</a>
                                     </div>
                                 </div>

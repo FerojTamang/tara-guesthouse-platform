@@ -28,7 +28,7 @@ final class ContactMessageRepositoryTest extends DatabaseTestCase
         $this->repository = new PdoContactMessageRepository($this->connection);
     }
 
-    public function testCreateRequiresCallerOwnedTransactionAndStoresNullWorkflowState(): void
+    public function testCreateRequiresCallerOwnedTransactionAndStartsNewWorkflow(): void
     {
         try {
             $this->repository->create(
@@ -56,7 +56,7 @@ final class ContactMessageRepositoryTest extends DatabaseTestCase
         self::assertTrue($this->connection->commit());
 
         self::assertInstanceOf(ContactMessage::class, $contact);
-        self::assertNull($contact->status());
+        self::assertSame(ContactMessage::STATUS_NEW, $contact->status());
         self::assertNull($contact->phone());
         self::assertSame('asha@example.test', $contact->email());
     }
@@ -101,6 +101,7 @@ final class ContactMessageRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $this->repository->findAll('100%'));
         self::assertSame([], $this->repository->findAll('100_'));
 
+        $this->connection->exec('DROP TABLE contact_message_replies');
         $this->connection->exec('DROP TABLE contact_messages');
 
         try {

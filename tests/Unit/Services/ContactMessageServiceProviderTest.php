@@ -9,6 +9,7 @@ use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\ContactMessageRepository;
 use App\Services\ContactMessageService;
 use App\Services\ContactMessageServiceProvider;
+use App\Services\NullContactReplyMailSender;
 use App\Services\ContactTransaction;
 use PHPUnit\Framework\TestCase;
 
@@ -21,6 +22,7 @@ final class ContactMessageServiceProviderTest extends TestCase
             $this->createStub(ContactMessageRepository::class),
             $this->createStub(AuditLogWriteRepository::class),
             $this->createStub(ContactTransaction::class),
+            new NullContactReplyMailSender(),
         );
         $provider = new ContactMessageServiceProvider(
             static function () use (&$calls, $service): ContactMessageService {

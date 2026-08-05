@@ -41,6 +41,11 @@ final class ContactMigrationTest extends DatabaseTestCase
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
         '20260802000100_add_activity_catalogue_homepage_curation',
+        '20260804000100_add_contact_reply_workflow',
+        '20260804220000_create_professional_content_foundation',
+        '20260805000100_create_navigation_items_table',
+        '20260805000200_add_advanced_publishing_controls',
+        '20260805000300_expand_navigation_routes_for_publishing',
     ];
 
     private MigrationRunner $runner;
@@ -54,25 +59,64 @@ final class ContactMigrationTest extends DatabaseTestCase
         );
     }
 
-    public function testMigrationExposesRetainedInquiryColumnsAndIndexes(): void
+    public function testMigrationExposesControlledInquiryAndReplySchema(): void
     {
         self::assertSame(self::APPLICATION_MIGRATIONS, $this->runner->migrate());
         self::assertSame([
             'id', 'name', 'email', 'phone', 'subject', 'message', 'status', 'created_at', 'updated_at',
-        ], $this->columns());
-        self::assertSame(['created_at', 'id'], $this->indexColumns('idx_contact_messages_created'));
-        self::assertSame(['status', 'created_at', 'id'], $this->indexColumns('idx_contact_messages_status_created'));
-        self::assertSame(['email', 'created_at', 'id'], $this->indexColumns('idx_contact_messages_email_created'));
-        self::assertSame('YES', $this->columnNullability('status'));
-        self::assertSame('InnoDB', $this->tableOption('ENGINE'));
-        self::assertSame('utf8mb4_unicode_ci', $this->tableOption('TABLE_COLLATION'));
+        ], $this->columns('contact_messages'));
+        self::assertSame(
+            ['created_at', 'id'],
+            $this->indexColumns('contact_messages', 'idx_contact_messages_created'),
+        );
+        self::assertSame(
+            ['status', 'created_at', 'id'],
+            $this->indexColumns('contact_messages', 'idx_contact_messages_status_created'),
+        );
+        self::assertSame(
+            ['email', 'created_at', 'id'],
+            $this->indexColumns('contact_messages', 'idx_contact_messages_email_created'),
+        );
+        self::assertSame('NO', $this->columnNullability('contact_messages', 'status'));
+        self::assertSame('new', $this->columnDefault('contact_messages', 'status'));
+        self::assertSame('InnoDB', $this->tableOption('contact_messages', 'ENGINE'));
+        self::assertSame('utf8mb4_unicode_ci', $this->tableOption('contact_messages', 'TABLE_COLLATION'));
+
+        self::assertSame([
+            'id',
+            'contact_message_id',
+            'reply_body',
+            'sent_by',
+            'delivery_status',
+            'sent_at',
+            'failure_code',
+            'created_at',
+            'updated_at',
+        ], $this->columns('contact_message_replies'));
+        self::assertSame(
+            ['contact_message_id', 'created_at', 'id'],
+            $this->indexColumns('contact_message_replies', 'idx_contact_replies_message_created'),
+        );
+        self::assertSame(
+            ['delivery_status', 'created_at', 'id'],
+            $this->indexColumns('contact_message_replies', 'idx_contact_replies_delivery_created'),
+        );
+        self::assertSame(
+            ['sent_by'],
+            $this->indexColumns('contact_message_replies', 'idx_contact_replies_sent_by'),
+        );
+        self::assertSame('InnoDB', $this->tableOption('contact_message_replies', 'ENGINE'));
+        self::assertSame(
+            'utf8mb4_unicode_ci',
+            $this->tableOption('contact_message_replies', 'TABLE_COLLATION'),
+        );
     }
 
-    public function testConstraintsPermitNullPolicyStateAndRetainOldMessages(): void
+    public function testConstraintsRequireControlledWorkflowStateAndRetainOldMessages(): void
     {
         $this->runner->migrate();
         $oldId = ContactFixture::insert($this->connection, [
-            'status' => null,
+            'status' => 'new',
             'created_at' => '2020-01-01 00:00:00',
             'updated_at' => '2020-01-01 00:00:00',
         ]);
@@ -81,63 +125,117 @@ final class ContactMigrationTest extends DatabaseTestCase
             'SELECT COUNT(*) FROM contact_messages WHERE id = ' . $oldId,
         )->fetchColumn());
 
+        foreach (['new', 'in_progress', 'replied', 'closed'] as $status) {
+            self::assertGreaterThan(0, ContactFixture::insert($this->connection, ['status' => $status]));
+        }
+
         foreach ([
             ['name' => ' Asha'],
             ['email' => ' guest@example.test'],
             ['phone' => str_repeat('1', 21)],
             ['subject' => 'No'],
             ['message' => 'Too short'],
+            ['status' => null],
+            ['status' => 'pending'],
             ['status' => 'Awaiting Reply'],
         ] as $overrides) {
             $this->assertPdoFailure(fn () => ContactFixture::insert($this->connection, $overrides));
         }
     }
 
-    public function testRollbackRemovesContactTableBeforeDependencies(): void
+    public function testRollbackRemovesContactTablesBeforeDependencies(): void
     {
         $this->runner->migrate();
         self::assertSame(array_reverse(self::APPLICATION_MIGRATIONS), $this->runner->rollbackLastBatch());
-        self::assertSame(0, $this->tableCount());
+        self::assertSame(0, $this->tableCount('contact_message_replies'));
+        self::assertSame(0, $this->tableCount('contact_messages'));
     }
 
     /** @return list<string> */
-    private function columns(): array
+    private function columns(string $table): array
     {
-        $rows = $this->connection->query(
-            "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
-            . "AND TABLE_NAME = 'contact_messages' ORDER BY ORDINAL_POSITION",
-        )->fetchAll();
-        return array_map(static fn (array $row): string => (string) $row['COLUMN_NAME'], $rows);
+        $statement = $this->connection->prepare(
+            'SELECT COLUMN_NAME FROM information_schema.COLUMNS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name ORDER BY ORDINAL_POSITION',
+        );
+        $statement->execute(['table_name' => $table]);
+
+        return array_map(
+            static fn (array $row): string => (string) $row['COLUMN_NAME'],
+            $statement->fetchAll(),
+        );
     }
 
     /** @return list<string> */
-    private function indexColumns(string $index): array
+    private function indexColumns(string $table, string $index): array
     {
         $statement = $this->connection->prepare(
-            "SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() "
-            . "AND TABLE_NAME = 'contact_messages' AND INDEX_NAME = :index_name ORDER BY SEQ_IN_INDEX",
+            'SELECT COLUMN_NAME FROM information_schema.STATISTICS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name '
+            . 'AND INDEX_NAME = :index_name ORDER BY SEQ_IN_INDEX',
         );
-        $statement->execute(['index_name' => $index]);
-        return array_map(static fn (array $row): string => (string) $row['COLUMN_NAME'], $statement->fetchAll());
+        $statement->execute([
+            'table_name' => $table,
+            'index_name' => $index,
+        ]);
+
+        return array_map(
+            static fn (array $row): string => (string) $row['COLUMN_NAME'],
+            $statement->fetchAll(),
+        );
     }
 
-    private function columnNullability(string $column): string
+    private function columnNullability(string $table, string $column): string
     {
         $statement = $this->connection->prepare(
-            "SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
-            . "AND TABLE_NAME = 'contact_messages' AND COLUMN_NAME = :column_name",
+            'SELECT IS_NULLABLE FROM information_schema.COLUMNS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND COLUMN_NAME = :column_name',
         );
-        $statement->execute(['column_name' => $column]);
+        $statement->execute([
+            'table_name' => $table,
+            'column_name' => $column,
+        ]);
+
         return (string) $statement->fetchColumn();
     }
 
-    private function tableOption(string $column): string
+    private function columnDefault(string $table, string $column): string
     {
         $statement = $this->connection->prepare(
-            'SELECT ' . $column . " FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
-            . "AND TABLE_NAME = 'contact_messages'",
+            'SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND COLUMN_NAME = :column_name',
         );
-        $statement->execute();
+        $statement->execute([
+            'table_name' => $table,
+            'column_name' => $column,
+        ]);
+
+        $default = (string) $statement->fetchColumn();
+
+        // MariaDB versions differ when exposing string defaults through
+        // information_schema: some return new, while newer releases return
+        // the SQL literal 'new'. Normalize only a quoted string literal so
+        // the contract verifies the semantic default rather than driver
+        // presentation details.
+        if (strlen($default) >= 2 && $default[0] === "'" && $default[-1] === "'") {
+            return str_replace("''", "'", substr($default, 1, -1));
+        }
+
+        return $default;
+    }
+
+    private function tableOption(string $table, string $column): string
+    {
+        if (!in_array($column, ['ENGINE', 'TABLE_COLLATION'], true)) {
+            self::fail('Unsafe information-schema column.');
+        }
+
+        $statement = $this->connection->prepare(
+            'SELECT ' . $column . ' FROM information_schema.TABLES '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name',
+        );
+        $statement->execute(['table_name' => $table]);
+
         return (string) $statement->fetchColumn();
     }
 
@@ -151,11 +249,14 @@ final class ContactMigrationTest extends DatabaseTestCase
         }
     }
 
-    private function tableCount(): int
+    private function tableCount(string $table): int
     {
-        return (int) $this->connection->query(
-            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() "
-            . "AND TABLE_NAME = 'contact_messages'",
-        )->fetchColumn();
+        $statement = $this->connection->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name',
+        );
+        $statement->execute(['table_name' => $table]);
+
+        return (int) $statement->fetchColumn();
     }
 }

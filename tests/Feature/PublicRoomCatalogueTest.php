@@ -88,11 +88,19 @@ final class PublicRoomCatalogueTest extends TestCase
         $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
 
         self::assertStringContainsString('3 rooms', $body);
+        self::assertStringContainsString('Featured room', $body);
+        self::assertStringContainsString('Explore all rooms', $body);
         self::assertSame(1, substr_count($body, 'class="tg-card tg-rooms-lead"'));
         self::assertSame(2, substr_count($body, 'class="tg-card tg-room-card tg-room-card--listing"'));
+        self::assertSame(3, substr_count($body, 'href="/availability?room='));
         foreach (['first-room', 'second-room', 'third-room'] as $slug) {
             self::assertSame(1, substr_count($body, 'data-room-slug="' . $slug . '"'));
+            self::assertStringContainsString('href="/availability?room=' . $slug . '"', $body);
+            self::assertStringContainsString('href="/rooms/' . $slug . '"', $body);
         }
+        self::assertStringContainsString('First description', $body);
+        self::assertStringContainsString('Second description', $body);
+        self::assertStringContainsString('Third description', $body);
         self::assertStringContainsString('<img src="/uploads/rooms/' . str_repeat('1', 64) . '.png" alt="" decoding="async">', $body);
     }
 
@@ -141,6 +149,10 @@ final class PublicRoomCatalogueTest extends TestCase
         self::assertStringContainsString('value="2026-08-10"', $detail->body());
         self::assertStringContainsString('value="2026-08-12"', $detail->body());
         self::assertStringContainsString('Check This Room’s Availability', $detail->body());
+        self::assertStringContainsString('class="tg-reservation-card"', $detail->body());
+        self::assertStringContainsString('class="tg-room-capacity-summary"', $detail->body());
+        self::assertStringContainsString('class="tg-room-amenities-section"', $detail->body());
+        self::assertStringContainsString('Sleeps up to 2 adults and 1 child', preg_replace('/\s+/', ' ', $detail->body()) ?? $detail->body());
         self::assertStringContainsString('/assets/css/pages/room-detail.css', $detail->body());
         self::assertSame(1, substr_count($detail->body(), '<h1'));
         self::assertStringNotContainsString('101', $detail->body());
@@ -175,6 +187,8 @@ final class PublicRoomCatalogueTest extends TestCase
         $body = $this->router->dispatch(Request::create('GET', '/rooms/garden-room'))->body();
 
         self::assertSame(5, substr_count($body, 'class="tg-room-gallery__item'));
+        self::assertStringContainsString('tg-room-gallery--count-5', $body);
+        self::assertStringContainsString('tg-room-detail__intro-facts', $body);
         self::assertStringContainsString('6 photos', $body);
         self::assertStringContainsString('View all photos', $body);
         self::assertStringContainsString('role="dialog" aria-modal="true"', $body);

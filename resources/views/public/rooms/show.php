@@ -19,6 +19,7 @@ $supportingImages = array_values(array_filter(
 ));
 $displayImages = array_merge([$primaryDisplay], array_slice($supportingImages, 0, 4));
 $hasViewer = count($galleryImages) > 1;
+$displayImageCount = count($displayImages);
 ?>
 <article class="tg-room-detail" data-room-detail data-room-slug="<?= $e($room['slug']) ?>">
     <section class="tg-room-detail__hero" aria-labelledby="room-detail-title">
@@ -27,10 +28,18 @@ $hasViewer = count($galleryImages) > 1;
                 <a href="/">Home</a><span aria-hidden="true">/</span><a href="/rooms">Rooms</a><span aria-hidden="true">/</span><span aria-current="page"><?= $e($room['name']) ?></span>
             </nav>
             <div class="tg-room-detail__heading">
-                <div><p class="tg-eyebrow"><?= $e($room['roomTypeName']) ?></p><h1 id="room-detail-title"><?= $e($room['name']) ?></h1></div>
-                <p class="tg-room-detail__price"><strong>NPR <?= $e($room['pricePerNight']) ?></strong><span>per night</span></p>
+                <div class="tg-room-detail__identity">
+                    <p class="tg-eyebrow"><?= $e($room['roomTypeName']) ?></p>
+                    <h1 id="room-detail-title"><?= $e($room['name']) ?></h1>
+                    <div class="tg-room-detail__intro-facts" aria-label="Room capacity">
+                        <span><?= $e($room['capacityAdults']) ?> adult<?= $room['capacityAdults'] === 1 ? '' : 's' ?></span>
+                        <span><?= $e($room['capacityChildren']) ?> child<?= $room['capacityChildren'] === 1 ? '' : 'ren' ?></span>
+                        <span><?= $e((string) count($galleryImages)) ?> photo<?= count($galleryImages) === 1 ? '' : 's' ?></span>
+                    </div>
+                </div>
+                <p class="tg-room-detail__price"><span>From</span><strong>NPR <?= $e($room['pricePerNight']) ?></strong><span>per night</span></p>
             </div>
-            <div class="tg-room-gallery<?= count($displayImages) < 2 ? ' tg-room-gallery--single' : '' ?>" aria-label="Photos of <?= $e($room['name']) ?>">
+            <div class="tg-room-gallery tg-room-gallery--count-<?= $e((string) $displayImageCount) ?><?= $displayImageCount < 2 ? ' tg-room-gallery--single' : '' ?>" aria-label="Photos of <?= $e($room['name']) ?>">
                 <?php foreach ($displayImages as $index => $image): ?>
                     <?php $viewerIndex = array_search($image['url'], array_column($galleryImages, 'url'), true); ?>
                     <?php if ($hasViewer && $viewerIndex !== false): ?>
@@ -69,15 +78,34 @@ $hasViewer = count($galleryImages) > 1;
 
     <div class="tg-container tg-room-detail__layout">
         <div class="tg-room-detail__content">
-            <section aria-labelledby="room-overview-title">
-                <p class="tg-eyebrow">Your stay</p><h2 id="room-overview-title">A comfortable base in Sauraha</h2>
-                <div class="tg-room-facts" aria-label="Room capacity"><span><?= $e($room['capacityAdults']) ?> adult<?= $room['capacityAdults'] === 1 ? '' : 's' ?></span><span><?= $e($room['capacityChildren']) ?> child<?= $room['capacityChildren'] === 1 ? '' : 'ren' ?></span></div>
+            <section class="tg-room-overview" aria-labelledby="room-overview-title">
+                <p class="tg-eyebrow">Your stay</p>
+                <h2 id="room-overview-title">A comfortable base in Sauraha</h2>
+                <p class="tg-room-capacity-summary">
+                    <?= $partial('components.public-icon', ['name' => 'users']) ?>
+                    Sleeps up to <?= $e($room['capacityAdults']) ?> adult<?= $room['capacityAdults'] === 1 ? '' : 's' ?>
+                    <?php if ($room['capacityChildren'] > 0): ?> and <?= $e($room['capacityChildren']) ?> child<?= $room['capacityChildren'] === 1 ? '' : 'ren' ?><?php endif; ?>
+                </p>
                 <p class="tg-room-description"><?= nl2br($e($room['description'])) ?></p>
             </section>
-            <section aria-labelledby="room-amenities-title"><p class="tg-eyebrow">Included</p><h2 id="room-amenities-title">Room amenities</h2>
-                <?php if ($room['amenities'] === []): ?><p>Contact us if you need details about amenities for this room.</p><?php else: ?><ul class="tg-amenity-list"><?php foreach ($room['amenities'] as $amenity): ?><li><?= $e($amenity['name']) ?></li><?php endforeach; ?></ul><?php endif; ?>
+            <section class="tg-room-amenities-section" aria-labelledby="room-amenities-title">
+                <p class="tg-eyebrow">Included</p>
+                <h2 id="room-amenities-title">Room amenities</h2>
+                <?php if ($room['amenities'] === []): ?>
+                    <p class="tg-room-amenities-empty">Detailed amenity information is available on request.</p>
+                <?php else: ?>
+                    <ul class="tg-amenity-list">
+                        <?php foreach ($room['amenities'] as $amenity): ?>
+                            <li><?= $partial('components.public-icon', ['name' => 'check']) ?><span><?= $e($amenity['name']) ?></span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
             </section>
-            <section class="tg-room-info" aria-labelledby="room-info-title"><p class="tg-eyebrow">Good to know</p><h2 id="room-info-title">A request is not yet a confirmed stay</h2><p>Availability is checked for your complete stay. A booking remains pending until the approved payment is submitted and verified.</p></section>
+            <section class="tg-room-info" aria-labelledby="room-info-title">
+                <p class="tg-eyebrow">Good to know</p>
+                <h2 id="room-info-title">A request is not yet a confirmed stay</h2>
+                <p>Availability is checked for your complete stay. A booking remains pending until the approved payment is submitted and verified.</p>
+            </section>
         </div>
 
         <aside class="tg-reservation-card" aria-labelledby="room-availability-title" data-availability-card>

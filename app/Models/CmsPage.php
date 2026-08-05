@@ -11,9 +11,13 @@ use InvalidArgumentException;
 final readonly class CmsPage
 {
     public const DRAFT = 'draft';
+    public const SCHEDULED = 'scheduled';
     public const PUBLISHED = 'published';
     public const ARCHIVED = 'archived';
+
+    /** Database-backed states. Scheduled pages are stored as published with a future timestamp. */
     public const STATUSES = [self::DRAFT, self::PUBLISHED, self::ARCHIVED];
+    public const PUBLICATION_STATES = [self::DRAFT, self::SCHEDULED, self::PUBLISHED, self::ARCHIVED];
 
     public function __construct(
         private int $id,
@@ -62,6 +66,26 @@ final readonly class CmsPage
     public function createdAt(): DateTimeImmutable { return $this->createdAt; }
     public function updatedAt(): DateTimeImmutable { return $this->updatedAt; }
     public function isPublished(): bool { return $this->status === self::PUBLISHED; }
+
+    public function publicationState(DateTimeImmutable $now): string
+    {
+        if ($now->getOffset() !== 0) {
+            throw new InvalidArgumentException('Publication comparisons require UTC time.');
+        }
+        if (
+            $this->status === self::PUBLISHED
+            && $this->publishedAt instanceof DateTimeImmutable
+            && $this->publishedAt > $now
+        ) {
+            return self::SCHEDULED;
+        }
+        return $this->status;
+    }
+
+    public function isPublicAt(DateTimeImmutable $now): bool
+    {
+        return $this->publicationState($now) === self::PUBLISHED;
+    }
 
     private function requiredText(string $value, ?int $maximumLength = null): bool
     {

@@ -12,6 +12,7 @@ use App\Repositories\PdoAuditLogRepository;
 use App\Repositories\PdoContactMessageRepository;
 use App\Requests\ContactMessageRequest;
 use App\Services\ContactMessageService;
+use App\Services\NullContactReplyMailSender;
 use App\Services\PdoContactTransaction;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\Group;
@@ -47,7 +48,7 @@ final class ContactMessageServiceIntegrationTest extends DatabaseTestCase
 
         self::assertGreaterThan(0, $contact->id());
         self::assertSame('asha@example.test', $contact->email());
-        self::assertNull($contact->status());
+        self::assertSame('new', $contact->status());
         self::assertSame(1, (int) $this->connection->query('SELECT COUNT(*) FROM contact_messages')->fetchColumn());
 
         $audit = $this->connection->query(
@@ -96,6 +97,7 @@ final class ContactMessageServiceIntegrationTest extends DatabaseTestCase
             new PdoContactMessageRepository($this->connection),
             $audit,
             new PdoContactTransaction($this->connection),
+            new NullContactReplyMailSender(),
             static fn (): DateTimeImmutable => new DateTimeImmutable('2026-07-31 12:00:00 UTC'),
         );
     }

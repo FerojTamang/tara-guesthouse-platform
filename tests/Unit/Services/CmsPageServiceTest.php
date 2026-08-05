@@ -17,7 +17,7 @@ final class CmsPageServiceTest extends TestCase
     public function testItCreatesDraftUpdatesContentAndPublishesWithActorAttribution(): void
     {
         $repository = new InMemoryPageRepository();
-        $service = new CmsPageService($repository);
+        $service = new CmsPageService($repository, self::clock());
 
         $page = $service->createDraft('About', 'about', 'Original content.', null, null, 3);
         self::assertSame(CmsPage::DRAFT, $page->status());
@@ -39,7 +39,7 @@ final class CmsPageServiceTest extends TestCase
     public function testTransitionRulesRetainArchivedPagesAndRequireDraftBeforeRepublish(): void
     {
         $repository = new InMemoryPageRepository();
-        $service = new CmsPageService($repository);
+        $service = new CmsPageService($repository, self::clock());
         $page = $service->createDraft('Policy', 'policy', 'Policy content.', null, null, 1);
         $page = $service->transitionStatus($page->id(), CmsPage::PUBLISHED, 1);
         $publishedAt = $page->publishedAt();
@@ -60,9 +60,38 @@ final class CmsPageServiceTest extends TestCase
         self::assertNull($draft->publishedAt());
     }
 
+    public function testScheduledPagesStayPrivateUntilDueAndCanBeRescheduledOrPublishedNow(): void
+    {
+        $repository = new InMemoryPageRepository();
+        $service = new CmsPageService($repository, self::clock());
+        $page = $service->createDraft('Garden update', 'garden-update', 'Body.', null, null, 1);
+        $scheduledAt = new DateTimeImmutable('2026-08-06 00:00:00 UTC');
+
+        $page = $service->transitionStatus($page->id(), CmsPage::SCHEDULED, 2, $scheduledAt);
+        self::assertSame(CmsPage::PUBLISHED, $page->status());
+        self::assertSame(CmsPage::SCHEDULED, $page->publicationState(self::clock()()));
+        self::assertSame($scheduledAt, $page->publishedAt());
+
+        try {
+            $service->getPublishedBySlug('garden-update');
+            self::fail('Scheduled content must remain private before its publication time.');
+        } catch (CmsException $exception) {
+            self::assertTrue($exception->isNotFound());
+        }
+
+        $rescheduledAt = new DateTimeImmutable('2026-08-07 00:00:00 UTC');
+        $page = $service->transitionStatus($page->id(), CmsPage::SCHEDULED, 3, $rescheduledAt);
+        self::assertSame($rescheduledAt, $page->publishedAt());
+
+        $page = $service->transitionStatus($page->id(), CmsPage::PUBLISHED, 4);
+        self::assertSame(CmsPage::PUBLISHED, $page->publicationState(self::clock()()));
+        self::assertSame('2026-08-05 00:00:00', $page->publishedAt()?->format('Y-m-d H:i:s'));
+        self::assertSame($page->id(), $service->getPublishedBySlug('garden-update')->id());
+    }
+
     public function testInvalidContentActorsAndSameStatusTransitionsAreRejected(): void
     {
-        $service = new CmsPageService(new InMemoryPageRepository());
+        $service = new CmsPageService(new InMemoryPageRepository(), self::clock());
         $page = $service->createDraft('About', 'about', 'Body.', null, null, 1);
 
         foreach ([
@@ -78,6 +107,11 @@ final class CmsPageServiceTest extends TestCase
                 self::assertTrue($exception->isValidationFailure());
             }
         }
+    }
+    /** @return callable(): DateTimeImmutable */
+    private static function clock(): callable
+    {
+        return static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC');
     }
 }
 

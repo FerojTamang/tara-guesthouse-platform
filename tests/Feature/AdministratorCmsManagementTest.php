@@ -24,18 +24,26 @@ use App\Middleware\CsrfMiddleware;
 use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\AuditLogWriteRepository;
+use App\Repositories\ContentMediaRepository;
 use App\Repositories\PageRepository;
 use App\Repositories\SettingRepository;
 use App\Requests\AdministratorLoginRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorCmsService;
+use App\Services\AdministratorContentMediaService;
 use App\Services\AdministratorLogoutService;
 use App\Services\CmsManagementServiceProvider;
 use App\Services\CmsPageService;
 use App\Services\CmsSettingsService;
 use App\Services\CmsTransaction;
+use App\Services\ContentMediaManagementServiceProvider;
+use App\Services\ContentMediaStorageProvider;
 use App\Services\PlainTextCmsPageContentSanitizer;
 use App\Services\SettingDefinitionRegistry;
+use App\Storage\ContentMediaStorage;
+use App\Storage\StoredContentMedia;
+use App\Requests\ContentMediaUploadRequest;
+use App\Models\ContentMedia;
 use DateTimeImmutable;
 use DateTimeZone;
 use JsonException;
@@ -86,6 +94,13 @@ final class AdministratorCmsManagementTest extends TestCase
             new SettingDefinition('contact.email', 'email', true, 254),
             new SettingDefinition('homepage.rooms.limit', 'integer', false, 3),
         ]);
+        $contentMedia = new ContentMediaManagementServiceProvider(fn (): AdministratorContentMediaService => new AdministratorContentMediaService(
+            new AdministratorCmsContentMediaRepositoryFeatureFake(),
+            new AdministratorCmsContentMediaStorageFeatureFake(),
+            $this->audit,
+            new AdministratorCmsTransactionFeatureFake(),
+            static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-04 16:50:00 UTC'),
+        ));
         $cmsController = new AdministratorCmsController(
             $renderer,
             new CmsManagementServiceProvider(fn (): AdministratorCmsService => new AdministratorCmsService(
@@ -99,6 +114,9 @@ final class AdministratorCmsManagementTest extends TestCase
             $this->administratorSession,
             $this->csrfTokens,
             new DateTimeZone('Asia/Kathmandu'),
+            null,
+            $contentMedia,
+            new ContentMediaStorageProvider(dirname(__DIR__, 2)),
         );
         $guestOnly = new GuestOnlyMiddleware($this->administratorSession);
         $requireAdministrator = new RequireAdministratorMiddleware($this->administratorSession);
@@ -136,14 +154,16 @@ final class AdministratorCmsManagementTest extends TestCase
 
     public function testGuestsCannotReadCmsOrMutateBeforeCsrf(): void
     {
-        foreach (['/admin/settings', '/admin/pages', '/admin/pages/create'] as $path) {
+        foreach (['/admin/settings', '/admin/pages', '/admin/media', '/admin/navigation', '/admin/pages/create'] as $path) {
             $response = $this->handle(Request::create('GET', $path));
             self::assertSame(302, $response->statusCode());
             self::assertSame('/admin/login', $response->headers()['Location']);
         }
 
-        $read = $this->handle(Request::create('GET', '/api/v1/admin/pages', headers: ['Accept' => 'application/json']));
-        self::assertSame(401, $read->statusCode());
+        foreach (['/api/v1/admin/pages', '/api/v1/admin/media', '/api/v1/admin/navigation'] as $path) {
+            $read = $this->handle(Request::create('GET', $path, headers: ['Accept' => 'application/json']));
+            self::assertSame(401, $read->statusCode());
+        }
         $mutation = $this->handle(Request::create(
             'POST',
             '/api/v1/admin/pages',
@@ -164,16 +184,32 @@ final class AdministratorCmsManagementTest extends TestCase
         self::assertStringNotContainsString('<script>About</script>', $index->body());
         self::assertStringContainsString('/api/v1/admin/pages/7/status', $index->body());
         self::assertStringContainsString('href="/admin/settings"', $index->body());
+        self::assertStringContainsString('href="/admin/media"', $index->body());
+        self::assertStringContainsString('name="type"', $index->body());
+        self::assertStringContainsString('name="status"', $index->body());
+        self::assertStringContainsString('name="search"', $index->body());
+
+        $media = $this->handle(Request::create('GET', '/admin/media'));
+        self::assertSame(200, $media->statusCode());
+        self::assertStringContainsString('Media library', $media->body());
+        self::assertStringContainsString('Upload media', $media->body());
 
         $form = $this->handle(Request::create('GET', '/admin/pages/7/edit'));
         self::assertSame(200, $form->statusCode());
         self::assertStringContainsString('data-api-method="PUT"', $form->body());
         self::assertStringContainsString('Content format: plain_text', $form->body());
+        self::assertStringContainsString('name="publish_at"', $form->body());
+        self::assertStringContainsString('name="is_pinned"', $form->body());
+        self::assertStringContainsString('name="seo_noindex"', $form->body());
         self::assertStringNotContainsString('name="status"', $form->body());
 
         $settings = $this->handle(Request::create('GET', '/admin/settings'));
         self::assertSame(200, $settings->statusCode());
         self::assertStringContainsString('data-setting-key="contact.email"', $settings->body());
+        self::assertStringContainsString('Professional site settings', $settings->body());
+        self::assertStringContainsString('Contact information', $settings->body());
+        self::assertStringContainsString('Public email', $settings->body());
+        self::assertStringContainsString('Advanced', $settings->body());
         self::assertStringContainsString('Public', $settings->body());
         self::assertStringContainsString('Private', $settings->body());
     }
@@ -191,12 +227,24 @@ final class AdministratorCmsManagementTest extends TestCase
         self::assertSame(200, $settings->statusCode());
         self::assertSame('stay@example.test', $this->settings->settings['contact.email']->value());
 
+        $media = $this->jsonRequest('GET', '/api/v1/admin/media', []);
+        self::assertSame(200, $media->statusCode());
+        self::assertSame([], $this->decoded($media)['data']);
+
         $created = $this->jsonRequest('POST', '/api/v1/admin/pages', $this->pagePayload());
         self::assertSame(201, $created->statusCode());
         $body = $this->decoded($created);
         $id = $body['data']['id'];
         self::assertIsInt($id);
         self::assertSame(CmsPage::DRAFT, $body['data']['status']);
+
+        $scheduled = $this->jsonRequest('PATCH', '/api/v1/admin/pages/' . $id . '/status', [
+            'status' => 'scheduled',
+            'publish_at' => '2099-08-10T15:30',
+        ]);
+        self::assertSame(200, $scheduled->statusCode());
+        self::assertSame(CmsPage::SCHEDULED, $this->decoded($scheduled)['data']['status']);
+        self::assertSame(CmsPage::PUBLISHED, $this->pages->pages[$id]->status());
 
         $published = $this->jsonRequest('PATCH', '/api/v1/admin/pages/' . $id . '/status', ['status' => 'published']);
         self::assertSame(200, $published->statusCode());
@@ -207,7 +255,42 @@ final class AdministratorCmsManagementTest extends TestCase
             'cms_setting_updated',
             'cms_page_created',
             'cms_page_status_changed',
+            'cms_page_status_changed',
         ], array_map(static fn (AuditLogEntry $entry): string => $entry->eventType(), $this->audit->entries));
+    }
+
+    public function testMediaApiRejectsWrongTransportMissingFilesAndMissingTargets(): void
+    {
+        $this->authenticate();
+
+        self::assertSame(415, $this->jsonRequest('POST', '/api/v1/admin/media', [
+            'title' => '',
+            'alt_text' => 'Garden view',
+            'caption' => '',
+        ])->statusCode());
+
+        $missingFile = $this->handle(Request::create(
+            'POST',
+            '/api/v1/admin/media',
+            headers: [
+                'Accept' => 'application/json',
+                'Content-Type' => 'multipart/form-data; boundary=test',
+                'X-CSRF-Token' => $this->csrfTokens->token(),
+            ],
+            input: [
+                'title' => '',
+                'alt_text' => 'Garden view',
+                'caption' => '',
+            ],
+        ));
+        self::assertSame(422, $missingFile->statusCode());
+
+        self::assertSame(404, $this->jsonRequest('PUT', '/api/v1/admin/media/999', [
+            'title' => '',
+            'alt_text' => 'Garden view',
+            'caption' => '',
+        ])->statusCode());
+        self::assertSame(404, $this->jsonRequest('DELETE', '/api/v1/admin/media/999', [])->statusCode());
     }
 
     public function testUnknownFieldsHtmlUnknownKeysAndMissingPagesFailSafely(): void
@@ -275,6 +358,16 @@ final class AdministratorCmsManagementTest extends TestCase
             'content' => 'Welcome to Tara Guest House.',
             'meta_title' => 'About Tara',
             'meta_description' => 'About Tara Guest House.',
+            'notice_style' => null,
+            'publish_at' => null,
+            'expires_at' => null,
+            'is_featured' => false,
+            'is_pinned' => false,
+            'featured_media_id' => null,
+            'social_title' => null,
+            'social_description' => null,
+            'social_media_id' => null,
+            'seo_noindex' => false,
         ];
     }
 
@@ -388,4 +481,23 @@ final class AdministratorCmsTransactionFeatureFake implements CmsTransaction
     public function commit(): void { $this->active = false; }
     public function rollBack(): void { $this->active = false; }
     public function inProgress(): bool { return $this->active; }
+}
+
+
+final class AdministratorCmsContentMediaRepositoryFeatureFake implements ContentMediaRepository
+{
+    public function findAllActive(): array { return []; }
+    public function findActiveById(int $id): ?ContentMedia { return null; }
+    public function findActiveByIdForShare(int $id): ?ContentMedia { return $this->findActiveById($id); }
+    public function findActiveByIdForUpdate(int $id): ?ContentMedia { return $this->findActiveById($id); }
+    public function findActiveByChecksum(string $sha256): ?ContentMedia { return null; }
+    public function create(string $storagePath, string $originalName, string $mimeType, string $extension, int $byteSize, int $width, int $height, string $sha256, ?string $title, string $altText, ?string $caption, int $uploadedBy): ContentMedia { throw new \RuntimeException('not used'); }
+    public function updateMetadata(int $id, ?string $title, string $altText, ?string $caption): ?ContentMedia { return null; }
+    public function softDelete(int $id): bool { return false; }
+}
+
+final class AdministratorCmsContentMediaStorageFeatureFake implements ContentMediaStorage
+{
+    public function store(ContentMediaUploadRequest $request): StoredContentMedia { throw new \RuntimeException('not used'); }
+    public function remove(string $relativePath): void {}
 }

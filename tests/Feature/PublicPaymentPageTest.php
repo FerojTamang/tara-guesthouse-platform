@@ -209,6 +209,8 @@ final class PublicPaymentPageTest extends TestCase
         self::assertStringContainsString('Use the configured account.', $response->body());
         self::assertStringContainsString('TGH-ACCOUNT-8', $response->body());
         self::assertStringContainsString('src="/payment-methods/wallet.png"', $response->body());
+        self::assertStringContainsString('Scan this QR code to pay', $response->body());
+        self::assertStringContainsString('tg-payment-method-card__qr', $response->body());
         self::assertStringNotContainsString('storage/private/secret.png', $response->body());
         self::assertStringContainsString(
             'value="' . $this->tokens->token() . '"',

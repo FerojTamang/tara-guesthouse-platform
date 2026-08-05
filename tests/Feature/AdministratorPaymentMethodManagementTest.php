@@ -21,11 +21,13 @@ use App\Middleware\GuestOnlyMiddleware;
 use App\Middleware\RequireAdministratorMiddleware;
 use App\Repositories\PaymentMethodCatalogRepository;
 use App\Requests\AdministratorLoginRequest;
+use App\Requests\PaymentMethodQrUploadRequest;
 use App\Services\AdministratorAuthenticator;
 use App\Services\AdministratorLogoutService;
 use App\Services\PaymentMethodFlashMessages;
 use App\Services\PaymentMethodManagementService;
 use App\Services\PaymentMethodManagementServiceProvider;
+use App\Storage\PaymentMethodQrStorage;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -51,6 +53,8 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
 
     private PaymentMethodManagementRepositoryFake $repository;
 
+    private PaymentMethodQrStorageFake $qrStorage;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -68,6 +72,7 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
             $this->csrfTokens,
         );
         $this->repository = new PaymentMethodManagementRepositoryFake();
+        $this->qrStorage = new PaymentMethodQrStorageFake();
         $logger = new NullLogger();
         $renderer = new ViewRenderer(
             dirname(__DIR__, 2)
@@ -90,6 +95,7 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
             new PaymentMethodManagementServiceProvider(
                 fn (): PaymentMethodManagementService => new PaymentMethodManagementService(
                     $this->repository,
+                    $this->qrStorage,
                 ),
             ),
             $this->csrfTokens,
@@ -241,7 +247,7 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
         );
     }
 
-    public function testCreateFormUsesPostOnlyCsrfProtectedDefaultsWithoutQrInput(): void
+    public function testCreateFormUsesPostOnlyCsrfProtectedDefaultsWithQrUpload(): void
     {
         $this->authenticate();
         $token = $this->csrfTokens->token();
@@ -257,7 +263,7 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
             $response->body(),
         );
         self::assertStringContainsString(
-            'method="post" action="/admin/payment-methods"',
+            'method="post" action="/admin/payment-methods" enctype="multipart/form-data"',
             $response->body(),
         );
         self::assertStringContainsString(
@@ -266,6 +272,7 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
         );
         self::assertStringContainsString('name="requires_proof"', $response->body());
         self::assertStringContainsString('name="active"', $response->body());
+        self::assertStringContainsString('name="qr_image"', $response->body());
         self::assertStringNotContainsString('name="qr_image_path"', $response->body());
         self::assertSame(2, substr_count($response->body(), 'checked'));
     }
@@ -340,6 +347,29 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
         );
     }
 
+    public function testSuccessfulCreateStoresValidatedQrImagePath(): void
+    {
+        $this->authenticate();
+        $upload = $this->qrUploadFile('payment-qr.png');
+
+        $response = $this->application->handle(Request::create(
+            'POST',
+            '/admin/payment-methods',
+            input: [
+                ...$this->validInput(),
+                '_csrf' => $this->csrfTokens->token(),
+            ],
+            files: ['qr_image' => $upload],
+        ));
+
+        self::assertSame(303, $response->statusCode());
+        self::assertSame(1, $this->qrStorage->storeCalls);
+        self::assertSame(
+            'payment-methods/' . str_repeat('a', 64) . '.png',
+            $this->repository->lastCreatedQrImagePath,
+        );
+    }
+
     public function testEditEscapesStoredValuesAndUpdatePreservesExistingQrPath(): void
     {
         $timestamp = new DateTimeImmutable('2026-07-28 10:11:12 UTC');
@@ -373,14 +403,9 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
             '&lt;script&gt;Line two&lt;/script&gt;',
             $formResponse->body(),
         );
-        self::assertStringContainsString(
-            'An existing QR image is configured and will be preserved.',
-            $formResponse->body(),
-        );
-        self::assertStringNotContainsString(
-            'payment-methods/existing.png',
-            $formResponse->body(),
-        );
+        self::assertStringContainsString('name="qr_image"', $formResponse->body());
+        self::assertStringContainsString('name="remove_qr_image"', $formResponse->body());
+        self::assertStringContainsString('src="/payment-methods/existing.png"', $formResponse->body());
 
         $this->reopenSession();
         $input = $this->validInput();
@@ -402,6 +427,38 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
         );
         self::assertSame('Updated transfer', $this->repository->items[7]->name());
         self::assertFalse($this->repository->items[7]->requiresProof());
+    }
+
+    public function testUpdateCanRemoveExistingQrImage(): void
+    {
+        $timestamp = new DateTimeImmutable('2026-07-28 10:11:12 UTC');
+        $path = 'payment-methods/' . str_repeat('b', 64) . '.png';
+        $this->repository->items[7] = new PaymentMethod(
+            7,
+            'Existing method',
+            null,
+            null,
+            $path,
+            true,
+            true,
+            $timestamp,
+            $timestamp,
+        );
+        $this->authenticate();
+
+        $response = $this->application->handle(Request::create(
+            'POST',
+            '/admin/payment-methods/7',
+            input: [
+                ...$this->validInput(),
+                'remove_qr_image' => '1',
+                '_csrf' => $this->csrfTokens->token(),
+            ],
+        ));
+
+        self::assertSame(303, $response->statusCode());
+        self::assertNull($this->repository->lastUpdatedQrImagePath);
+        self::assertSame([$path], $this->qrStorage->removedPaths);
     }
 
     public function testMissingOrMalformedEditTargetsReturn404WithoutDisclosure(): void
@@ -517,6 +574,26 @@ final class AdministratorPaymentMethodManagementTest extends TestCase
             'account_reference' => 'BANK-001',
             'requires_proof' => '1',
             'active' => '1',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function qrUploadFile(string $name): array
+    {
+        $path = $this->savePath . DIRECTORY_SEPARATOR . $name;
+        $bytes = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($bytes);
+        self::assertSame(strlen($bytes), file_put_contents($path, $bytes));
+
+        return [
+            'name' => $name,
+            'type' => 'image/png',
+            'tmp_name' => $path,
+            'error' => UPLOAD_ERR_OK,
+            'size' => strlen($bytes),
         ];
     }
 
@@ -679,6 +756,26 @@ final class PaymentMethodManagementRepositoryFake implements PaymentMethodCatalo
         $this->items[$id] = $method;
 
         return $method;
+    }
+}
+
+final class PaymentMethodQrStorageFake implements PaymentMethodQrStorage
+{
+    public int $storeCalls = 0;
+
+    /** @var list<string> */
+    public array $removedPaths = [];
+
+    public function store(PaymentMethodQrUploadRequest $request): string
+    {
+        $this->storeCalls++;
+
+        return 'payment-methods/' . str_repeat('a', 64) . '.png';
+    }
+
+    public function remove(string $relativePath): void
+    {
+        $this->removedPaths[] = $relativePath;
     }
 }
 

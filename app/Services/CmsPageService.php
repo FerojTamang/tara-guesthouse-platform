@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Exceptions\CmsException;
 use App\Models\CmsPage;
 use App\Repositories\PageRepository;
+use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
@@ -15,13 +16,22 @@ use Throwable;
 final readonly class CmsPageService
 {
     private const TRANSITIONS = [
-        CmsPage::DRAFT => [CmsPage::PUBLISHED, CmsPage::ARCHIVED],
-        CmsPage::PUBLISHED => [CmsPage::DRAFT, CmsPage::ARCHIVED],
+        CmsPage::DRAFT => [CmsPage::PUBLISHED, CmsPage::SCHEDULED, CmsPage::ARCHIVED],
+        CmsPage::SCHEDULED => [CmsPage::PUBLISHED, CmsPage::SCHEDULED, CmsPage::DRAFT, CmsPage::ARCHIVED],
+        CmsPage::PUBLISHED => [CmsPage::SCHEDULED, CmsPage::DRAFT, CmsPage::ARCHIVED],
         CmsPage::ARCHIVED => [CmsPage::DRAFT],
     ];
 
-    public function __construct(private PageRepository $repository)
-    {
+    private Closure $clock;
+
+    /** @param null|callable(): DateTimeImmutable $clock */
+    public function __construct(
+        private PageRepository $repository,
+        ?callable $clock = null,
+    ) {
+        $this->clock = Closure::fromCallable(
+            $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now', new DateTimeZone('UTC')),
+        );
     }
 
     /** @return list<CmsPage> */
@@ -45,7 +55,7 @@ final readonly class CmsPageService
     {
         return $this->execute(function () use ($slug): CmsPage {
             $page = $this->repository->findPublishedBySlug($slug);
-            if (!$page instanceof CmsPage || !$page->isPublished()) {
+            if (!$page instanceof CmsPage || !$page->isPublicAt($this->now())) {
                 throw CmsException::pageNotFound();
             }
             return $page;
@@ -122,10 +132,14 @@ final readonly class CmsPageService
         });
     }
 
-    public function transitionStatus(int $id, string $newStatus, int $actorId): CmsPage
-    {
-        return $this->execute(function () use ($id, $newStatus, $actorId): CmsPage {
-            if ($actorId <= 0 || !in_array($newStatus, CmsPage::STATUSES, true)) {
+    public function transitionStatus(
+        int $id,
+        string $newStatus,
+        int $actorId,
+        ?DateTimeImmutable $publishAt = null,
+    ): CmsPage {
+        return $this->execute(function () use ($id, $newStatus, $actorId, $publishAt): CmsPage {
+            if ($actorId <= 0 || !in_array($newStatus, CmsPage::PUBLICATION_STATES, true)) {
                 throw CmsException::invalidInput('The page status transition is invalid.');
             }
 
@@ -134,12 +148,32 @@ final readonly class CmsPageService
                 throw CmsException::pageNotFound();
             }
 
-            if (!in_array($newStatus, self::TRANSITIONS[$current->status()] ?? [], true)) {
+            $now = $this->now();
+            $currentState = $current->publicationState($now);
+            if (!in_array($newStatus, self::TRANSITIONS[$currentState] ?? [], true)) {
                 throw CmsException::invalidInput('The page status transition is not allowed.');
             }
 
+            if ($newStatus === CmsPage::SCHEDULED) {
+                if (!$publishAt instanceof DateTimeImmutable || $publishAt->getOffset() !== 0 || $publishAt <= $now) {
+                    throw CmsException::invalidInput('The scheduled publication date must be in the future.');
+                }
+                if ($currentState === CmsPage::SCHEDULED && $publishAt == $current->publishedAt()) {
+                    throw CmsException::invalidInput('The scheduled publication date has not changed.');
+                }
+            } elseif ($publishAt !== null) {
+                throw CmsException::invalidInput('A publication date is accepted only for scheduled pages.');
+            }
+
+            $databaseStatus = match ($newStatus) {
+                CmsPage::PUBLISHED, CmsPage::SCHEDULED => CmsPage::PUBLISHED,
+                CmsPage::DRAFT => CmsPage::DRAFT,
+                CmsPage::ARCHIVED => CmsPage::ARCHIVED,
+                default => throw CmsException::invalidInput('The page status transition is invalid.'),
+            };
             $publishedAt = match ($newStatus) {
-                CmsPage::PUBLISHED => new DateTimeImmutable('now', new DateTimeZone('UTC')),
+                CmsPage::PUBLISHED => $now,
+                CmsPage::SCHEDULED => $publishAt,
                 CmsPage::DRAFT => null,
                 CmsPage::ARCHIVED => $current->publishedAt(),
                 default => null,
@@ -148,7 +182,7 @@ final readonly class CmsPageService
             $page = $this->repository->transitionStatus(
                 $id,
                 $current->status(),
-                $newStatus,
+                $databaseStatus,
                 $publishedAt,
                 $actorId,
             );
@@ -195,6 +229,15 @@ final readonly class CmsPageService
         }
 
         return [$title, $slug, $content, $metaTitle, $metaDescription];
+    }
+
+    private function now(): DateTimeImmutable
+    {
+        $value = ($this->clock)();
+        if (!$value instanceof DateTimeImmutable || $value->getOffset() !== 0) {
+            throw CmsException::failure();
+        }
+        return $value;
     }
 
     /** @template T @param callable(): T $operation @return T */

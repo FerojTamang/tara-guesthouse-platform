@@ -10,6 +10,29 @@
             <p class="text-secondary mb-0">
                 Do not include passwords, payment credentials, or other sensitive secrets.
             </p>
+
+            <div class="tg-contact-options" data-public-contact-options hidden>
+                <a class="tg-contact-option" href="#" data-public-contact-card="email" hidden>
+                    <span class="tg-contact-option__icon" aria-hidden="true">@</span>
+                    <span><strong>Email us</strong><span data-public-contact-email-text></span></span>
+                </a>
+                <a class="tg-contact-option" href="#" data-public-contact-card="phone" hidden>
+                    <span class="tg-contact-option__icon" aria-hidden="true">☎</span>
+                    <span><strong>Call us</strong><span data-public-contact-phone-text></span></span>
+                </a>
+                <a class="tg-contact-option" href="#" target="_blank" rel="noopener noreferrer" data-public-contact-card="whatsapp" hidden>
+                    <span class="tg-contact-option__icon" aria-hidden="true">W</span>
+                    <span><strong>Chat on WhatsApp</strong><span data-public-contact-whatsapp-text></span></span>
+                </a>
+                <div class="tg-contact-option" data-public-contact-card="address" hidden>
+                    <span class="tg-contact-option__icon" aria-hidden="true">⌖</span>
+                    <span><strong>Our address</strong><span data-public-contact-address></span></span>
+                </div>
+                <a class="tg-contact-option" href="#" target="_blank" rel="noopener noreferrer" data-public-contact-card="maps" hidden>
+                    <span class="tg-contact-option__icon" aria-hidden="true">↗</span>
+                    <span><strong>Open Google Maps</strong><span>Get directions in a new tab</span></span>
+                </a>
+            </div>
         </div>
 
         <div class="col-lg-7">

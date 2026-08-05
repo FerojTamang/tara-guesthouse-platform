@@ -36,6 +36,7 @@ final readonly class PublicActivityController
                 [
                     'title' => 'Activities | Tara Guest House',
                     'activities' => $this->services->service()->list(),
+                    'isActivities' => true,
                 ],
                 'layouts.base',
             );

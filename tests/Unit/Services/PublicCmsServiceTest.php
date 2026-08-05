@@ -7,13 +7,19 @@ namespace Tests\Unit\Services;
 use App\Exceptions\CmsException;
 use App\Models\Activity;
 use App\Models\CmsPage;
+use App\Models\ContentMedia;
+use App\Models\PageContentProfile;
+use App\Models\PublishedContentItem;
 use App\Models\GalleryItem;
 use App\Models\SettingDefinition;
 use App\Models\SiteSetting;
 use App\Presentation\RoomImageUrl;
 use App\Repositories\ActivityCatalogRepository;
+use App\Repositories\ContentMediaRepository;
 use App\Repositories\GalleryCatalogRepository;
+use App\Repositories\PageContentProfileRepository;
 use App\Repositories\PageRepository;
+use App\Repositories\PublicContentCatalogRepository;
 use App\Repositories\RoomCatalogRepository;
 use App\Repositories\RoomImageCatalogRepository;
 use App\Repositories\SettingRepository;
@@ -51,6 +57,180 @@ final class PublicCmsServiceTest extends TestCase
             ['title' => 'Policy', 'slug' => 'policy'],
         ], $layout['navigation_pages']);
         self::assertSame([], $layout['footer_settings']);
+    }
+
+
+    public function testPublishingProfileProjectsNoticeMediaSocialAndNoindexMetadata(): void
+    {
+        $page = self::page(5, 'guest-update', CmsPage::PUBLISHED, 'Notice body.');
+        $pages = $this->createStub(PageRepository::class);
+        $pages->method('findPublishedBySlug')->willReturn($page);
+
+        $profiles = $this->createMock(PageContentProfileRepository::class);
+        $profiles->expects(self::once())
+            ->method('findByPageId')
+            ->with(5)
+            ->willReturn(new PageContentProfile(
+            5,
+            'notice',
+            'Important information for arriving guests.',
+            'important',
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+            new DateTimeImmutable('2026-08-10 04:00:00 UTC'),
+            true,
+            true,
+            9,
+            'Arrival update',
+            'Please review this information before arrival.',
+            null,
+            true,
+            1,
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+        ));
+
+        $media = $this->createMock(ContentMediaRepository::class);
+        $media->expects(self::once())
+            ->method('findActiveById')
+            ->with(9)
+            ->willReturn(self::media(9));
+
+        $result = $this->service(
+            pages: $pages,
+            profiles: $profiles,
+            contentMedia: $media,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC'),
+        )->page('guest-update');
+
+        self::assertSame('notice', $result['content_type']);
+        self::assertSame('important', $result['notice_style']);
+        self::assertSame('Important information for arriving guests.', $result['summary']);
+        self::assertSame('/uploads/content/' . str_repeat('a', 64) . '.webp', $result['featured_image']['url']);
+        self::assertSame('Garden view', $result['featured_image']['alt_text']);
+        self::assertSame('Arrival update', $result['social_title']);
+        self::assertSame('https://example.test/uploads/content/' . str_repeat('a', 64) . '.webp', $result['social_image']);
+        self::assertTrue($result['seo_noindex']);
+        self::assertSame('https://example.test/notices/guest-update', $result['canonical_url']);
+    }
+
+    public function testPublicCollectionsOrderPinnedAndImportantContentAndFeedHomepage(): void
+    {
+        $newsRegular = self::publishedItem(11, 'regular-update', 'news', 'Regular update.');
+        $newsPinned = self::publishedItem(12, 'pinned-update', 'news', 'Pinned update.', pinned: true);
+        $noticeInfo = self::publishedItem(21, 'information-notice', 'notice', 'Information notice.', 'information');
+        $noticeImportant = self::publishedItem(22, 'important-notice', 'notice', 'Important notice.', 'important');
+        $catalog = $this->createStub(PublicContentCatalogRepository::class);
+        $catalog->method('findAllPublishedByType')->willReturnCallback(
+            static fn (string $type): array => $type === 'news'
+                ? [$newsRegular, $newsPinned]
+                : [$noticeInfo, $noticeImportant],
+        );
+
+        $service = $this->service(
+            publicContent: $catalog,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC'),
+        );
+        $news = $service->newsIndex();
+        $notices = $service->noticesIndex();
+        $home = $service->homepage();
+
+        self::assertSame(['pinned-update', 'regular-update'], array_column($news['items'], 'slug'));
+        self::assertSame('/news/pinned-update', $news['items'][0]['href']);
+        self::assertSame(['important-notice', 'information-notice'], array_column($notices['items'], 'slug'));
+        self::assertSame('/notices/important-notice', $notices['items'][0]['href']);
+        self::assertSame(['pinned-update', 'regular-update'], array_column($home['latest_news'], 'slug'));
+        self::assertSame('important-notice', $home['active_notice']['slug']);
+        self::assertSame('https://example.test/news', $news['canonical_url']);
+        self::assertSame('https://example.test/notices', $notices['canonical_url']);
+    }
+
+    public function testStructuredContentWithoutSummaryNeverLeaksStoredJsonIntoPublicCards(): void
+    {
+        $content = json_encode([
+            'format' => 'tara-blocks-v1',
+            'version' => 1,
+            'type' => 'news',
+            'summary' => '',
+            'blocks' => [[
+                'type' => 'image',
+                'media_id' => 9,
+                'url' => '/uploads/content/' . str_repeat('a', 64) . '.webp',
+                'width' => 1600,
+                'height' => 900,
+                'alt' => 'Garden view',
+            ]],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $item = new PublishedContentItem(
+            self::page(13, 'image-update', CmsPage::PUBLISHED, $content),
+            self::profile(13, 'news', null),
+            null,
+        );
+        $catalog = $this->createStub(PublicContentCatalogRepository::class);
+        $catalog->method('findAllPublishedByType')->willReturn([$item]);
+
+        $news = $this->service(
+            publicContent: $catalog,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC'),
+        )->newsIndex();
+
+        self::assertSame('Read the full update.', $news['items'][0]['summary']);
+        self::assertStringNotContainsString('tara-blocks-v1', $news['items'][0]['summary']);
+    }
+
+    public function testTypedPublicRoutesRejectContentFromTheWrongCollection(): void
+    {
+        $page = self::page(5, 'arrival-notice', CmsPage::PUBLISHED, 'Notice body.');
+        $pages = $this->createStub(PageRepository::class);
+        $pages->method('findPublishedBySlug')->willReturn($page);
+        $profiles = $this->createStub(PageContentProfileRepository::class);
+        $profiles->method('findByPageId')->willReturn(self::profile(5, 'notice', 'Arrival details.', 'important'));
+        $service = $this->service(pages: $pages, profiles: $profiles);
+
+        self::assertSame('notice', $service->notice('arrival-notice')['content_type']);
+
+        try {
+            $service->newsArticle('arrival-notice');
+            self::fail('A notice must not be available under the news route.');
+        } catch (CmsException $exception) {
+            self::assertTrue($exception->isNotFound());
+        }
+    }
+
+    public function testExpiredPublishingProfileReturnsNotFound(): void
+    {
+        $page = self::page(5, 'expired-notice', CmsPage::PUBLISHED, 'Expired.');
+        $pages = $this->createStub(PageRepository::class);
+        $pages->method('findPublishedBySlug')->willReturn($page);
+        $profiles = $this->createStub(PageContentProfileRepository::class);
+        $profiles->method('findByPageId')->willReturn(new PageContentProfile(
+            5,
+            'notice',
+            null,
+            'information',
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+            new DateTimeImmutable('2026-08-04 04:00:00 UTC'),
+            false,
+            false,
+            null,
+            null,
+            null,
+            null,
+            false,
+            1,
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+            new DateTimeImmutable('2026-07-31 04:00:00 UTC'),
+        ));
+
+        try {
+            $this->service(
+                pages: $pages,
+                profiles: $profiles,
+                clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-05 00:00:00 UTC'),
+            )->page('expired-notice');
+            self::fail('Expired content must not remain public.');
+        } catch (CmsException $exception) {
+            self::assertTrue($exception->isNotFound());
+        }
     }
 
     public function testUnpublishedMalformedAndMissingPagesReturnNotFound(): void
@@ -206,6 +386,10 @@ final class PublicCmsServiceTest extends TestCase
         ?GalleryCatalogRepository $gallery = null,
         ?string $applicationUrl = 'https://example.test',
         ?callable $reviews = null,
+        ?PageContentProfileRepository $profiles = null,
+        ?ContentMediaRepository $contentMedia = null,
+        ?callable $clock = null,
+        ?PublicContentCatalogRepository $publicContent = null,
     ): PublicCmsService {
         $pages ??= $this->createStub(PageRepository::class);
         $settings ??= $this->createStub(SettingRepository::class);
@@ -232,6 +416,10 @@ final class PublicCmsServiceTest extends TestCase
             'Tara Guest House',
             $applicationUrl,
             $reviews,
+            $profiles,
+            $contentMedia,
+            $clock,
+            $publicContent,
         );
     }
 
@@ -252,6 +440,78 @@ final class PublicCmsServiceTest extends TestCase
             1,
             $timestamp,
             $timestamp,
+        );
+    }
+
+
+    private static function publishedItem(
+        int $id,
+        string $slug,
+        string $contentType,
+        string $summary,
+        ?string $noticeStyle = null,
+        bool $featured = false,
+        bool $pinned = false,
+    ): PublishedContentItem {
+        return new PublishedContentItem(
+            self::page($id, $slug, CmsPage::PUBLISHED, $summary),
+            self::profile($id, $contentType, $summary, $noticeStyle, $featured, $pinned),
+            null,
+        );
+    }
+
+    private static function profile(
+        int $pageId,
+        string $contentType,
+        ?string $summary,
+        ?string $noticeStyle = null,
+        bool $featured = false,
+        bool $pinned = false,
+    ): PageContentProfile {
+        $timestamp = new DateTimeImmutable('2026-07-31 04:00:00 UTC');
+
+        return new PageContentProfile(
+            $pageId,
+            $contentType,
+            $summary,
+            $noticeStyle,
+            $timestamp,
+            $contentType === 'notice' ? new DateTimeImmutable('2026-08-31 04:00:00 UTC') : null,
+            $featured,
+            $pinned,
+            null,
+            null,
+            null,
+            null,
+            false,
+            1,
+            $timestamp,
+            $timestamp,
+        );
+    }
+
+    private static function media(int $id): ContentMedia
+    {
+        $timestamp = new DateTimeImmutable('2026-07-31 04:00:00 UTC');
+
+        return new ContentMedia(
+            $id,
+            'uploads/content/' . str_repeat('a', 64) . '.webp',
+            'garden.webp',
+            'image/webp',
+            'webp',
+            145000,
+            1600,
+            900,
+            str_repeat('b', 64),
+            'Garden',
+            'Garden view',
+            null,
+            1,
+            $timestamp,
+            $timestamp,
+            null,
+            0,
         );
     }
 

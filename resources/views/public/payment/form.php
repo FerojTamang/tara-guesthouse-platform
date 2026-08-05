@@ -24,7 +24,25 @@ $proofDescription = $proofError !== null ? 'proof_upload_help proof_upload_error
 
                 <div class="tg-method-details d-none" data-payment-method-details aria-live="polite"><p class="d-none" data-payment-instructions></p><p class="d-none"><strong>Account/reference:</strong> <span data-payment-account-reference></span></p></div>
 
-                <div class="tg-payment-method-list" aria-label="Payment method guidance"><?php foreach ($paymentMethods as $method): ?><article class="tg-payment-method-card"><h3><?= $e($method['name']) ?></h3><?php if ($method['instructions'] !== null): ?><p><?= nl2br($e($method['instructions'])) ?></p><?php endif; ?><?php if ($method['accountReference'] !== null): ?><p><strong>Account/reference:</strong> <?= $e($method['accountReference']) ?></p><?php endif; ?><?php if ($method['qrImageUrl'] !== null): ?><img src="<?= $e($method['qrImageUrl']) ?>" alt="<?= $e($method['name']) ?> payment QR code" loading="lazy"><?php endif; ?><p><?= $method['requiresProof'] ? 'Payment proof is required.' : 'Payment proof is optional.' ?></p></article><?php endforeach; ?></div>
+                <div class="tg-payment-method-list" aria-label="Payment method guidance">
+                    <?php foreach ($paymentMethods as $method): ?>
+                        <article class="tg-payment-method-card<?= $method['qrImageUrl'] === null ? ' tg-payment-method-card--without-qr' : '' ?>">
+                            <div class="tg-payment-method-card__details">
+                                <p class="tg-eyebrow">Administrator-configured method</p>
+                                <h3><?= $e($method['name']) ?></h3>
+                                <?php if ($method['instructions'] !== null): ?><p class="tg-payment-method-card__instructions"><?= nl2br($e($method['instructions'])) ?></p><?php endif; ?>
+                                <?php if ($method['accountReference'] !== null): ?><p class="tg-payment-method-card__reference"><strong>Account/reference:</strong> <span><?= $e($method['accountReference']) ?></span></p><?php endif; ?>
+                                <p class="tg-payment-method-card__proof"><?= $method['requiresProof'] ? 'Payment proof is required for this method.' : 'Payment proof is optional for this method.' ?></p>
+                            </div>
+                            <?php if ($method['qrImageUrl'] !== null): ?>
+                                <figure class="tg-payment-method-card__qr">
+                                    <img src="<?= $e($method['qrImageUrl']) ?>" alt="<?= $e($method['name']) ?> payment QR code" width="320" height="320" loading="lazy">
+                                    <figcaption>Scan this QR code to pay</figcaption>
+                                </figure>
+                            <?php endif; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
 
                 <div><label for="transaction_reference">Transaction/reference code <span>(optional)</span></label><input id="transaction_reference" name="transaction_reference" type="text" maxlength="100" value="<?= $e($values['transactionReference']) ?>" autocomplete="off" <?= $transactionReferenceError !== null ? 'aria-invalid="true" aria-describedby="transaction_reference_error"' : '' ?>><?php if ($transactionReferenceError !== null): ?><p id="transaction_reference_error" class="tg-field-error"><?= $e($transactionReferenceError) ?></p><?php endif; ?></div>
                 <div><label for="proof_upload">Payment proof <span data-proof-requirement>(required only for selected methods)</span></label><input id="proof_upload" name="proof_upload" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" aria-describedby="<?= $e($proofDescription) ?>" <?= $proofError !== null ? 'aria-invalid="true"' : '' ?> data-payment-proof><p id="proof_upload_help" class="tg-form-note">Upload a JPG, PNG, or PDF no larger than 5 MiB. Files are stored privately.</p><?php if ($proofError !== null): ?><p id="proof_upload_error" class="tg-field-error"><?= $e($proofError) ?></p><?php endif; ?></div>

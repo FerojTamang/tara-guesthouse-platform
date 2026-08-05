@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ContactModelsTest extends TestCase
 {
-    public function testContactMessageRetainsNullableWorkflowStatus(): void
+    public function testContactMessageRetainsControlledWorkflowStatus(): void
     {
         $timestamp = new DateTimeImmutable('2026-07-31 12:00:00 UTC');
         $contact = new ContactMessage(
@@ -22,7 +22,7 @@ final class ContactModelsTest extends TestCase
             null,
             'General inquiry',
             'Please send more information.',
-            null,
+            ContactMessage::STATUS_NEW,
             $timestamp,
             $timestamp,
         );
@@ -30,14 +30,16 @@ final class ContactModelsTest extends TestCase
         self::assertSame(4, $contact->id());
         self::assertSame('Asha Sharma', $contact->name());
         self::assertNull($contact->phone());
-        self::assertNull($contact->status());
+        self::assertSame(ContactMessage::STATUS_NEW, $contact->status());
         self::assertSame($timestamp, $contact->createdAt());
     }
 
-    public function testApprovedFutureStatusShapeCanBeReadWithoutDefiningVocabulary(): void
+    public function testUnknownWorkflowStatusIsRejected(): void
     {
         $timestamp = new DateTimeImmutable('2026-07-31 12:00:00 UTC');
-        $contact = new ContactMessage(
+
+        $this->expectException(InvalidArgumentException::class);
+        new ContactMessage(
             5,
             'Asha Sharma',
             'asha@example.test',
@@ -48,8 +50,6 @@ final class ContactModelsTest extends TestCase
             $timestamp,
             $timestamp,
         );
-
-        self::assertSame('future_approved_status', $contact->status());
     }
 
     public function testInvalidContactAndRateLimitStateAreRejected(): void
@@ -64,7 +64,7 @@ final class ContactModelsTest extends TestCase
                 null,
                 'General inquiry',
                 'Please send more information.',
-                null,
+                ContactMessage::STATUS_NEW,
                 $timestamp,
                 $timestamp,
             );

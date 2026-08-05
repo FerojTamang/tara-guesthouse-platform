@@ -146,6 +146,97 @@
     line-height: 1.45;
 }
 
+.tg-home-updates {
+    padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+
+.tg-home-notice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    padding: clamp(1.25rem, 3vw, 1.8rem);
+    border: 1px solid rgba(6, 95, 70, 0.22);
+    border-left: 5px solid var(--tg-emerald);
+    border-radius: var(--tg-radius-md);
+    background: var(--tg-white);
+    box-shadow: var(--tg-shadow-sm);
+}
+
+.tg-home-notice--important {
+    border-left-color: #b42318;
+    background: #fff8f7;
+}
+
+.tg-home-notice--warning {
+    border-left-color: #b54708;
+    background: #fffbeb;
+}
+
+.tg-home-notice--event {
+    border-left-color: #175cd3;
+    background: #f5f9ff;
+}
+
+.tg-home-notice__icon {
+    display: grid;
+    width: 3.2rem;
+    height: 3.2rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--tg-mint-soft);
+    color: var(--tg-emerald);
+}
+
+.tg-home-notice__body h2 {
+    margin-bottom: 0.4rem;
+    font-size: clamp(1.45rem, 2.5vw, 2rem);
+}
+
+.tg-home-notice__body > p:last-child {
+    margin: 0;
+    color: var(--tg-muted);
+}
+
+.tg-home-news__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.tg-home-news-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.tg-home-news-card__media {
+    aspect-ratio: 16 / 10;
+}
+
+.tg-home-news-card .tg-card__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.tg-home-news-card .tg-card__body h3 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.tg-home-news-card .tg-text-link {
+    margin-top: auto;
+}
+
+.tg-home-updates__notices-link {
+    display: flex;
+    justify-content: flex-end;
+    margin: 1.25rem 0 0;
+}
+
 .tg-home-content {
     background:
         radial-gradient(circle at 8% 18%, rgba(167, 243, 208, 0.16), transparent 24rem),
@@ -786,5 +877,26 @@
     .tg-gallery-tile::after {
         transition: none;
         transform: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .tg-home-news__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .tg-home-notice {
+        grid-template-columns: 1fr;
+        align-items: flex-start;
+    }
+
+    .tg-home-notice .tg-button {
+        justify-self: start;
+    }
+
+    .tg-home-news__grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -7,11 +7,13 @@ namespace Tests\Unit\Services;
 use App\Core\ViewRenderer;
 use App\Exceptions\MailException;
 use App\Models\Booking;
+use App\Models\ContactMessage;
 use App\Models\MailMessage;
 use App\Models\Payment;
 use App\Services\MailTemplateRenderer;
 use App\Services\MailTransport;
 use App\Services\TransactionalMailService;
+use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\MailFixture;
@@ -106,6 +108,34 @@ final class TransactionalMailServiceTest extends TestCase
         );
         self::assertStringContainsString('/review/' . $token, $message->htmlBody());
         self::assertStringNotContainsString($invitation->invitation()->tokenHash(), $message->textBody());
+    }
+
+    public function testContactReplyUsesLockedRecipientAndEscapesAdministratorContent(): void
+    {
+        $contact = new ContactMessage(
+            9,
+            'Asha Guest',
+            'asha@example.test',
+            null,
+            'Airport transfer request',
+            'Could you arrange a transfer?',
+            ContactMessage::STATUS_IN_PROGRESS,
+            new DateTimeImmutable('2026-08-04 00:00:00 UTC'),
+            new DateTimeImmutable('2026-08-04 00:00:00 UTC'),
+        );
+
+        $this->service->sendContactReply(
+            $contact,
+            'Yes, we can arrange it. <script>alert(1)</script>',
+        );
+
+        self::assertCount(1, $this->transport->messages);
+        $message = $this->transport->messages[0];
+        self::assertSame('asha@example.test', $message->recipientAddress());
+        self::assertSame('Re: Airport transfer request', $message->subject());
+        self::assertStringContainsString('Yes, we can arrange it.', $message->textBody());
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $message->htmlBody());
+        self::assertStringNotContainsString('<script>alert(1)</script>', $message->htmlBody());
     }
 
     public function testWrongEventStateFailsBeforeTransport(): void

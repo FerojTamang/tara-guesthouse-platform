@@ -58,7 +58,11 @@ final class PublicGalleryExperienceTest extends TestCase
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringContainsString('Gallery | Tara Guest House', $response->body());
-        self::assertStringContainsString('row-cols-1 row-cols-sm-2 row-cols-lg-3', $response->body());
+        self::assertStringContainsString('href="/assets/css/pages/gallery.css"', $response->body());
+        self::assertStringContainsString('class="tg-main tg-main--gallery"', $response->body());
+        self::assertStringContainsString('class="tg-gallery-grid"', $response->body());
+        self::assertStringContainsString('tg-gallery-card--featured', $response->body());
+        self::assertSame(1, preg_match_all('/<h1\b/i', $response->body()));
         self::assertStringContainsString('loading="lazy"', $response->body());
         self::assertStringContainsString('decoding="async"', $response->body());
         self::assertStringContainsString('src="/gallery?image=2"', $response->body());

@@ -136,6 +136,15 @@
                 </li>
                 <li class="nav-item">
                     <a
+                        class="nav-link admin-navigation-link<?= $activeNavigation === 'navigation' ? ' active' : '' ?>"
+                        href="/admin/navigation"
+                        <?= $activeNavigation === 'navigation' ? 'aria-current="page"' : '' ?>
+                    >
+                        Navigation
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a
                         class="nav-link admin-navigation-link<?= $activeNavigation === 'reviews' ? ' active' : '' ?>"
                         href="/admin/reviews"
                         <?= $activeNavigation === 'reviews' ? 'aria-current="page"' : '' ?>

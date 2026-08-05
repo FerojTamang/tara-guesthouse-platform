@@ -104,6 +104,10 @@ final class PublicActivityExperienceTest extends TestCase
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertStringContainsString('Activities | Tara Guest House', $response->body());
+        self::assertStringContainsString('href="/assets/css/pages/activities.css"', $response->body());
+        self::assertStringContainsString('class="tg-main tg-main--activities"', $response->body());
+        self::assertStringContainsString('class="tg-activities-grid"', $response->body());
+        self::assertSame(1, preg_match_all('/<h1\b/i', $response->body()));
         self::assertStringContainsString('&lt;script&gt;Village Walk&lt;/script&gt;', $response->body());
         self::assertStringNotContainsString('<script>Village Walk</script>', $response->body());
         self::assertStringContainsString('Explore &lt;b&gt;nearby&lt;/b&gt; paths.<br', $response->body());

@@ -41,6 +41,11 @@ final class ActivityMigrationTest extends DatabaseTestCase
         '20260801000300_create_notifications_table',
         '20260801000400_add_operational_query_indexes',
         '20260802000100_add_activity_catalogue_homepage_curation',
+        '20260804000100_add_contact_reply_workflow',
+        '20260804220000_create_professional_content_foundation',
+        '20260805000100_create_navigation_items_table',
+        '20260805000200_add_advanced_publishing_controls',
+        '20260805000300_expand_navigation_routes_for_publishing',
     ];
 
     private MigrationRunner $runner;

@@ -10,6 +10,7 @@ use App\Core\Response;
 use App\Core\ViewRenderer;
 use App\Exceptions\PaymentMethodException;
 use App\Models\PaymentMethod;
+use App\Requests\PaymentMethodQrUploadRequest;
 use App\Requests\PaymentMethodUpsertRequest;
 use App\Services\PaymentMethodFlashMessages;
 use App\Services\PaymentMethodManagementServiceProvider;
@@ -68,6 +69,7 @@ final readonly class AdministratorPaymentMethodController
 
         try {
             $validated = $this->validatedRequest($request);
+            $qrUpload = PaymentMethodQrUploadRequest::fromFile($request->file('qr_image'));
         } catch (PaymentMethodException $exception) {
             if (!$exception->isValidationFailure()) {
                 throw $exception;
@@ -83,7 +85,7 @@ final readonly class AdministratorPaymentMethodController
             );
         }
 
-        $this->services->service()->create($validated);
+        $this->services->service()->create($validated, $qrUpload);
         $this->flashMessages->success('Payment method created successfully.');
 
         return $this->redirectToIndex();
@@ -114,6 +116,7 @@ final readonly class AdministratorPaymentMethodController
             'Save payment method',
             $this->storedValues($method),
             qrConfigured: $method->qrImagePath() !== null,
+            qrImageUrl: $this->qrImageUrl($method->qrImagePath()),
         );
     }
 
@@ -140,6 +143,8 @@ final readonly class AdministratorPaymentMethodController
 
         try {
             $validated = $this->validatedRequest($request);
+            $qrUpload = PaymentMethodQrUploadRequest::fromFile($request->file('qr_image'));
+            $removeQr = $this->scalarInput($request->input('remove_qr_image')) === '1';
         } catch (PaymentMethodException $exception) {
             if (!$exception->isValidationFailure()) {
                 throw $exception;
@@ -153,11 +158,12 @@ final readonly class AdministratorPaymentMethodController
                 $exception->getMessage(),
                 422,
                 $current->qrImagePath() !== null,
+                $this->qrImageUrl($current->qrImagePath()),
             );
         }
 
         try {
-            $this->services->service()->update($id, $validated);
+            $this->services->service()->update($id, $validated, $qrUpload, $removeQr);
         } catch (PaymentMethodException $exception) {
             if ($exception->isNotFound()) {
                 return $this->notFound();
@@ -292,6 +298,7 @@ final readonly class AdministratorPaymentMethodController
         ?string $error = null,
         int $statusCode = 200,
         bool $qrConfigured = false,
+        ?string $qrImageUrl = null,
     ): Response {
         $html = $this->views->render(
             'admin.payment-methods.form',
@@ -306,11 +313,27 @@ final readonly class AdministratorPaymentMethodController
                 'values' => $values,
                 'error' => $error,
                 'qrConfigured' => $qrConfigured,
+                'qrImageUrl' => $qrImageUrl,
             ],
             'layouts.admin',
         );
 
         return Response::html($html, $statusCode, ['Cache-Control' => 'no-store']);
+    }
+
+    private function qrImageUrl(?string $path): ?string
+    {
+        if (
+            $path === null
+            || preg_match(
+                '#\Apayment-methods/[a-zA-Z0-9][a-zA-Z0-9._/-]*\z#D',
+                $path,
+            ) !== 1
+        ) {
+            return null;
+        }
+
+        return '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
     }
 
     private function redirectToIndex(): Response

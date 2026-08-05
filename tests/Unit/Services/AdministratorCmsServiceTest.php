@@ -83,6 +83,35 @@ final class AdministratorCmsServiceTest extends TestCase
         )));
     }
 
+    public function testReservedPublicRouteSlugsAreRejectedBeforeAnyWriteStarts(): void
+    {
+        $pages = new CmsPageRepositoryFake();
+        $transaction = new CmsTransactionFake();
+        $service = $this->service(
+            new CmsSettingRepositoryFake(),
+            $pages,
+            new CmsAuditRepositoryFake(),
+            $transaction,
+        );
+
+        foreach (['rooms', 'news', 'notices'] as $slug) {
+            try {
+                $service->createPage(
+                    CmsPageContentRequest::fromInput('Reserved route', $slug, 'Safe content', null, null),
+                    9,
+                    null,
+                    null,
+                );
+                self::fail('Expected the reserved public route to be rejected.');
+            } catch (CmsException $exception) {
+                self::assertTrue($exception->isValidationFailure());
+            }
+        }
+
+        self::assertSame([], $pages->pages);
+        self::assertSame(0, $transaction->begins);
+    }
+
     public function testAuditFailureRollsBackAndIsSanitized(): void
     {
         $transaction = new CmsTransactionFake();

@@ -265,7 +265,9 @@ final class PublicAvailabilityPageTest extends TestCase
         self::assertSame(422, $response->statusCode());
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame(0, $this->availability->searchCalls);
-        self::assertStringContainsString('role="alert"', $response->body());
+        self::assertStringContainsString('id="availability-search-error"', $response->body());
+        self::assertStringContainsString('class="tg-availability-search-stage"', $response->body());
+        self::assertStringContainsString('aria-describedby="availability-search-error"', $response->body());
         self::assertStringContainsString('Check-in date is invalid.', $response->body());
         self::assertStringContainsString(
             'value="&lt;script&gt;bad&lt;/script&gt;"',

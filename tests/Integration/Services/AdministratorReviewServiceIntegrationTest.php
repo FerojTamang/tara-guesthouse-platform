@@ -86,6 +86,38 @@ final class AdministratorReviewServiceIntegrationTest extends DatabaseTestCase
         self::assertFalse($this->connection->inTransaction());
     }
 
+    public function testApprovalNormalizesLiveClockMicrosecondsToDatabasePrecision(): void
+    {
+        $administratorId = ReviewFixture::insertAdministrator($this->connection);
+        [, , $reviewId] = $this->pendingReview();
+        $service = $this->service(
+            new DateTimeImmutable('2026-08-02 02:00:00.987654 UTC'),
+        );
+
+        $review = $service->transition(
+            $reviewId,
+            AdministratorReviewStatusRequest::fromInput(
+                Review::STATUS_APPROVED,
+                null,
+                false,
+                new ReviewModerationPolicy(1000, true),
+            ),
+            $administratorId,
+            null,
+            null,
+        );
+
+        self::assertSame(Review::STATUS_APPROVED, $review->status());
+        self::assertSame(
+            '2026-08-02 02:00:00.000000',
+            $review->moderatedAt()?->format('Y-m-d H:i:s.u'),
+        );
+        self::assertSame('2026-08-02 02:00:00', (string) $this->connection->query(
+            'SELECT moderated_at FROM reviews WHERE id = ' . $reviewId,
+        )->fetchColumn());
+        self::assertFalse($this->connection->inTransaction());
+    }
+
     public function testCompletedReviewCannotBeModeratedAgain(): void
     {
         $administratorId = ReviewFixture::insertAdministrator($this->connection);

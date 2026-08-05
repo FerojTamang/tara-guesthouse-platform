@@ -420,6 +420,16 @@ return static function (
     if ($administratorCms !== null) {
         $router->get('/api/v1/admin/settings', [$administratorCms, 'apiSettings'], [$requireAdministrator->forJson()]);
         $router->put('/api/v1/admin/settings', [$administratorCms, 'apiUpdateSettings'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->post('/api/v1/admin/settings/logo', [$administratorCms, 'apiUploadLogo'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->get('/api/v1/admin/media', [$administratorCms, 'apiMedia'], [$requireAdministrator->forJson()]);
+        $router->get('/api/v1/admin/navigation', [$administratorCms, 'apiNavigation'], [$requireAdministrator->forJson()]);
+        $router->post('/api/v1/admin/navigation', [$administratorCms, 'apiCreateNavigation'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->put('/api/v1/admin/navigation/{id}', [$administratorCms, 'apiUpdateNavigation'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->patch('/api/v1/admin/navigation/{id}/active', [$administratorCms, 'apiSetNavigationActive'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->patch('/api/v1/admin/navigation/{id}/move', [$administratorCms, 'apiMoveNavigation'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->post('/api/v1/admin/media', [$administratorCms, 'apiUploadMedia'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->put('/api/v1/admin/media/{id}', [$administratorCms, 'apiUpdateMedia'], [$requireAdministrator->forJson(), $csrf->forJson()]);
+        $router->delete('/api/v1/admin/media/{id}', [$administratorCms, 'apiDeleteMedia'], [$requireAdministrator->forJson(), $csrf->forJson()]);
         $router->get('/api/v1/admin/pages', [$administratorCms, 'apiPages'], [$requireAdministrator->forJson()]);
         $router->post('/api/v1/admin/pages', [$administratorCms, 'apiCreatePage'], [$requireAdministrator->forJson(), $csrf->forJson()]);
         $router->get('/api/v1/admin/pages/{id}', [$administratorCms, 'apiShowPage'], [$requireAdministrator->forJson()]);
@@ -473,6 +483,16 @@ return static function (
             '/api/v1/admin/contact-messages/{id}',
             [$administratorContact, 'apiShow'],
             [$requireAdministrator->forJson()],
+        );
+        $router->post(
+            '/api/v1/admin/contact-messages/{id}/reply',
+            [$administratorContact, 'apiReply'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
+        );
+        $router->patch(
+            '/api/v1/admin/contact-messages/{id}/status',
+            [$administratorContact, 'apiTransition'],
+            [$requireAdministrator->forJson(), $csrf->forJson()],
         );
     }
 

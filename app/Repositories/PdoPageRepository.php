@@ -24,6 +24,13 @@ final class PdoPageRepository implements PageRepository
         FROM pages
         SQL;
 
+    private const PUBLIC_SELECT = <<<'SQL'
+        SELECT p.id, p.title, p.slug, p.content, p.meta_title, p.meta_description, p.status, p.published_at,
+               p.created_by, p.updated_by, p.created_at, p.updated_at
+        FROM pages p
+        LEFT JOIN page_content_profiles pcp ON pcp.page_id = p.id
+        SQL;
+
     public function __construct(private readonly PDO $connection)
     {
     }
@@ -41,7 +48,10 @@ final class PdoPageRepository implements PageRepository
     public function findPublishedBySlug(string $slug): ?CmsPage
     {
         return $slug === '' ? null : $this->lookup(
-            self::SELECT . " WHERE slug = :lookup AND status = 'published' LIMIT 1",
+            self::PUBLIC_SELECT
+            . " WHERE p.slug = :lookup AND p.status = 'published'"
+            . ' AND p.published_at <= UTC_TIMESTAMP()'
+            . ' AND (pcp.expires_at IS NULL OR pcp.expires_at > UTC_TIMESTAMP()) LIMIT 1',
             $slug,
             PDO::PARAM_STR,
         );
@@ -55,7 +65,11 @@ final class PdoPageRepository implements PageRepository
     public function findAllPublished(): array
     {
         return $this->listing(
-            self::SELECT . " WHERE status = 'published' ORDER BY title ASC, id ASC",
+            self::PUBLIC_SELECT
+            . " WHERE p.status = 'published'"
+            . ' AND p.published_at <= UTC_TIMESTAMP()'
+            . ' AND (pcp.expires_at IS NULL OR pcp.expires_at > UTC_TIMESTAMP())'
+            . ' ORDER BY p.title ASC, p.id ASC',
         );
     }
 

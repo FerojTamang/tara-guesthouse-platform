@@ -14,10 +14,12 @@ use App\Middleware\CsrfMiddleware;
 use App\Middleware\PublicContactRateLimitMiddleware;
 use App\Models\AuditLogEntry;
 use App\Models\ContactMessage;
+use App\Models\ContactMessageReply;
 use App\Repositories\AuditLogWriteRepository;
 use App\Repositories\ContactMessageRepository;
 use App\Services\ContactMessageService;
 use App\Services\ContactMessageServiceProvider;
+use App\Services\NullContactReplyMailSender;
 use App\Services\ContactSubmissionFlash;
 use App\Services\ContactTransaction;
 use App\Services\PublicContactRateLimiter;
@@ -51,6 +53,7 @@ final class PublicContactExperienceTest extends TestCase
             $this->repository,
             new PublicContactAuditFake(),
             new PublicContactTransactionFake(),
+            new NullContactReplyMailSender(),
             static fn (): DateTimeImmutable => new DateTimeImmutable('2026-07-31 12:00:00 UTC'),
         );
         $renderer = new ViewRenderer(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'views');
@@ -225,10 +228,22 @@ final class PublicContactRepositoryFake implements ContactMessageRepository
 {
     /** @var array<int, ContactMessage> */
     public array $messages = [];
+    /** @var array<int, ContactMessageReply> */
+    public array $replies = [];
 
     public function create(string $name, string $email, ?string $phone, string $subject, string $message, DateTimeImmutable $createdAt): ContactMessage
     {
-        $contact = new ContactMessage(count($this->messages) + 1, $name, $email, $phone, $subject, $message, null, $createdAt, $createdAt);
+        $contact = new ContactMessage(
+            count($this->messages) + 1,
+            $name,
+            $email,
+            $phone,
+            $subject,
+            $message,
+            ContactMessage::STATUS_NEW,
+            $createdAt,
+            $createdAt,
+        );
         $this->messages[$contact->id()] = $contact;
         return $contact;
     }
@@ -241,6 +256,83 @@ final class PublicContactRepositoryFake implements ContactMessageRepository
     public function findById(int $id): ?ContactMessage
     {
         return $this->messages[$id] ?? null;
+    }
+
+    public function findByIdForUpdate(int $id): ?ContactMessage
+    {
+        return $this->findById($id);
+    }
+
+    public function updateStatus(int $id, string $status, DateTimeImmutable $updatedAt): ContactMessage
+    {
+        $current = $this->messages[$id];
+        return $this->messages[$id] = new ContactMessage(
+            $current->id(),
+            $current->name(),
+            $current->email(),
+            $current->phone(),
+            $current->subject(),
+            $current->message(),
+            $status,
+            $current->createdAt(),
+            $updatedAt,
+        );
+    }
+
+    public function createReply(int $contactMessageId, string $replyBody, int $sentBy, DateTimeImmutable $createdAt): ContactMessageReply
+    {
+        $id = count($this->replies) + 1;
+        return $this->replies[$id] = new ContactMessageReply(
+            $id,
+            $contactMessageId,
+            $replyBody,
+            $sentBy,
+            ContactMessageReply::STATUS_PENDING,
+            null,
+            null,
+            $createdAt,
+            $createdAt,
+        );
+    }
+
+    public function markReplySent(int $replyId, DateTimeImmutable $sentAt): ContactMessageReply
+    {
+        $current = $this->replies[$replyId];
+        return $this->replies[$replyId] = new ContactMessageReply(
+            $current->id(),
+            $current->contactMessageId(),
+            $current->replyBody(),
+            $current->sentBy(),
+            ContactMessageReply::STATUS_SENT,
+            $sentAt,
+            null,
+            $current->createdAt(),
+            $sentAt,
+        );
+    }
+
+    public function markReplyFailed(int $replyId, string $failureCode, DateTimeImmutable $updatedAt): ContactMessageReply
+    {
+        $current = $this->replies[$replyId];
+        return $this->replies[$replyId] = new ContactMessageReply(
+            $current->id(),
+            $current->contactMessageId(),
+            $current->replyBody(),
+            $current->sentBy(),
+            ContactMessageReply::STATUS_FAILED,
+            null,
+            $failureCode,
+            $current->createdAt(),
+            $updatedAt,
+        );
+    }
+
+    public function findRepliesByContactMessageId(int $contactMessageId): array
+    {
+        return array_values(array_filter(
+            $this->replies,
+            static fn (ContactMessageReply $reply): bool => $reply->contactMessageId() === $contactMessageId,
+        ));
     }
 }
 
