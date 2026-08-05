@@ -234,10 +234,13 @@ final class Bootstrap
         $errorHandler = new ErrorHandler($logger, $config->require('app.debug') === true);
         $errorHandler->register();
         $sessionConfiguration = $config->require('session');
+        $responseSecurityConfiguration = $config->require('http.security_headers');
 
-        if (!is_array($sessionConfiguration)) {
-            throw new ConfigurationException('The configured session settings are invalid.');
+        if (!is_array($sessionConfiguration) || !is_array($responseSecurityConfiguration)) {
+            throw new ConfigurationException('The configured session or response security settings are invalid.');
         }
+
+        $responseSecurityPolicy = new ResponseSecurityPolicy($responseSecurityConfiguration);
 
         $session = Session::start($sessionConfiguration);
 
@@ -1017,7 +1020,7 @@ final class Bootstrap
             $publicReviewRateLimit,
         );
 
-        return new Application($router, $errorHandler, $session);
+        return new Application($router, $errorHandler, $session, $responseSecurityPolicy);
     }
 
     /**

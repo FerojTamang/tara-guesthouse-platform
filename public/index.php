@@ -62,6 +62,11 @@ try {
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=UTF-8', true);
+        header('Cache-Control: no-store', true);
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'", true);
+        header('X-Content-Type-Options: nosniff', true);
+        header('X-Frame-Options: DENY', true);
+        header('Referrer-Policy: no-referrer', true);
     }
 
     echo 'Internal Server Error';

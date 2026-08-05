@@ -141,6 +141,14 @@ final class BootstrapTest extends TestCase
 
         self::assertSame(200, $response->statusCode());
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
+        self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
+        self::assertSame('DENY', $response->headers()['X-Frame-Options']);
+        self::assertSame('strict-origin-when-cross-origin', $response->headers()['Referrer-Policy']);
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertSame('no-cache', $response->headers()['Pragma']);
+        self::assertArrayHasKey('Content-Security-Policy', $response->headers());
+        self::assertArrayHasKey('Permissions-Policy', $response->headers());
+        self::assertArrayNotHasKey('Strict-Transport-Security', $response->headers());
         self::assertStringContainsString('Administrator login', $response->body());
         self::assertSame('Asia/Kathmandu', date_default_timezone_get());
         self::assertSame($sessionStatus, session_status());
@@ -170,6 +178,8 @@ final class BootstrapTest extends TestCase
         self::assertTrue($config->has('database'));
         self::assertTrue($config->has('mail'));
         self::assertFalse($config->require('mail.enabled'));
+        self::assertTrue($config->has('http'));
+        self::assertNull($config->require('http.security_headers.strict_transport_security'));
         self::assertTrue($config->has('session'));
         self::assertFalse($config->has('upload'));
     }

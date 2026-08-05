@@ -184,12 +184,14 @@ final class SessionBootstrapTest extends TestCase
     {
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
+            'APP_URL' => 'https://stay.example.test',
             'SESSION_SECURE_COOKIE' => 'false',
             'MAIL_HOST' => 'smtp.example.test',
             'MAIL_FROM_ADDRESS' => 'stay@example.test',
         ]);
 
         $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('SESSION_SECURE_COOKIE must be true for staging and production.');
         Bootstrap::boot($this->basePath);
     }
 
@@ -197,6 +199,7 @@ final class SessionBootstrapTest extends TestCase
     {
         $this->setEnvironmentValues([
             'APP_ENV' => 'production',
+            'APP_URL' => 'https://stay.example.test',
             'SESSION_SECURE_COOKIE' => 'true',
             'MAIL_HOST' => 'smtp.example.test',
             'MAIL_FROM_ADDRESS' => 'stay@example.test',

@@ -1,8 +1,20 @@
 Options -Indexes -MultiViews
 DirectoryIndex index.php
+ServerSignature Off
+
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Permit ACME challenges while denying other hidden files and directories.
+    RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,L]
+
+    # Only the front controller may execute from the public document root.
+    RewriteCond %{REQUEST_URI} !^/index\.php$
+    RewriteRule \.(?:php(?:[0-9]+|s)?|phtml|pht|phar|cgi|pl|py|sh|bash|exe|com|bat|cmd|ps1)(?:/|$) - [F,L,NC]
 
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d

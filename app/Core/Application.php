@@ -15,6 +15,7 @@ final class Application
         private readonly Router $router,
         private readonly ErrorHandler $errorHandler,
         private readonly Session $session,
+        private readonly ?ResponseSecurityPolicy $responseSecurityPolicy = null,
     ) {
     }
 
@@ -27,12 +28,20 @@ final class Application
             $response = $this->router->dispatch($request);
         } catch (Throwable $throwable) {
             $response = $this->errorHandler->render($throwable);
-        } finally {
+        }
+
+        if ($this->responseSecurityPolicy !== null) {
             try {
-                $this->session->close();
+                $response = $this->responseSecurityPolicy->apply($request, $response);
             } catch (Throwable $throwable) {
-                $this->errorHandler->render($throwable);
+                $response = $this->errorHandler->render($throwable);
             }
+        }
+
+        try {
+            $this->session->close();
+        } catch (Throwable $throwable) {
+            $this->errorHandler->render($throwable);
         }
 
         return $response;
