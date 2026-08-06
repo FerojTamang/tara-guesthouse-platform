@@ -493,6 +493,11 @@ final class PaymentStatusApiWriterFake implements PaymentWriteRepository
         throw new RuntimeException('Not used.');
     }
 
+    public function hasBlockingSubmissionForBooking(int $bookingId): bool
+    {
+        return false;
+    }
+
     public function hasVerifiedForBooking(
         int $bookingId,
         ?int $excludingPaymentId = null,

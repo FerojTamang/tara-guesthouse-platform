@@ -79,6 +79,10 @@ final class GuestPaymentSubmissionService implements GuestPaymentSubmitter
                 $submittedAt,
             );
 
+            if ($this->payments->hasBlockingSubmissionForBooking($booking->id())) {
+                throw GuestPaymentException::paymentAlreadySubmitted();
+            }
+
             $proofPath = null;
             $proof = $request->proof();
 

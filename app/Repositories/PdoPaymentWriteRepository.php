@@ -224,6 +224,28 @@ final readonly class PdoPaymentWriteRepository implements PaymentWriteRepository
         }
     }
 
+    public function hasBlockingSubmissionForBooking(int $bookingId): bool
+    {
+        if (!$this->connection->inTransaction() || $bookingId <= 0) {
+            throw new DatabaseException('The booking payment lookup failed.');
+        }
+
+        try {
+            $statement = $this->connection->prepare(
+                'SELECT 1 FROM payments '
+                . 'WHERE booking_id = :booking_id '
+                . "AND BINARY payment_status IN (BINARY 'submitted', BINARY 'verified') "
+                . 'LIMIT 1',
+            );
+            $statement->bindValue('booking_id', $bookingId, PDO::PARAM_INT);
+            $statement->execute();
+
+            return $statement->fetchColumn() !== false;
+        } catch (Throwable) {
+            throw new DatabaseException('The booking payment lookup failed.');
+        }
+    }
+
     public function hasVerifiedForBooking(
         int $bookingId,
         ?int $excludingPaymentId = null,

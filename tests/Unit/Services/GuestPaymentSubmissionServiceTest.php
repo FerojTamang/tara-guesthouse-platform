@@ -70,7 +70,7 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
         self::assertNull($payment->proofPath());
         self::assertSame(['begin', 'commit'], $transaction->events);
         self::assertSame(
-            ['lock-booking', 'lock-method', 'create'],
+            ['lock-booking', 'lock-method', 'blocking-submission', 'create'],
             $writer->events,
         );
         self::assertSame(1, $transaction->commits);
@@ -78,11 +78,48 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
         self::assertSame([], $storage->removedPaths);
     }
 
-    public function testEachSuccessfulSubmissionCreatesASeparateRetainedAttempt(): void
+    public function testExistingSubmittedAttemptBlocksDuplicateBeforeProofStorage(): void
+    {
+        $booking = $this->booking();
+        $method = $this->method(requiresProof: true);
+        $writer = new GuestPaymentWriteRepositoryFake($booking, $method);
+        $writer->hasBlockingSubmission = true;
+        $storage = new GuestPaymentProofStorageFake();
+        $transaction = new GuestPaymentTransactionFake();
+        $service = $this->service(
+            $booking,
+            $method,
+            $writer,
+            $storage,
+            $transaction,
+        );
+
+        try {
+            $service->submit($this->request($booking, withProof: true));
+            self::fail('A duplicate submitted payment was accepted.');
+        } catch (GuestPaymentException $exception) {
+            self::assertTrue($exception->isConflict());
+            self::assertSame(
+                'A payment is already under review for this booking.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertSame(0, $writer->createCalls);
+        self::assertSame(0, $storage->storeCalls);
+        self::assertSame(1, $transaction->rollbacks);
+        self::assertSame(
+            ['lock-booking', 'lock-method', 'blocking-submission'],
+            $writer->events,
+        );
+    }
+
+    public function testRejectedHistoryDoesNotBlockACorrectedSubmission(): void
     {
         $booking = $this->booking();
         $method = $this->method();
         $writer = new GuestPaymentWriteRepositoryFake($booking, $method);
+        $writer->hasBlockingSubmission = false;
         $service = $this->service(
             $booking,
             $method,
@@ -91,11 +128,10 @@ final class GuestPaymentSubmissionServiceTest extends TestCase
             new GuestPaymentTransactionFake(),
         );
 
-        $first = $service->submit($this->request($booking));
-        $second = $service->submit($this->request($booking));
+        $payment = $service->submit($this->request($booking));
 
-        self::assertNotSame($first->id(), $second->id());
-        self::assertSame(2, $writer->createCalls);
+        self::assertTrue($payment->isSubmitted());
+        self::assertSame(1, $writer->createCalls);
     }
 
     public function testLockedBookingAndMethodFactsAreRecheckedBeforeProofStorage(): void
@@ -428,6 +464,8 @@ final class GuestPaymentWriteRepositoryFake implements PaymentWriteRepository
 
     public ?\Throwable $createFailure = null;
 
+    public bool $hasBlockingSubmission = false;
+
     private int $nextIdentifier = 44;
 
     public function __construct(
@@ -501,6 +539,13 @@ final class GuestPaymentWriteRepositoryFake implements PaymentWriteRepository
             $submittedAt,
             $submittedAt,
         );
+    }
+
+    public function hasBlockingSubmissionForBooking(int $bookingId): bool
+    {
+        $this->events[] = 'blocking-submission';
+
+        return $this->hasBlockingSubmission;
     }
 
     public function hasVerifiedForBooking(

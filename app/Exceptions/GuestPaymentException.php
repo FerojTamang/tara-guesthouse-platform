@@ -40,6 +40,14 @@ final class GuestPaymentException extends RuntimeException
         return new self('The selected payment method is not available.', 'conflict');
     }
 
+    public static function paymentAlreadySubmitted(): self
+    {
+        return new self(
+            'A payment is already under review for this booking.',
+            'conflict',
+        );
+    }
+
     public static function failure(?Throwable $previous = null): self
     {
         return new self('Payment operation failed.', 'system', $previous);

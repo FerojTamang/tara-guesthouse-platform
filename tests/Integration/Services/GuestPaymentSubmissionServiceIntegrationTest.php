@@ -72,34 +72,44 @@ final class GuestPaymentSubmissionServiceIntegrationTest extends DatabaseTestCas
         parent::tearDown();
     }
 
-    public function testItCommitsSeparateSubmittedRowsAndPrivateProofs(): void
+    public function testCommittedSubmissionBlocksADuplicateAndRetainsOnePrivateProof(): void
     {
         $service = $this->service();
         $request = $this->request('TGH-PAY-SUBMIT-001');
 
-        $first = $service->submit($request);
-        $second = $service->submit($request);
+        $payment = $service->submit($request);
 
-        self::assertNotSame($first->id(), $second->id());
-        self::assertTrue($first->isSubmitted());
-        self::assertTrue($second->isSubmitted());
-        self::assertNotSame($first->proofPath(), $second->proofPath());
+        try {
+            $service->submit($request);
+            self::fail('A duplicate submitted payment was accepted.');
+        } catch (GuestPaymentException $exception) {
+            self::assertTrue($exception->isConflict());
+            self::assertSame(
+                'A payment is already under review for this booking.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertTrue($payment->isSubmitted());
+        self::assertSame(Payment::CURRENCY_NPR, $payment->currency());
+        self::assertSame('10000.00', $payment->amount());
+        self::assertSame('BANK-INTEGRATION-001', $payment->transactionReference());
+        self::assertMatchesRegularExpression(
+            '/^payment-proofs\/[a-f0-9]{64}\.pdf$/D',
+            (string) $payment->proofPath(),
+        );
         self::assertSame(
-            2,
+            1,
             (int) $this->connection->query('SELECT COUNT(*) FROM payments')->fetchColumn(),
         );
 
-        foreach ([$first, $second] as $payment) {
-            self::assertSame(Payment::CURRENCY_NPR, $payment->currency());
-            self::assertSame('10000.00', $payment->amount());
-            self::assertSame('BANK-INTEGRATION-001', $payment->transactionReference());
-            self::assertMatchesRegularExpression(
-                '/^payment-proofs\/[a-f0-9]{64}\.pdf$/D',
-                (string) $payment->proofPath(),
-            );
-            $filename = basename((string) $payment->proofPath());
-            self::assertFileExists($this->proofDirectory . DIRECTORY_SEPARATOR . $filename);
-        }
+        $proofs = glob($this->proofDirectory . DIRECTORY_SEPARATOR . '*') ?: [];
+        self::assertCount(1, $proofs);
+        self::assertSame(
+            basename((string) $payment->proofPath()),
+            basename($proofs[0]),
+        );
+        self::assertFalse($this->connection->inTransaction());
     }
 
     public function testDatabaseFailureRollsBackAndRemovesTheStoredProof(): void

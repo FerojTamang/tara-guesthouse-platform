@@ -236,6 +236,56 @@ final class PdoPaymentWriteRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testBlockingSubmissionLookupRequiresTheCallerHeldBookingLockContract(): void
+    {
+        $submittedId = $this->insertSubmittedPayment(
+            $this->bookingId,
+            'BLOCKING-001',
+        );
+        $this->insertReviewedPayment(
+            $this->secondBookingId,
+            Payment::STATUS_REJECTED,
+            'REJECTED-HISTORY-001',
+        );
+
+        try {
+            $this->writer->hasBlockingSubmissionForBooking($this->bookingId);
+            self::fail('Expected a transaction requirement.');
+        } catch (DatabaseException $exception) {
+            self::assertSame(
+                'The booking payment lookup failed.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->connection->beginTransaction();
+
+        try {
+            self::assertTrue(
+                $this->writer->hasBlockingSubmissionForBooking($this->bookingId),
+            );
+            self::assertFalse(
+                $this->writer->hasBlockingSubmissionForBooking(
+                    $this->secondBookingId,
+                ),
+            );
+
+            $statement = $this->connection->prepare(
+                'UPDATE payments SET payment_status = :status WHERE id = :payment_id',
+            );
+            $statement->execute([
+                'status' => Payment::STATUS_REJECTED,
+                'payment_id' => $submittedId,
+            ]);
+
+            self::assertFalse(
+                $this->writer->hasBlockingSubmissionForBooking($this->bookingId),
+            );
+        } finally {
+            $this->connection->rollBack();
+        }
+    }
+
     public function testVerifiedLookupSupportsTheCallerHeldBookingLockContract(): void
     {
         $verifiedId = $this->insertReviewedPayment(

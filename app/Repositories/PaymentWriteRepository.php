@@ -34,6 +34,14 @@ interface PaymentWriteRepository
 
     /**
      * The caller must already hold the associated booking row lock.
+     *
+     * Submitted and verified attempts block another Guest submission. Rejected
+     * attempts remain retained history and do not block a corrected retry.
+     */
+    public function hasBlockingSubmissionForBooking(int $bookingId): bool;
+
+    /**
+     * The caller must already hold the associated booking row lock.
      */
     public function hasVerifiedForBooking(
         int $bookingId,
