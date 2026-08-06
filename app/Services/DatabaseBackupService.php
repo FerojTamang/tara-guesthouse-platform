@@ -10,7 +10,7 @@ use DateTimeZone;
 use RuntimeException;
 use Throwable;
 
-/** Coordinates one private, logical SQL backup without opening a database connection. */
+/** Coordinates one private logical SQL backup with bounded schema metadata capture. */
 final class DatabaseBackupService
 {
     /** @var array<string, mixed> */
@@ -66,6 +66,7 @@ final class DatabaseBackupService
         $sqlFinalized = false;
         $manifestFinalized = false;
         $completed = false;
+        $metadataBefore = null;
 
         try {
             $client = $this->resolveClient();
@@ -85,6 +86,7 @@ final class DatabaseBackupService
                 $finalManifest = $this->root->resolve($manifestBasename);
                 $temporarySql = $this->root->resolve($sqlBasename . '.part');
                 $temporaryManifest = $this->root->resolve($manifestBasename . '.part');
+                $metadataBefore = $this->optionalMetadata();
 
                 foreach ([$finalSql, $finalManifest, $temporarySql, $temporaryManifest] as $path) {
                     if (file_exists($path) || is_link($path)) {
@@ -140,6 +142,7 @@ final class DatabaseBackupService
             }
 
             try {
+                $this->root->protectFile($temporarySql);
                 $bytes = filesize($temporarySql);
                 $sha256 = hash_file('sha256', $temporarySql);
 
@@ -148,6 +151,9 @@ final class DatabaseBackupService
                 }
 
                 $metadata = $this->optionalMetadata();
+                if ($metadataBefore !== $metadata) {
+                    throw new RuntimeException();
+                }
                 $toolVersion = self::boundedToolVersion($client['version']);
                 $manifest = new DatabaseBackupManifest(
                     $createdAtUtc,
@@ -172,6 +178,7 @@ final class DatabaseBackupService
                 );
 
                 ($this->manifestWriter)($temporaryManifest, $manifest->toJson());
+                $this->root->protectFile($temporaryManifest);
 
                 if (file_exists($finalSql) || is_link($finalSql) || !@rename($temporarySql, $finalSql)) {
                     throw new RuntimeException();
@@ -260,41 +267,44 @@ final class DatabaseBackupService
     /** @return array{application_revision: string|null, migration_count: int|null, latest_migration: string|null} */
     private function optionalMetadata(): array
     {
-        $empty = [
-            'application_revision' => null,
-            'migration_count' => null,
-            'latest_migration' => null,
-        ];
-
         if ($this->metadataProvider === null) {
-            return $empty;
+            return [
+                'application_revision' => null,
+                'migration_count' => null,
+                'latest_migration' => null,
+            ];
         }
 
         try {
             $metadata = ($this->metadataProvider)();
             if (!is_array($metadata)) {
-                return $empty;
+                throw new RuntimeException();
+            }
+
+            $applicationRevision = $metadata['application_revision'] ?? null;
+            $migrationCount = $metadata['migration_count'] ?? null;
+            $latestMigration = $metadata['latest_migration'] ?? null;
+
+            if (
+                ($applicationRevision !== null && (
+                    !is_string($applicationRevision)
+                    || preg_match('/^[a-f0-9]{7,64}$/D', $applicationRevision) !== 1
+                ))
+                || !is_int($migrationCount)
+                || $migrationCount <= 0
+                || !is_string($latestMigration)
+                || preg_match('/^[0-9]{14}_[a-z0-9_]+$/D', $latestMigration) !== 1
+            ) {
+                throw new RuntimeException();
             }
 
             return [
-                'application_revision' => isset($metadata['application_revision'])
-                    && is_string($metadata['application_revision'])
-                    && preg_match('/^[a-f0-9]{7,64}$/D', $metadata['application_revision']) === 1
-                        ? $metadata['application_revision']
-                        : null,
-                'migration_count' => isset($metadata['migration_count'])
-                    && is_int($metadata['migration_count'])
-                    && $metadata['migration_count'] >= 0
-                        ? $metadata['migration_count']
-                        : null,
-                'latest_migration' => isset($metadata['latest_migration'])
-                    && is_string($metadata['latest_migration'])
-                    && preg_match('/^[0-9]{14}_[a-z0-9_]+$/D', $metadata['latest_migration']) === 1
-                        ? $metadata['latest_migration']
-                        : null,
+                'application_revision' => $applicationRevision,
+                'migration_count' => $migrationCount,
+                'latest_migration' => $latestMigration,
             ];
         } catch (Throwable) {
-            return $empty;
+            throw new RuntimeException('Database backup metadata could not be captured.');
         }
     }
 

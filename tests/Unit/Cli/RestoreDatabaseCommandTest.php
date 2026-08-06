@@ -42,12 +42,17 @@ final class RestoreDatabaseCommandTest extends TestCase
         self::assertSame('', $result['stderr']);
         self::assertFalse($configurationCalled);
         self::assertFalse($serviceCalled);
+        $normalizedStdout = preg_replace('/\s+/', ' ', $result['stdout']);
+        self::assertIsString($normalizedStdout);
         foreach ([
             'Restore defaults to preflight',
             'manifest, byte count',
             'SHA-256',
             'configured application database',
             'zero tables and zero views',
+            'schema-engine compatibility',
+            'schema_migrations',
+            'discard that disposable database',
             '--execute',
             'exact database confirmation',
             'exact environment confirmation',
@@ -57,11 +62,11 @@ final class RestoreDatabaseCommandTest extends TestCase
             'CREATE DATABASE',
             'TRUNCATE',
             'backup and manifest are retained',
-            'disposable, empty test database',
+            'Production/cPanel restore validation remains pending',
         ] as $text) {
-            self::assertStringContainsStringIgnoringCase($text, $result['stdout']);
+            self::assertStringContainsStringIgnoringCase($text, $normalizedStdout);
         }
-        self::assertStringNotContainsString(self::DATABASE, $result['stdout']);
+        self::assertStringNotContainsString(self::DATABASE, $normalizedStdout);
     }
 
     #[DataProvider('invalidSyntaxProvider')]
@@ -148,6 +153,8 @@ final class RestoreDatabaseCommandTest extends TestCase
             'SHA-256: ' . str_repeat('a', 64),
             'Target tables: 0',
             'Target views: 0',
+            'Expected migrations: 32',
+            'Expected latest migration: 20260805000300_expand_navigation_routes_for_publishing',
             'Restore not executed.',
         ] as $metadata) {
             self::assertStringContainsString($metadata, $result['stdout']);
@@ -238,7 +245,9 @@ final class RestoreDatabaseCommandTest extends TestCase
         self::assertSame([], $service->preflightCalls);
         self::assertSame([self::SQL_FILE], $service->executeCalls);
         self::assertSame(1, $configurationCalls);
-        self::assertStringContainsString('Restore executed.', $result['stdout']);
+        self::assertStringContainsString('Restore executed and verified.', $result['stdout']);
+        self::assertStringContainsString('Verified tables: 41', $result['stdout']);
+        self::assertStringContainsString('Verified migrations: 32', $result['stdout']);
         self::assertStringContainsString('Restored UTC: 2026-08-01T15:45:00Z', $result['stdout']);
         $this->assertNonSecret($result['stdout']);
     }
@@ -316,6 +325,8 @@ final class RestoreDatabaseCommandTest extends TestCase
             'mysql',
             0,
             0,
+            32,
+            '20260805000300_expand_navigation_routes_for_publishing',
             false,
         );
     }
@@ -330,6 +341,11 @@ final class RestoreDatabaseCommandTest extends TestCase
             '2026-08-01T15:45:00Z',
             'mysql',
             'mysql 8.0.44',
+            41,
+            0,
+            32,
+            '20260805000300_expand_navigation_routes_for_publishing',
+            true,
             true,
         );
     }

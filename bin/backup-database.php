@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Cli\BackupDatabaseCommand;
 use App\Core\Config;
+use App\Core\ConnectionFactory;
 use App\Core\Environment;
+use App\Repositories\PdoDatabaseBackupMetadataRepository;
 use App\Services\DatabaseBackupFilenameGenerator;
 use App\Services\DatabaseBackupRoot;
 use App\Services\DatabaseBackupService;
@@ -35,6 +37,9 @@ $command = new BackupDatabaseCommand(static function () use ($basePath) {
         $basePath . DIRECTORY_SEPARATOR . 'storage',
         $basePath . DIRECTORY_SEPARATOR . 'public',
     );
+    $metadata = new PdoDatabaseBackupMetadataRepository(
+        (new ConnectionFactory($database))->create(),
+    );
 
     return (new DatabaseBackupService(
         $root,
@@ -43,6 +48,15 @@ $command = new BackupDatabaseCommand(static function () use ($basePath) {
         new DatabaseNativeClientResolver($runner),
         new DatabaseNativeClientCommandBuilder(),
         $runner,
+        metadataProvider: static function () use ($metadata): array {
+            $state = $metadata->read();
+
+            return [
+                'application_revision' => null,
+                'migration_count' => $state['migration_count'],
+                'latest_migration' => $state['latest_migration'],
+            ];
+        },
     ))->create();
 });
 

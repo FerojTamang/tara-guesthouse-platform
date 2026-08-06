@@ -21,17 +21,21 @@ Usage:
   php bin/restore-database.php --help
 
 Restore defaults to preflight. Preflight verifies the manifest, byte count,
-SHA-256, native client, and that the configured application database already
-exists with zero tables and zero views. It does not import SQL.
+SHA-256, schema-engine compatibility, native client, and that the configured
+application database already exists with zero tables and zero views. It does not
+import SQL.
 
 Execution requires --execute and exact database confirmation. Staging and
 production also require exact environment confirmation. SQL is supplied to the
 native client through stdin and credentials use a temporary private option file.
-The backup and manifest are retained.
+A zero native exit code is not enough: the restored schema_migrations state and
+object counts are read back and must match manifest metadata when recorded. The
+backup and manifest are retained.
 
 There is no force mode or automatic database replacement. The command never uses
-DROP DATABASE, CREATE DATABASE, or TRUNCATE. Production/cPanel restore validation
-remains pending; real testing requires a disposable, empty test database.
+DROP DATABASE, CREATE DATABASE, or TRUNCATE. A failed or unverified import may
+leave a partial target; discard that disposable database rather than retrying in
+place. Production/cPanel restore validation remains pending.
 TEXT;
 
     /** @var Closure(): array{database: string, environment: string} */
@@ -186,7 +190,7 @@ TEXT;
     private static function preflightOutput(DatabaseRestorePreflightResult $result): string
     {
         return sprintf(
-            "SQL backup: %s\nManifest: %s\nBytes: %d\nSHA-256: %s\nBackup created UTC: %s\nBackup tool: %s\nRestore tool: %s\nTarget tables: %d\nTarget views: %d\nRestore not executed.\n",
+            "SQL backup: %s\nManifest: %s\nBytes: %d\nSHA-256: %s\nBackup created UTC: %s\nBackup tool: %s\nRestore tool: %s\nTarget tables: %d\nTarget views: %d\nExpected migrations: %s\nExpected latest migration: %s\nRestore not executed.\n",
             $result->sqlBackupFile,
             $result->manifestFile,
             $result->bytes,
@@ -196,19 +200,25 @@ TEXT;
             self::tool($result->restoreToolFamily, $result->restoreToolVersion),
             $result->targetTableCount,
             $result->targetViewCount,
+            $result->expectedMigrationCount === null ? 'not recorded' : (string) $result->expectedMigrationCount,
+            $result->expectedLatestMigration ?? 'not recorded',
         );
     }
 
     private static function restoreOutput(DatabaseRestoreResult $result): string
     {
         return sprintf(
-            "SQL backup: %s\nManifest: %s\nBytes: %d\nSHA-256: %s\nRestored UTC: %s\nRestore tool: %s\nRestore executed.\n",
+            "SQL backup: %s\nManifest: %s\nBytes: %d\nSHA-256: %s\nRestored UTC: %s\nRestore tool: %s\nVerified tables: %d\nVerified views: %d\nVerified migrations: %d\nLatest migration: %s\nRestore executed and verified.\n",
             $result->sqlBackupFile,
             $result->manifestFile,
             $result->bytes,
             $result->sha256,
             $result->restoredAtUtc,
             self::tool($result->toolFamily, $result->toolVersion),
+            $result->targetTableCount,
+            $result->targetViewCount,
+            $result->migrationCount,
+            $result->latestMigration,
         );
     }
 

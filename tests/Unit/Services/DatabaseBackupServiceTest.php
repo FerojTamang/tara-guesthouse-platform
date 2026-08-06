@@ -81,6 +81,8 @@ final class DatabaseBackupServiceTest extends TestCase
         self::assertSame('mysql', $manifest->databaseEngine);
         self::assertSame('mariadb', $manifest->toolFamily);
         self::assertSame('MariaDB dump 11.4', $manifest->toolVersion);
+        self::assertSame(32, $manifest->migrationCount);
+        self::assertSame('20260805000300_expand_navigation_routes_for_publishing', $manifest->latestMigration);
 
         self::assertSame(self::SQL_FILE, $result->sqlBackupFile);
         self::assertSame(self::MANIFEST_FILE, $result->manifestFile);
@@ -164,6 +166,67 @@ final class DatabaseBackupServiceTest extends TestCase
         yield 'manifest' => [self::MANIFEST_FILE];
     }
 
+    public function testInvalidRequiredMetadataFailsClosedAndLeavesNoBackupPair(): void
+    {
+        $runner = new BackupRunnerFake("CREATE TABLE rooms (id INT);\n");
+        $root = new DatabaseBackupRoot($this->storageRoot, $this->publicRoot);
+        $service = new DatabaseBackupService(
+            $root,
+            [
+                'driver' => 'mysql',
+                'host' => 'fake-db.example',
+                'port' => 3306,
+                'database' => 'tgh_backup_test',
+                'username' => 'fake-backup-user',
+                'password' => self::PASSWORD,
+                'charset' => 'utf8mb4',
+            ],
+            new DatabaseBackupFilenameGenerator(static fn (int $length): string => str_repeat("\xAB", $length)),
+            new DatabaseNativeClientResolver($runner),
+            new DatabaseNativeClientCommandBuilder(),
+            $runner,
+            static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-01T20:15:00+05:45'),
+            static fn (int $length): string => str_repeat("\xCD", $length),
+            static fn (): array => [
+                'application_revision' => null,
+                'migration_count' => 0,
+                'latest_migration' => null,
+            ],
+        );
+
+        $this->expectSafeFailure(
+            fn () => $service->create(),
+            'Database backup could not be created.',
+        );
+
+        $this->assertNoBackupFilesRemain();
+    }
+
+    public function testMigrationMetadataChangingDuringDumpRejectsTheBackupPair(): void
+    {
+        $runner = new BackupRunnerFake("CREATE TABLE rooms (id INT);\n");
+        $calls = 0;
+        $metadata = static function () use (&$calls): array {
+            $calls++;
+
+            return [
+                'application_revision' => null,
+                'migration_count' => $calls === 1 ? 31 : 32,
+                'latest_migration' => $calls === 1
+                    ? '20260805000200_add_advanced_publishing_controls'
+                    : '20260805000300_expand_navigation_routes_for_publishing',
+            ];
+        };
+
+        $this->expectSafeFailure(
+            fn () => $this->service($runner, null, null, $metadata)->create(),
+            'Database backup could not be finalized.',
+        );
+
+        self::assertSame(2, $calls);
+        $this->assertNoBackupFilesRemain();
+    }
+
     public function testManifestWriteFailureLeavesNoOrphansOrCredentials(): void
     {
         $runner = new BackupRunnerFake("CREATE TABLE rooms (id INT);\n");
@@ -183,6 +246,7 @@ final class DatabaseBackupServiceTest extends TestCase
         BackupRunnerFake $runner,
         ?DatabaseBackupRoot $root = null,
         ?callable $manifestWriter = null,
+        ?callable $metadataProvider = null,
     ): DatabaseBackupService {
         $root ??= new DatabaseBackupRoot($this->storageRoot, $this->publicRoot);
 
@@ -203,10 +267,10 @@ final class DatabaseBackupServiceTest extends TestCase
             $runner,
             static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-01T20:15:00+05:45'),
             static fn (int $length): string => str_repeat("\xCD", $length),
-            static fn (): array => [
+            $metadataProvider ?? static fn (): array => [
                 'application_revision' => 'a87babe',
-                'migration_count' => 25,
-                'latest_migration' => null,
+                'migration_count' => 32,
+                'latest_migration' => '20260805000300_expand_navigation_routes_for_publishing',
             ],
             $manifestWriter,
         );

@@ -137,7 +137,7 @@ Network Latency
 
 Regular backups are mandatory.
 
-> **Implementation status:** The application provides the manual logical-database backup command `php bin/backup-database.php` and the guarded restore command `php bin/restore-database.php`. Backup writes an integrity manifest beside the private SQL file in `storage/backups/`; restore defaults to non-importing preflight. The frequencies, additional copies, encryption, offsite/cloud storage, retention automation, and scheduling below are operational policy targets, not implemented application automation. No real restore or production/cPanel validation has been completed; those exercises remain deferred to the approved Sprint 5 operations gates.
+> **Implementation status:** The application provides the manual logical-database backup command `php bin/backup-database.php` (Composer alias: `composer database:backup`) and the guarded restore command `php bin/restore-database.php` (Composer alias: `composer database:restore -- ...`). Backup requires a private writable `storage/backups/` directory, writes private SQL and manifest files, and records the exact applied migration count and latest migration for later verification. Restore defaults to non-importing preflight and, after an explicitly confirmed import, reads the restored schema back before reporting success. The frequencies, additional copies, encryption, offsite/cloud storage, retention automation, and scheduling below are operational policy targets, not implemented application automation. No real restore or production/cPanel validation has been completed; those exercises remain deferred to the approved operations gates.
 
 ## Backup Policy Targets
 
@@ -149,6 +149,17 @@ Regular backups are mandatory.
 | Offsite Backup | Monthly |
 
 ---
+
+
+Before creating a backup, verify that `storage/backups/` is outside the public document root, is readable and writable by the CLI account, and is not group- or world-accessible on POSIX hosts. The command fails closed when those conditions or private-file permissions cannot be established.
+
+Create one backup:
+
+```text
+composer database:backup
+```
+
+Record the printed SQL basename, manifest basename, byte count, SHA-256, creation time, and native tool version in the operations log. Copy the SQL and manifest together; neither file is independently sufficient for restore verification. Never email an unencrypted backup or place it beneath `public/`.
 
 ## Backup Workflow
 
@@ -202,7 +213,7 @@ Use only a generated SQL basename from private `storage/backups/`; never pass an
 php bin/restore-database.php tara-guest-house-YYYYMMDDTHHMMSSZ-<12-hex>.sql
 ```
 
-This default preflight verifies the versioned manifest, logical SQL, exact byte count, lowercase SHA-256, configured-database existence, zero base tables, zero views, and restore-client availability. It does not import SQL and reports `Restore not executed.` The configured application database is the only target, and it must already exist and be empty.
+This default preflight verifies the versioned manifest, logical SQL, exact byte count, lowercase SHA-256, database-engine compatibility, recorded migration identity, configured-database existence, zero base tables, zero views, and restore-client availability. It does not import SQL and reports `Restore not executed.` The configured application database is the only target, and it must already exist and be empty.
 
 Execution uses exact confirmation:
 
@@ -216,9 +227,9 @@ Staging and production additionally require the exact validated environment:
 php bin/restore-database.php <generated-basename.sql> --execute --confirm-database=<exact-configured-name> --confirm-environment=<exact-environment>
 ```
 
-Execution reruns the complete preflight immediately before import. Credentials are carried in a temporary private native-client option file that is always cleaned; they are not command-line arguments. The SQL file is opened directly as native-process stdin with no shell redirection. The SQL backup and matching manifest are retained after success or failure.
+Execution reruns the complete preflight immediately before import. Credentials are carried in a temporary private native-client option file that is always cleaned; they are not command-line arguments. The SQL file is opened directly as native-process stdin with no shell redirection. After a zero native exit code, the command queries the restored target and requires a non-empty application schema, a valid `schema_migrations` table, and an exact migration-count/latest-migration match when those values were recorded by the backup. Only then does it report `Restore executed and verified.` The SQL backup and matching manifest are retained after success or failure.
 
-There is no arbitrary target, force mode, skip-checksum/empty-target override, automatic replacement, `DROP DATABASE`, `CREATE DATABASE`, or `TRUNCATE` behavior. There is no web/API restore trigger. Scheduling, retention automation, encryption, and offsite/cloud replication are not implemented. Do not perform a real restoration against development or production data; the later operations rehearsal must use a disposable, empty test database. Production and cPanel validation remain deferred.
+There is no arbitrary target, force mode, skip-checksum/empty-target override, automatic replacement, `DROP DATABASE`, `CREATE DATABASE`, or `TRUNCATE` behavior. There is no web/API restore trigger. Scheduling, retention automation, encryption, and offsite/cloud replication are not implemented. Do not perform a real restoration against development or production data; the operations rehearsal must use a disposable, empty test database. A failed or unverified import may leave partial objects because logical MySQL/MariaDB DDL is not transactionally reversible. Delete that disposable target and create a new empty database before retrying; never retry into the same partially restored database. Production and cPanel validation remain deferred.
 
 ---
 

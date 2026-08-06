@@ -24,6 +24,8 @@ final readonly class DatabaseRestorePreflightResult
         public string $databaseEngine,
         public int $targetTableCount,
         public int $targetViewCount,
+        public ?int $expectedMigrationCount,
+        public ?string $expectedLatestMigration,
         public bool $restoreExecuted = false,
     ) {
         $createdAt = DateTimeImmutable::createFromFormat(
@@ -31,6 +33,13 @@ final readonly class DatabaseRestorePreflightResult
             $backupCreatedAtUtc,
             new DateTimeZone('UTC'),
         );
+        $migrationMetadataValid = ($expectedMigrationCount === null && $expectedLatestMigration === null)
+            || (
+                is_int($expectedMigrationCount)
+                && $expectedMigrationCount > 0
+                && is_string($expectedLatestMigration)
+                && preg_match('/^[0-9]{14}_[a-z0-9_]+$/D', $expectedLatestMigration) === 1
+            );
 
         if (
             preg_match('/^tara-guest-house-\d{8}T\d{6}Z-[a-f0-9]{12}\.sql$/D', $sqlBackupFile) !== 1
@@ -46,6 +55,7 @@ final readonly class DatabaseRestorePreflightResult
             || !self::validVersion($restoreToolVersion)
             || $targetTableCount !== 0
             || $targetViewCount !== 0
+            || !$migrationMetadataValid
             || $restoreExecuted
         ) {
             throw new InvalidArgumentException('Database restore preflight result is invalid.');

@@ -104,7 +104,7 @@ Migrations are the executable schema source of truth.
 1. Back up the current production database using the supported mechanism.
 2. Put the site into the approved maintenance mode if required.
 3. Run the application migration command through cPanel Terminal/approved deployment hook, or use an architect-approved one-time deployment mechanism with authentication and immediate removal.
-4. Verify `composer database:status` reports exactly 25 applied migrations and 0 pending for the Sprint 4 release.
+4. Verify `composer database:status` reports the release-approved migration count and 0 pending. For the current S6 baseline, the expected count is 32 applied and 0 pending.
 5. Run only the approved production seeder (currently the non-secret `Administrator` role prerequisite); create the initial account through the protected CLI bootstrap command, and never seed Guest/future roles or sample data.
 6. On failure, stop and follow the migration-specific rollback/recovery plan.
 
@@ -126,7 +126,7 @@ Where supported, use cPanel Cron Jobs only for separately approved scheduled tas
 
 ## 13. Backups and Restore Readiness
 
-Use supported cPanel account/database backup tools and/or approved application backups. Define frequency, retention, encryption/access, off-host copy and restoration ownership before go-live. Test restoration in a safe environment. Never expose backup archives beneath the public document root.
+Use supported cPanel account/database backup tools and/or the application `composer database:backup` command. Confirm that `storage/backups/` is private and writable by the CLI account before execution, preserve each SQL file with its matching manifest, and record the SHA-256. Define frequency, retention, encryption/access, off-host copy and restoration ownership before go-live. Rehearse `composer database:restore -- <basename.sql>` preflight and an explicitly confirmed restore only against a disposable empty database. Accept success only when the command reports `Restore executed and verified.` Never expose backup archives beneath the public document root.
 
 ## 14. Deployment Verification
 

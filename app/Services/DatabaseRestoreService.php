@@ -52,6 +52,8 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
         $preflight = $validated['result'];
         $client = $validated['client'];
         $sqlPath = $validated['sql_path'];
+        $expectedMigrationCount = $validated['expected_migration_count'];
+        $expectedLatestMigration = $validated['expected_latest_migration'];
         $optionFile = null;
 
         try {
@@ -94,6 +96,25 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
                 throw new RuntimeException();
             }
 
+            $verification = $this->repository->inspectRestoredTarget($this->databaseName());
+            if (
+                !is_int($verification['table_count'] ?? null)
+                || !is_int($verification['view_count'] ?? null)
+                || !is_int($verification['migration_count'] ?? null)
+                || !is_string($verification['latest_migration'] ?? null)
+                || $verification['table_count'] <= 0
+                || $verification['view_count'] < 0
+                || $verification['migration_count'] <= 0
+                || preg_match('/^[0-9]{14}_[a-z0-9_]+$/D', $verification['latest_migration']) !== 1
+                || ($expectedMigrationCount !== null && $verification['migration_count'] !== $expectedMigrationCount)
+                || ($expectedLatestMigration !== null && !hash_equals(
+                    $expectedLatestMigration,
+                    $verification['latest_migration'],
+                ))
+            ) {
+                throw new RuntimeException();
+            }
+
             $restoredAt = ($this->clock)();
             if (!$restoredAt instanceof DateTimeImmutable) {
                 throw new RuntimeException();
@@ -107,6 +128,11 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
                 $restoredAt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
                 $preflight->restoreToolFamily,
                 $preflight->restoreToolVersion,
+                $verification['table_count'],
+                $verification['view_count'],
+                $verification['migration_count'],
+                $verification['latest_migration'],
+                true,
                 true,
             );
         } catch (Throwable) {
@@ -122,7 +148,9 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
      * @return array{
      *   result: DatabaseRestorePreflightResult,
      *   client: array{executable: string, family: string, version: string|null},
-     *   sql_path: string
+     *   sql_path: string,
+     *   expected_migration_count: int|null,
+     *   expected_latest_migration: string|null
      * }
      */
     private function validate(string $backupBasename): array
@@ -159,6 +187,9 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
 
             $databaseName = $this->databaseName();
             $databaseEngine = $this->databaseEngine();
+            if ($manifest->databaseEngine !== $databaseEngine) {
+                throw new RuntimeException();
+            }
         } catch (Throwable) {
             throw new RuntimeException('Database restore preflight failed.');
         }
@@ -215,10 +246,14 @@ final class DatabaseRestoreService implements DatabaseRestoreOperations
                 $databaseEngine,
                 $target['table_count'],
                 $target['view_count'],
+                $manifest->migrationCount,
+                $manifest->latestMigration,
                 false,
             ),
             'client' => $client,
             'sql_path' => $sqlPath,
+            'expected_migration_count' => $manifest->migrationCount,
+            'expected_latest_migration' => $manifest->latestMigration,
         ];
     }
 

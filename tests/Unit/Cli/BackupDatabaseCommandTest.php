@@ -31,8 +31,10 @@ final class BackupDatabaseCommandTest extends TestCase
         self::assertStringContainsString('logical SQL backup', $result['stdout']);
         self::assertStringContainsString('private storage/backups', $result['stdout']);
         self::assertStringContainsString('matching versioned manifest containing SHA-256', $result['stdout']);
+        self::assertMatchesRegularExpression('/applied\s+migration identity metadata/', $result['stdout']);
+        self::assertStringContainsString('must remain private', $result['stdout']);
         self::assertStringContainsString('Scheduling, retention automation, encryption, and offsite/cloud upload are not', $result['stdout']);
-        self::assertStringContainsString('Restore is a separate command', $result['stdout']);
+        self::assertStringContainsString('separate guarded restore command', $result['stdout']);
     }
 
     public function testUnknownAndExcessArgumentsReturnUsageFailure(): void

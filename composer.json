@@ -36,6 +36,8 @@
         "database:migrate": "@php bin/database.php migrate",
         "database:rollback": "@php bin/database.php rollback",
         "database:seed": "@php bin/database.php seed",
+        "database:backup": "@php bin/backup-database.php",
+        "database:restore": "@php bin/restore-database.php",
         "test": "@php vendor/bin/phpunit",
         "test:database": "@php vendor/bin/phpunit --group database",
         "test:unit": "@php vendor/bin/phpunit --testsuite Unit",

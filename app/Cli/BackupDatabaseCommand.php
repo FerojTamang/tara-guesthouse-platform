@@ -15,13 +15,15 @@ final class BackupDatabaseCommand
 Usage: php bin/backup-database.php [--help]
 
 Creates one logical SQL backup in the private storage/backups directory and
-produces a matching versioned manifest containing SHA-256 and byte-size metadata.
-The command requires mariadb-dump or mysqldump. Database credentials are carried
-in a temporary private option file, not command-line arguments.
+produces a matching versioned manifest containing SHA-256, byte-size, and applied
+migration identity metadata. The directory and generated files must remain private
+and writable by the CLI account. The command requires mariadb-dump or mysqldump.
+Database credentials are carried in a temporary private option file, not command-
+line arguments.
 
 Scheduling, retention automation, encryption, and offsite/cloud upload are not
-implemented. Restore is a separate command and is not part of this backup slice.
-cPanel and production verification remain pending.
+implemented. Restore uses the separate guarded restore command. cPanel and
+production verification remain pending.
 TEXT;
 
     /** @var Closure(): DatabaseBackupResult */

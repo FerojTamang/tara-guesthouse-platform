@@ -8,4 +8,14 @@ interface DatabaseRestorePreflightRepository
 {
     /** @return array{exists: bool, table_count: int, view_count: int} */
     public function inspectTarget(string $databaseName): array;
+
+    /**
+     * @return array{
+     *   table_count: int,
+     *   view_count: int,
+     *   migration_count: int,
+     *   latest_migration: string|null
+     * }
+     */
+    public function inspectRestoredTarget(string $databaseName): array;
 }

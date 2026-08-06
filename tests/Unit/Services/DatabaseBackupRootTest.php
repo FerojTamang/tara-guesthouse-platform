@@ -23,9 +23,43 @@ final class DatabaseBackupRootTest extends TestCase
     public function testValidStorageCreatesDirectBackupsChildAndResolvesGeneratedFiles(): void
     {
         $root = new DatabaseBackupRoot($this->storage(), $this->public());
-        self::assertDirectoryExists($this->storage() . DIRECTORY_SEPARATOR . 'backups');
-        foreach (['tara-guest-house-20260801T143000Z-a1b2c3d4e5f6.sql', 'tara-guest-house-20260801T143000Z-a1b2c3d4e5f6.manifest.json'] as $file) self::assertSame(realpath($this->storage() . DIRECTORY_SEPARATOR . 'backups') . DIRECTORY_SEPARATOR . $file, $root->resolve($file));
+        $backupDirectory = $this->storage() . DIRECTORY_SEPARATOR . 'backups';
+        self::assertDirectoryExists($backupDirectory);
+        if (DIRECTORY_SEPARATOR !== '\\') {
+            self::assertSame(0, ((int) fileperms($backupDirectory)) & 0077);
+        }
+        foreach (['tara-guest-house-20260801T143000Z-a1b2c3d4e5f6.sql', 'tara-guest-house-20260801T143000Z-a1b2c3d4e5f6.manifest.json'] as $file) self::assertSame(realpath($backupDirectory) . DIRECTORY_SEPARATOR . $file, $root->resolve($file));
     }
+    public function testGeneratedBackupFilesAreProtectedInsideThePrivateRoot(): void
+    {
+        $root = new DatabaseBackupRoot($this->storage(), $this->public());
+        $path = $root->resolve('tara-guest-house-20260801T143000Z-a1b2c3d4e5f6.sql');
+        file_put_contents($path, 'backup');
+
+        $root->protectFile($path);
+
+        self::assertFileIsReadable($path);
+        self::assertFileIsWritable($path);
+        if (DIRECTORY_SEPARATOR !== '\\') {
+            self::assertSame(0, ((int) fileperms($path)) & 0077);
+        }
+    }
+
+    public function testProtectFileRejectsAFileOutsideThePrivateBackupRoot(): void
+    {
+        $root = new DatabaseBackupRoot($this->storage(), $this->public());
+        $outside = $this->storage() . DIRECTORY_SEPARATOR . 'outside.sql';
+        file_put_contents($outside, 'backup');
+
+        try {
+            $root->protectFile($outside);
+            self::fail('Expected outside backup-file rejection.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('Backup file permissions are unsafe.', $exception->getMessage());
+            self::assertStringNotContainsString($this->base, $exception->getMessage());
+        }
+    }
+
     public function testExistingBackupsDirectoryIsReused(): void { mkdir($this->storage() . DIRECTORY_SEPARATOR . 'backups'); new DatabaseBackupRoot($this->storage(), $this->public()); self::assertDirectoryExists($this->storage() . DIRECTORY_SEPARATOR . 'backups'); }
     public function testBackupsRegularFileAndStorageUnderPublicAreRejected(): void
     {

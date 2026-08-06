@@ -25,7 +25,7 @@ final class DatabaseRestoreServiceTest extends TestCase
     private const PASSWORD = 'fake-restore-password';
     private const USERNAME = 'fake-restore-user';
     private const HOST = 'fake-restore-host';
-    private const SQL = "-- MariaDB dump 11.4\nCREATE TABLE rooms (id INT);\n";
+    private const SQL = "-- MariaDB dump 11.4\nCREATE TABLE schema_migrations (migration VARCHAR(191));\nINSERT INTO schema_migrations VALUES ('20260805000300_expand_navigation_routes_for_publishing');\nCREATE TABLE rooms (id INT);\n";
 
     private string $temporaryRoot;
     private string $storageRoot;
@@ -73,6 +73,8 @@ final class DatabaseRestoreServiceTest extends TestCase
         self::assertSame('mysql', $result->databaseEngine);
         self::assertSame(0, $result->targetTableCount);
         self::assertSame(0, $result->targetViewCount);
+        self::assertSame(32, $result->expectedMigrationCount);
+        self::assertSame('20260805000300_expand_navigation_routes_for_publishing', $result->expectedLatestMigration);
         self::assertFalse($result->restoreExecuted);
         self::assertStringNotContainsString($this->temporaryRoot, $result->sqlBackupFile);
         self::assertStringNotContainsString(self::DATABASE, implode('|', get_object_vars($result)));
@@ -170,6 +172,9 @@ final class DatabaseRestoreServiceTest extends TestCase
         } elseif ($mode === 'checksum') {
             $manifest['sha256'] = str_repeat('f', 64);
             file_put_contents($manifestPath, json_encode($manifest, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        } elseif ($mode === 'engine') {
+            $manifest['database_engine'] = 'mariadb';
+            file_put_contents($manifestPath, json_encode($manifest, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
         } else {
             $key = match ($mode) {
                 'version' => 'format_version',
@@ -207,6 +212,7 @@ final class DatabaseRestoreServiceTest extends TestCase
         yield 'backup filename mismatch' => ['filename'];
         yield 'byte-count mismatch' => ['byte count'];
         yield 'checksum mismatch' => ['checksum'];
+        yield 'database engine mismatch' => ['engine'];
     }
 
     #[DataProvider('targetFailureProvider')]
@@ -269,6 +275,7 @@ final class DatabaseRestoreServiceTest extends TestCase
 
         self::assertFalse($preflight->restoreExecuted);
         self::assertSame([self::DATABASE, self::DATABASE], $repository->databaseNames);
+        self::assertSame([self::DATABASE], $repository->verificationDatabaseNames);
         self::assertSame(['mariadb', 'mariadb', 'mariadb'], $runner->executables());
         $requests = $runner->requests();
         self::assertSame(['--version'], $requests[0]->arguments);
@@ -294,7 +301,12 @@ final class DatabaseRestoreServiceTest extends TestCase
         self::assertSame('2026-08-01T15:45:00Z', $result->restoredAtUtc);
         self::assertSame('mariadb', $result->toolFamily);
         self::assertSame('mysql 8.0.44', $result->toolVersion);
+        self::assertSame(41, $result->targetTableCount);
+        self::assertSame(0, $result->targetViewCount);
+        self::assertSame(32, $result->migrationCount);
+        self::assertSame('20260805000300_expand_navigation_routes_for_publishing', $result->latestMigration);
         self::assertTrue($result->restoreExecuted);
+        self::assertTrue($result->restoreVerified);
         self::assertStringNotContainsString($this->temporaryRoot, $result->sqlBackupFile);
         self::assertSame($sqlBefore, file_get_contents($sqlPath));
         self::assertSame($manifestBefore, file_get_contents($manifestPath));
@@ -329,6 +341,25 @@ final class DatabaseRestoreServiceTest extends TestCase
     {
         yield 'non-zero exit' => [7];
         yield 'process-start failure' => [new RuntimeException('native path and stderr detail')];
+    }
+
+    public function testSuccessfulNativeImportFailsWhenPostRestoreVerificationDoesNotMatchManifest(): void
+    {
+        $this->writeValidBackup();
+        $repository = new RestorePreflightRepositoryFake(
+            verifiedMigrationCount: 31,
+            verifiedLatestMigration: '20260805000200_add_advanced_publishing_controls',
+        );
+        $runner = new RestorePreflightRunnerFake([0, 0], 'mysql 8.0.44');
+
+        $this->expectSafeFailure(
+            fn () => $this->service($repository, $runner)->execute(self::SQL_FILE),
+            'Database restore could not be completed.',
+        );
+
+        self::assertSame([self::DATABASE], $repository->verificationDatabaseNames);
+        self::assertTrue($runner->optionFileExistedDuringRestore);
+        self::assertSame([], glob($this->backupRoot . DIRECTORY_SEPARATOR . '.db-client-*.cnf') ?: []);
     }
 
     #[DataProvider('executePreflightFailureProvider')]
@@ -376,6 +407,9 @@ final class DatabaseRestoreServiceTest extends TestCase
             'mysql',
             'mariadb',
             'MariaDB dump 11.4',
+            null,
+            32,
+            '20260805000300_expand_navigation_routes_for_publishing',
         );
         file_put_contents($manifestPath, $manifest->toJson());
 
@@ -441,11 +475,18 @@ final class RestorePreflightRepositoryFake implements DatabaseRestorePreflightRe
     /** @var list<string> */
     public array $databaseNames = [];
 
+    /** @var list<string> */
+    public array $verificationDatabaseNames = [];
+
     public function __construct(
         private readonly bool $exists = true,
         private readonly int $tables = 0,
         private readonly int $views = 0,
         private readonly bool $throws = false,
+        private readonly int $verifiedTables = 41,
+        private readonly int $verifiedViews = 0,
+        private readonly int $verifiedMigrationCount = 32,
+        private readonly string $verifiedLatestMigration = '20260805000300_expand_navigation_routes_for_publishing',
     ) {
     }
 
@@ -457,6 +498,21 @@ final class RestorePreflightRepositoryFake implements DatabaseRestorePreflightRe
         }
 
         return ['exists' => $this->exists, 'table_count' => $this->tables, 'view_count' => $this->views];
+    }
+
+    public function inspectRestoredTarget(string $databaseName): array
+    {
+        $this->verificationDatabaseNames[] = $databaseName;
+        if ($this->throws) {
+            throw new RuntimeException('verification query, DSN, and path details');
+        }
+
+        return [
+            'table_count' => $this->verifiedTables,
+            'view_count' => $this->verifiedViews,
+            'migration_count' => $this->verifiedMigrationCount,
+            'latest_migration' => $this->verifiedLatestMigration,
+        ];
     }
 }
 
