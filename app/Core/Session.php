@@ -141,6 +141,19 @@ final class Session
     }
 
     /**
+     * Replaces the active identifier and restarts the absolute session lifetime.
+     *
+     * Application state is preserved while the private metadata namespace,
+     * including the prior CSRF token, is replaced.
+     */
+    public function renew(): void
+    {
+        $this->assertActive();
+        $this->regenerate();
+        $this->writeMetadata(time());
+    }
+
+    /**
      * Clears prior state and creates a fresh active anonymous session.
      */
     public function reset(): void

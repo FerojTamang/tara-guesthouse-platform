@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Authentication;
 
 use App\Authentication\AdministratorIdentity;
+use App\Authentication\AdministratorIdentityValidator;
 use App\Authentication\AdministratorSession;
 use App\Core\CsrfTokenManager;
 use App\Core\Session;
@@ -81,6 +82,22 @@ final class AdministratorSessionTest extends TestCase
         ], $_SESSION['administrator_identity']);
     }
 
+    public function testEstablishRestartsTheAbsoluteAuthenticatedLifetime(): void
+    {
+        $_SESSION['__tgh']['created_at'] = time() - 43199;
+        $_SESSION['__tgh']['last_activity_at'] = time() - 120;
+        $beforeEstablish = time();
+
+        $this->administratorSession->establish(new AdministratorIdentity(18));
+
+        self::assertGreaterThanOrEqual($beforeEstablish, $_SESSION['__tgh']['created_at']);
+        self::assertLessThanOrEqual(time(), $_SESSION['__tgh']['created_at']);
+        self::assertSame(
+            $_SESSION['__tgh']['created_at'],
+            $_SESSION['__tgh']['last_activity_at'],
+        );
+    }
+
     public function testEstablishedIdentityCanBeReadBack(): void
     {
         $this->administratorSession->establish(new AdministratorIdentity(19));
@@ -117,6 +134,65 @@ final class AdministratorSessionTest extends TestCase
         self::assertSame(PHP_SESSION_NONE, session_status());
         self::assertSame([], $_SESSION);
         self::assertNotSame('', $authenticatedId);
+    }
+
+    public function testPersistedIdentityIsRevokedWhenTheAccountValidatorRejectsIt(): void
+    {
+        $originalId = session_id();
+        $originalToken = $this->csrfTokens->token();
+        $this->session->set('preserved', 'value');
+        $this->session->set(
+            'administrator_identity',
+            (new AdministratorIdentity(44))->toSessionData(),
+        );
+        $validator = new class implements AdministratorIdentityValidator {
+            public int $calls = 0;
+
+            public function isValid(AdministratorIdentity $identity): bool
+            {
+                $this->calls++;
+
+                return false;
+            }
+        };
+        $administratorSession = new AdministratorSession(
+            $this->session,
+            $this->csrfTokens,
+            $validator,
+        );
+
+        self::assertNull($administratorSession->identity());
+
+        self::assertSame(1, $validator->calls);
+        self::assertNotSame($originalId, session_id());
+        self::assertNotSame($originalToken, $this->csrfTokens->token());
+        self::assertFalse($this->session->has('administrator_identity'));
+        self::assertSame('value', $this->session->get('preserved'));
+        self::assertFalse($administratorSession->isAuthenticated());
+        self::assertSame(1, $validator->calls);
+    }
+
+    public function testValidatorFailureRevokesThePersistedIdentityFailClosed(): void
+    {
+        $this->session->set(
+            'administrator_identity',
+            (new AdministratorIdentity(45))->toSessionData(),
+        );
+        $validator = new class implements AdministratorIdentityValidator {
+            public function isValid(AdministratorIdentity $identity): bool
+            {
+                throw new \RuntimeException('test-only validator failure');
+            }
+        };
+        $administratorSession = new AdministratorSession(
+            $this->session,
+            $this->csrfTokens,
+            $validator,
+        );
+
+        self::assertNull($administratorSession->identity());
+        self::assertFalse($this->session->has('administrator_identity'));
+        self::assertFalse($administratorSession->isAuthenticated());
     }
 
     public function testMalformedIdentityIsRemovedAndTheAnonymousSessionIsHardened(): void

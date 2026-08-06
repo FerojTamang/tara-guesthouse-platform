@@ -207,6 +207,30 @@ final class SessionTest extends TestCase
         self::assertFileDoesNotExist($this->savePath . DIRECTORY_SEPARATOR . 'sess_' . $originalId);
     }
 
+    public function testRenewPreservesApplicationStateAndRestartsTheAbsoluteLifetime(): void
+    {
+        $originalId = session_id();
+        $originalToken = (new CsrfTokenManager($this->session))->token();
+        $this->session->set('preserved', 'value');
+        $_SESSION['__tgh']['created_at'] = time() - 43199;
+        $_SESSION['__tgh']['last_activity_at'] = time() - 120;
+        $beforeRenewal = time();
+
+        $this->session->renew();
+
+        self::assertNotSame($originalId, session_id());
+        self::assertSame('value', $this->session->get('preserved'));
+        self::assertNull($this->session->csrfToken());
+        self::assertArrayNotHasKey('csrf_token', $_SESSION['__tgh']);
+        self::assertNotSame('', $originalToken);
+        self::assertGreaterThanOrEqual($beforeRenewal, $_SESSION['__tgh']['created_at']);
+        self::assertLessThanOrEqual(time(), $_SESSION['__tgh']['created_at']);
+        self::assertSame(
+            $_SESSION['__tgh']['created_at'],
+            $_SESSION['__tgh']['last_activity_at'],
+        );
+    }
+
     public function testResetClearsStateAndKeepsAFreshSessionActive(): void
     {
         $originalId = session_id();

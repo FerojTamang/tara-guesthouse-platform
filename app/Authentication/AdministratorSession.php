@@ -6,6 +6,7 @@ namespace App\Authentication;
 
 use App\Core\CsrfTokenManager;
 use App\Core\Session;
+use Throwable;
 
 /**
  * Owns the authenticated Administrator identity inside the hardened PHP session.
@@ -14,19 +15,28 @@ final class AdministratorSession
 {
     private const IDENTITY_KEY = 'administrator_identity';
 
+    private bool $identityResolved = false;
+
+    private ?AdministratorIdentity $resolvedIdentity = null;
+
     public function __construct(
         private readonly Session $session,
         private readonly CsrfTokenManager $csrfTokens,
+        private readonly ?AdministratorIdentityValidator $identityValidator = null,
     ) {
     }
 
     /**
-     * Returns the current valid identity or safely removes malformed state.
+     * Returns the current valid identity or safely removes malformed/revoked state.
      */
     public function identity(): ?AdministratorIdentity
     {
+        if ($this->identityResolved) {
+            return $this->resolvedIdentity;
+        }
+
         if (!$this->session->has(self::IDENTITY_KEY)) {
-            return null;
+            return $this->resolve(null);
         }
 
         $identity = AdministratorIdentity::fromSessionData(
@@ -34,10 +44,25 @@ final class AdministratorSession
         );
 
         if ($identity === null) {
-            $this->discardMalformedIdentity();
+            $this->discardIdentity();
+
+            return $this->resolve(null);
         }
 
-        return $identity;
+        try {
+            $identityIsValid = $this->identityValidator === null
+                || $this->identityValidator->isValid($identity);
+        } catch (Throwable) {
+            $identityIsValid = false;
+        }
+
+        if (!$identityIsValid) {
+            $this->discardIdentity();
+
+            return $this->resolve(null);
+        }
+
+        return $this->resolve($identity);
     }
 
     public function isAuthenticated(): bool
@@ -50,9 +75,10 @@ final class AdministratorSession
      */
     public function establish(AdministratorIdentity $identity): void
     {
-        $this->session->regenerate();
+        $this->session->renew();
         $this->csrfTokens->rotate();
         $this->session->set(self::IDENTITY_KEY, $identity->toSessionData());
+        $this->resolve($identity);
     }
 
     /**
@@ -62,14 +88,23 @@ final class AdministratorSession
     {
         $identity = $this->identity();
         $this->session->destroy();
+        $this->resolve(null);
 
         return $identity;
     }
 
-    private function discardMalformedIdentity(): void
+    private function discardIdentity(): void
     {
         $this->session->remove(self::IDENTITY_KEY);
         $this->session->regenerate();
         $this->csrfTokens->rotate();
+    }
+
+    private function resolve(?AdministratorIdentity $identity): ?AdministratorIdentity
+    {
+        $this->identityResolved = true;
+        $this->resolvedIdentity = $identity;
+
+        return $identity;
     }
 }

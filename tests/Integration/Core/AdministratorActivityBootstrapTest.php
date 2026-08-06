@@ -11,6 +11,7 @@ use App\Core\Request;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tests\Support\ActivityFixture;
+use Tests\Support\CmsFixture;
 use Tests\Support\DatabaseTestCase;
 
 #[RunTestsInSeparateProcesses]
@@ -48,6 +49,10 @@ final class AdministratorActivityBootstrapTest extends DatabaseTestCase
             $this->connection,
             dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations',
         ))->migrate();
+        $administratorId = CmsFixture::insertAdministrator(
+            $this->connection,
+            'activity-bootstrap',
+        );
         ActivityFixture::insert($this->connection, [
             'title' => 'Legacy Activity',
             'slug' => 'legacy-activity',
@@ -65,7 +70,7 @@ final class AdministratorActivityBootstrapTest extends DatabaseTestCase
         $this->handlersRegistered = true;
         $sessionId = session_id();
         $this->sessionFile = rtrim(session_save_path(), '\\/') . DIRECTORY_SEPARATOR . 'sess_' . $sessionId;
-        $_SESSION['administrator_identity'] = (new AdministratorIdentity(1))->toSessionData();
+        $_SESSION['administrator_identity'] = (new AdministratorIdentity($administratorId))->toSessionData();
 
         $response = $application->handle(Request::create('GET', '/admin/activities'));
 
@@ -74,5 +79,38 @@ final class AdministratorActivityBootstrapTest extends DatabaseTestCase
         self::assertStringContainsString('Legacy Activity', $response->body());
         self::assertStringContainsString('Not published', $response->body());
         self::assertStringNotContainsString('Internal Server Error', $response->body());
+    }
+
+    public function testBootstrapRevokesAnAuthenticatedSessionWhenTheAdministratorBecomesInactive(): void
+    {
+        (new MigrationRunner(
+            $this->connection,
+            dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations',
+        ))->migrate();
+        $administratorId = CmsFixture::insertAdministrator(
+            $this->connection,
+            'session-revocation',
+        );
+
+        $application = Bootstrap::boot(dirname(__DIR__, 3));
+        $this->handlersRegistered = true;
+        $sessionId = session_id();
+        $this->sessionFile = rtrim(session_save_path(), '\\/') . DIRECTORY_SEPARATOR . 'sess_' . $sessionId;
+        $_SESSION['administrator_identity'] = (new AdministratorIdentity($administratorId))->toSessionData();
+
+        $statement = $this->connection->prepare(
+            'UPDATE users SET account_status = :status WHERE id = :id',
+        );
+        $statement->execute([
+            'status' => 'inactive',
+            'id' => $administratorId,
+        ]);
+
+        $response = $application->handle(Request::create('GET', '/admin/activities'));
+
+        self::assertSame(302, $response->statusCode());
+        self::assertSame('/admin/login', $response->headers()['Location']);
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+        self::assertArrayNotHasKey('administrator_identity', $_SESSION);
     }
 }

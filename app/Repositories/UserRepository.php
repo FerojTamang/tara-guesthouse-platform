@@ -16,7 +16,7 @@ use Throwable;
 /**
  * Provides narrowly scoped persistence access to Version 1 Administrator accounts.
  */
-final class UserRepository implements AdministratorAuthenticationRepository
+final class UserRepository implements AdministratorAuthenticationRepository, AdministratorSessionRepository
 {
     private const SELECT_COLUMNS = <<<'SQL'
         SELECT

@@ -96,6 +96,40 @@ final class RequestTest extends TestCase
     }
 
 
+    public function testFromGlobalsUsesOnlyTheDirectPeerAndIgnoresForwardedClientHeaders(): void
+    {
+        $server = $_SERVER;
+        $get = $_GET;
+        $post = $_POST;
+        $files = $_FILES;
+
+        try {
+            $_SERVER = [
+                'REQUEST_METHOD' => 'POST',
+                'REQUEST_URI' => '/admin/login',
+                'REMOTE_ADDR' => '192.0.2.10',
+                'HTTP_FORWARDED' => 'for=198.51.100.10',
+                'HTTP_X_FORWARDED_FOR' => '198.51.100.11',
+                'HTTP_X_REAL_IP' => '198.51.100.12',
+            ];
+            $_GET = [];
+            $_POST = [];
+            $_FILES = [];
+
+            $request = Request::fromGlobals();
+
+            self::assertSame('192.0.2.10', $request->remoteAddress());
+            self::assertSame('for=198.51.100.10', $request->header('forwarded'));
+            self::assertSame('198.51.100.11', $request->header('x-forwarded-for'));
+            self::assertSame('198.51.100.12', $request->header('x-real-ip'));
+        } finally {
+            $_SERVER = $server;
+            $_GET = $get;
+            $_POST = $post;
+            $_FILES = $files;
+        }
+    }
+
     public function testItStoresOnlyAValidatedDirectRemoteAddress(): void
     {
         $request = Request::create('POST', '/admin/login', remoteAddress: '2001:db8::10');

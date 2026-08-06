@@ -73,6 +73,7 @@ use App\Services\AdministratorCmsService;
 use App\Services\AdministratorContentMediaService;
 use App\Services\AdministratorGalleryService;
 use App\Services\AdministratorAuthenticationService;
+use App\Services\AdministratorSessionValidator;
 use App\Services\AdministratorDashboardMetricsService;
 use App\Services\AdministratorDashboardMetricsServiceProvider;
 use App\Services\ActivityManagementServiceProvider;
@@ -269,8 +270,6 @@ final class Bootstrap
         );
         $mail = $mailServices['dispatcher'];
         $contactReplyMail = $mailServices['contact_replies'];
-        $csrfTokens = new CsrfTokenManager($session);
-        $administratorSession = new AdministratorSession($session, $csrfTokens);
         $databaseConfiguration = $config->require('database');
         $loginPolicy = $config->require('security.administrator_login');
         $publicBookingPolicy = $config->require('security.public_booking');
@@ -292,6 +291,15 @@ final class Bootstrap
         }
 
         $connectionFactory = new ConnectionFactory($databaseConfiguration);
+        $csrfTokens = new CsrfTokenManager($session);
+        $administratorSession = new AdministratorSession(
+            $session,
+            $csrfTokens,
+            new AdministratorSessionValidator(
+                static fn (): UserRepository => new UserRepository($connectionFactory->create()),
+                $logger,
+            ),
+        );
         $authenticator = new LazyAdministratorAuthenticator(
             static fn (): AdministratorAuthenticationService => new AdministratorAuthenticationService(
                 new UserRepository($connectionFactory->create()),
