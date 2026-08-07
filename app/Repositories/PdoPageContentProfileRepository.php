@@ -42,6 +42,53 @@ final class PdoPageContentProfileRepository implements PageContentProfileReposit
         }
     }
 
+    /**
+     * @param list<int> $pageIds
+     * @return array<int, PageContentProfile>
+     */
+    public function findByPageIds(array $pageIds): array
+    {
+        $identifiers = $this->normalizeIdentifiers($pageIds);
+        if ($identifiers === []) {
+            return [];
+        }
+
+        try {
+            $placeholders = [];
+            foreach (array_keys($identifiers) as $index) {
+                $placeholders[] = ':page_id_' . $index;
+            }
+
+            $statement = $this->connection->prepare(
+                self::SELECT . ' WHERE page_id IN (' . implode(', ', $placeholders) . ') ORDER BY page_id ASC',
+            );
+            foreach ($identifiers as $index => $pageId) {
+                $statement->bindValue('page_id_' . $index, $pageId, PDO::PARAM_INT);
+            }
+            $statement->execute();
+            $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!is_array($rows)) {
+                throw ContentMediaException::failure();
+            }
+
+            $profiles = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw ContentMediaException::failure();
+                }
+                $profile = $this->map($row);
+                $profiles[$profile->pageId()] = $profile;
+            }
+
+            return $profiles;
+        } catch (ContentMediaException $exception) {
+            throw $exception;
+        } catch (Throwable $failure) {
+            throw ContentMediaException::failure($failure);
+        }
+    }
+
     public function upsertCore(int $pageId, string $contentType, ?string $summary, int $updatedBy): PageContentProfile
     {
         try {
@@ -186,6 +233,22 @@ final class PdoPageContentProfileRepository implements PageContentProfileReposit
             throw ContentMediaException::failure();
         }
         return $profile;
+    }
+
+    /**
+     * @param list<int> $identifiers
+     * @return list<int>
+     */
+    private function normalizeIdentifiers(array $identifiers): array
+    {
+        $normalized = [];
+        foreach ($identifiers as $identifier) {
+            if (is_int($identifier) && $identifier > 0) {
+                $normalized[$identifier] = $identifier;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /** @param array<string, mixed> $row */

@@ -664,8 +664,11 @@ final class RoomManagementRoomRepositoryFake implements RoomCatalogRepository
     }
 
     public function findAllPublic(): array { return []; }
+    public function findPublicById(int $roomId): ?Room { return null; }
+    public function findPublicByIds(array $roomIds): array { return []; }
     public function findPublicBySlug(string $slug): ?Room { return null; }
     public function findActiveAmenitiesByRoomId(int $roomId): array { return []; }
+    public function findActiveAmenitiesByRoomIds(array $roomIds): array { return []; }
 
     public function findAmenityIds(int $roomId): array
     {
@@ -796,6 +799,7 @@ final class RoomManagementImageRepositoryFake implements RoomImageCatalogReposit
     public function countByRoomId(int $roomId): int { return count($this->items); }
     public function findAllByRoomId(int $roomId): array { return $this->items; }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { return null; }
+    public function findPrimaryByRoomIds(array $roomIds): array { return []; }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage { return null; }
     public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage { throw new LogicException(); }
     public function clearPrimaryByRoomId(int $roomId): void { throw new LogicException(); }

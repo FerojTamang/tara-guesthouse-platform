@@ -118,6 +118,20 @@ final class RoomImageRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repository->findPrimaryByRoomId($this->roomIds['without_primary']));
     }
 
+    public function testItFindsPrimaryImagesForManyRoomsInOneKeyedResult(): void
+    {
+        $images = $this->repository->findPrimaryByRoomIds([
+            $this->roomIds['without_primary'],
+            $this->roomIds['with_images'],
+            $this->roomIds['with_images'],
+            0,
+        ]);
+
+        self::assertSame([$this->roomIds['with_images']], array_keys($images));
+        self::assertSame($this->imageIds['primary'], $images[$this->roomIds['with_images']]->id());
+        self::assertSame([], $this->repository->findPrimaryByRoomIds([0, -1]));
+    }
+
     public function testMissingIdentifiersReturnEmptyResultsWithoutMutation(): void
     {
         $before = $this->imageSnapshot();

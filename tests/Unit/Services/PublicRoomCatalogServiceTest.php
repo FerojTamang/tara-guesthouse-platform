@@ -21,24 +21,57 @@ final class PublicRoomCatalogServiceTest extends TestCase
 {
     public function testItMapsEligibleRoomsAndFallsBackForUnsafeImages(): void
     {
+        $room = $this->room();
         $rooms = $this->createStub(RoomCatalogRepository::class);
-        $rooms->method('findAllPublic')->willReturn([$this->room()]);
-        $rooms->method('findActiveAmenitiesByRoomId')->willReturn([$this->amenity()]);
+        $rooms->method('findAllPublic')->willReturn([$room]);
+        $rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => [$this->amenity()]]);
         $images = $this->createStub(RoomImageCatalogRepository::class);
-        $images->method('findPrimaryByRoomId')->willReturn($this->image('bad-path'));
-        $service = new PublicRoomCatalogService($rooms, $images, new RoomImageUrl());
-        $item = $service->list()[0];
+        $images->method('findPrimaryByRoomIds')->willReturn([1 => $this->image('bad-path')]);
+
+        $item = (new PublicRoomCatalogService($rooms, $images, new RoomImageUrl()))->list()[0];
+
         self::assertSame('Garden Room', $item['name']);
         self::assertSame('6200.00', $item['pricePerNight']);
         self::assertSame('Wi-Fi', $item['amenities'][0]['name']);
         self::assertSame('/assets/images/room-placeholder.svg', $item['primaryImageUrl']);
     }
 
+    public function testListingUsesOneBulkRelationLookupInsteadOfPerRoomQueries(): void
+    {
+        $first = $this->room(1, 'First Room', 'first-room');
+        $second = $this->room(2, 'Second Room', 'second-room');
+        $rooms = $this->createMock(RoomCatalogRepository::class);
+        $rooms->expects(self::once())->method('findAllPublic')->willReturn([$first, $second]);
+        $rooms->expects(self::once())
+            ->method('findActiveAmenitiesByRoomIds')
+            ->with([1, 2])
+            ->willReturn([1 => [$this->amenity()], 2 => []]);
+        $rooms->expects(self::never())->method('findActiveAmenitiesByRoomId');
+        $images = $this->createMock(RoomImageCatalogRepository::class);
+        $images->expects(self::once())
+            ->method('findPrimaryByRoomIds')
+            ->with([1, 2])
+            ->willReturn([2 => $this->image('uploads/rooms/' . str_repeat('b', 64) . '.png', 2)]);
+        $images->expects(self::never())->method('findPrimaryByRoomId');
+
+        $items = (new PublicRoomCatalogService($rooms, $images, new RoomImageUrl()))->list();
+
+        self::assertCount(2, $items);
+        self::assertSame('Wi-Fi', $items[0]['amenities'][0]['name']);
+        self::assertSame('/assets/images/room-placeholder.svg', $items[0]['primaryImageUrl']);
+        self::assertSame('/uploads/rooms/' . str_repeat('b', 64) . '.png', $items[1]['primaryImageUrl']);
+    }
+
     public function testMalformedSlugIsRejectedBeforeRepositoryAccess(): void
     {
         $rooms = $this->createMock(RoomCatalogRepository::class);
         $rooms->expects(self::never())->method('findPublicBySlug');
-        $service = new PublicRoomCatalogService($rooms, $this->createStub(RoomImageCatalogRepository::class), new RoomImageUrl());
+        $service = new PublicRoomCatalogService(
+            $rooms,
+            $this->createStub(RoomImageCatalogRepository::class),
+            new RoomImageUrl(),
+        );
+
         $this->expectException(PublicRoomCatalogException::class);
         $service->get('Garden Room');
     }
@@ -47,8 +80,16 @@ final class PublicRoomCatalogServiceTest extends TestCase
     {
         $rooms = $this->createStub(RoomCatalogRepository::class);
         $rooms->method('findAllPublic')->willThrowException(new RuntimeException('SQLSTATE secret C:\\storage'));
-        $service = new PublicRoomCatalogService($rooms, $this->createStub(RoomImageCatalogRepository::class), new RoomImageUrl());
-        try { $service->list(); self::fail('Expected a safe public failure.'); } catch (PublicRoomCatalogException $exception) {
+        $service = new PublicRoomCatalogService(
+            $rooms,
+            $this->createStub(RoomImageCatalogRepository::class),
+            new RoomImageUrl(),
+        );
+
+        try {
+            $service->list();
+            self::fail('Expected a safe public failure.');
+        } catch (PublicRoomCatalogException $exception) {
             self::assertStringNotContainsString('SQLSTATE', $exception->getMessage());
             self::assertStringNotContainsString('storage', $exception->getMessage());
         }
@@ -56,15 +97,24 @@ final class PublicRoomCatalogServiceTest extends TestCase
 
     public function testNoPrimaryImageUsesPlaceholder(): void
     {
-        $rooms = $this->createStub(RoomCatalogRepository::class); $rooms->method('findAllPublic')->willReturn([$this->room()]); $rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
-        $images = $this->createStub(RoomImageCatalogRepository::class); $images->method('findPrimaryByRoomId')->willReturn(null);
-        self::assertSame('/assets/images/room-placeholder.svg', (new PublicRoomCatalogService($rooms, $images, new RoomImageUrl()))->list()[0]['primaryImageUrl']);
-    }
-
-    public function testPublicRoomCanBeProjectedByValidatedIdentifier(): void
-    {
         $rooms = $this->createStub(RoomCatalogRepository::class);
         $rooms->method('findAllPublic')->willReturn([$this->room()]);
+        $rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => []]);
+        $images = $this->createStub(RoomImageCatalogRepository::class);
+        $images->method('findPrimaryByRoomIds')->willReturn([]);
+
+        self::assertSame(
+            '/assets/images/room-placeholder.svg',
+            (new PublicRoomCatalogService($rooms, $images, new RoomImageUrl()))->list()[0]['primaryImageUrl'],
+        );
+    }
+
+    public function testPublicRoomCanBeProjectedByValidatedIdentifierWithoutScanningTheCatalogue(): void
+    {
+        $rooms = $this->createMock(RoomCatalogRepository::class);
+        $rooms->expects(self::once())->method('findPublicById')->with(1)->willReturn($this->room());
+        $rooms->expects(self::never())->method('findAllPublic');
+        $rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
         $images = $this->createStub(RoomImageCatalogRepository::class);
         $images->method('findPrimaryByRoomId')->willReturn(null);
         $images->method('findAllByRoomId')->willReturn([]);
@@ -75,6 +125,24 @@ final class PublicRoomCatalogServiceTest extends TestCase
         self::assertArrayNotHasKey('roomNumber', $item);
         self::assertArrayNotHasKey('operationalStatus', $item);
         self::assertArrayNotHasKey('isPublished', $item);
+    }
+
+    public function testRequestedRoomBatchUsesBulkQueriesAndPreservesRequestedOrder(): void
+    {
+        $rooms = $this->createMock(RoomCatalogRepository::class);
+        $rooms->expects(self::once())->method('findPublicByIds')->with([2, 1])->willReturn([
+            $this->room(1, 'First Room', 'first-room'),
+            $this->room(2, 'Second Room', 'second-room'),
+        ]);
+        $rooms->expects(self::once())->method('findActiveAmenitiesByRoomIds')->with([1, 2])->willReturn([1 => [], 2 => []]);
+        $images = $this->createMock(RoomImageCatalogRepository::class);
+        $images->expects(self::once())->method('findPrimaryByRoomIds')->with([1, 2])->willReturn([]);
+
+        $items = (new PublicRoomCatalogService($rooms, $images, new RoomImageUrl()))->getManyByIds([2, 1, 2, 0]);
+
+        self::assertSame([2, 1], array_keys($items));
+        self::assertSame('Second Room', $items[2]['name']);
+        self::assertSame('First Room', $items[1]['name']);
     }
 
     public function testDetailPreservesSafeImageOrderAndRemovesDuplicateOrUnsafeUrls(): void
@@ -103,7 +171,36 @@ final class PublicRoomCatalogServiceTest extends TestCase
         self::assertFalse($item['images'][1]['isPrimary']);
     }
 
-    private function room(): Room { $time = new DateTimeImmutable('2026-07-23 UTC'); return new Room(1, new RoomType(1, 'Deluxe', 'deluxe', null, '5000.00', 2, 1, true, $time, $time), '101', 'Garden Room', 'garden-room', 'A <nice> room', '6200.00', 2, 1, Room::STATUS_ACTIVE, true, $time, $time, null); }
-    private function amenity(): Amenity { $time = new DateTimeImmutable('2026-07-23 UTC'); return new Amenity(1, 'Wi-Fi', null, true, $time, $time); }
-    private function image(string $path): RoomImage { return new RoomImage(1, 1, $path, null, 0, true, new DateTimeImmutable('2026-07-23 UTC')); }
+    private function room(int $id = 1, string $name = 'Garden Room', string $slug = 'garden-room'): Room
+    {
+        $time = new DateTimeImmutable('2026-07-23 UTC');
+
+        return new Room(
+            $id,
+            new RoomType(1, 'Deluxe', 'deluxe', null, '5000.00', 2, 1, true, $time, $time),
+            (string) (100 + $id),
+            $name,
+            $slug,
+            'A <nice> room',
+            '6200.00',
+            2,
+            1,
+            Room::STATUS_ACTIVE,
+            true,
+            $time,
+            $time,
+            null,
+        );
+    }
+
+    private function amenity(): Amenity
+    {
+        $time = new DateTimeImmutable('2026-07-23 UTC');
+        return new Amenity(1, 'Wi-Fi', null, true, $time, $time);
+    }
+
+    private function image(string $path, int $roomId = 1): RoomImage
+    {
+        return new RoomImage(1, $roomId, $path, null, 0, true, new DateTimeImmutable('2026-07-23 UTC'));
+    }
 }

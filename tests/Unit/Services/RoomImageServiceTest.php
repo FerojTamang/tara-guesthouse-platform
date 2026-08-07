@@ -576,8 +576,11 @@ final class ServiceRoomRepository implements RoomCatalogRepository
     public function findById(int $id): ?Room { return $this->room; }
     public function findAll(): array { return []; }
     public function findAllPublic(): array { return []; }
+    public function findPublicById(int $roomId): ?Room { return null; }
+    public function findPublicByIds(array $roomIds): array { return []; }
     public function findPublicBySlug(string $slug): ?Room { return null; }
     public function findActiveAmenitiesByRoomId(int $roomId): array { return []; }
+    public function findActiveAmenitiesByRoomIds(array $roomIds): array { return []; }
     public function findAmenityIds(int $roomId): array { return []; }
     public function create(int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): Room { throw new LogicException(); }
     public function update(int $id, int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): ?Room { throw new LogicException(); }
@@ -606,6 +609,7 @@ final class ServiceImageRepository implements RoomImageCatalogRepository
         return $this->existing;
     }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { $this->events[] = 'primary'; return $this->primary; }
+    public function findPrimaryByRoomIds(array $roomIds): array { return $this->primary === null ? [] : [$this->primary->roomId() => $this->primary]; }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage
     {
         $this->events[] = 'owned';

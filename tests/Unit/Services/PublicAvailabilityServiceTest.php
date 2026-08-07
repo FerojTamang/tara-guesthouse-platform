@@ -8,10 +8,14 @@ use App\Exceptions\AvailabilityException;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Repositories\AvailabilityRepository;
+use App\Presentation\RoomImageUrl;
 use App\Repositories\RoomCatalogRepository;
+use App\Repositories\RoomImageCatalogRepository;
 use App\Requests\AvailabilityRequest;
 use App\Services\AvailabilityService;
 use App\Services\PublicAvailabilityService;
+use App\Services\PublicRoomCatalogService;
+use App\Services\PublicRoomCatalogServiceProvider;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -57,6 +61,111 @@ final class PublicAvailabilityServiceTest extends TestCase
                 'price_per_night' => '4500.00',
             ],
         ], $result);
+    }
+
+    public function testRichAvailabilityBatchesRoomAmenitiesAndPrimaryImages(): void
+    {
+        $availability = new PublicAvailabilityRepositoryFake();
+        $availability->roomIds = [8, 4];
+        $rooms = $this->createMock(RoomCatalogRepository::class);
+        $rooms->expects(self::once())
+            ->method('findPublicByIds')
+            ->with([8, 4])
+            ->willReturn([
+                self::room(4, 'Garden Room', 'garden-room', '4500.00'),
+                self::room(8, 'Deluxe Room', 'deluxe-room', '6000.00'),
+            ]);
+        $rooms->expects(self::once())
+            ->method('findActiveAmenitiesByRoomIds')
+            ->with([4, 8])
+            ->willReturn([4 => [], 8 => []]);
+        $rooms->expects(self::never())->method('findAllPublic');
+        $rooms->expects(self::never())->method('findActiveAmenitiesByRoomId');
+        $images = $this->createMock(RoomImageCatalogRepository::class);
+        $images->expects(self::once())
+            ->method('findPrimaryByRoomIds')
+            ->with([4, 8])
+            ->willReturn([]);
+        $images->expects(self::never())->method('findPrimaryByRoomId');
+
+        $service = new PublicAvailabilityService(
+            new AvailabilityService(
+                $availability,
+                static fn (): DateTimeImmutable => self::timestamp('2026-08-01 12:00:00'),
+            ),
+            $rooms,
+            new PublicRoomCatalogServiceProvider(
+                static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                    $rooms,
+                    $images,
+                    new RoomImageUrl(),
+                ),
+            ),
+        );
+
+        $context = $service->searchContext(
+            AvailabilityRequest::fromInput('2026-08-10', '2026-08-12', 2, 0),
+        );
+
+        self::assertSame([8, 4], array_column($context['rooms'], 'room_id'));
+        self::assertSame([
+            '/assets/images/room-placeholder.svg',
+            '/assets/images/room-placeholder.svg',
+        ], array_column($context['rooms'], 'primary_image_url'));
+    }
+
+    public function testRichSelectedRoomUsesListingProjectionWithoutLoadingTheFullImageGallery(): void
+    {
+        $availability = new PublicAvailabilityRepositoryFake();
+        $availability->roomIds = [4];
+        $room = self::room(4, 'Garden Room', 'garden-room', '4500.00');
+        $rooms = $this->createMock(RoomCatalogRepository::class);
+        $rooms->expects(self::once())
+            ->method('findPublicBySlug')
+            ->with('garden-room')
+            ->willReturn($room);
+        $rooms->expects(self::once())
+            ->method('findPublicByIds')
+            ->with([4])
+            ->willReturn([$room]);
+        $rooms->expects(self::once())
+            ->method('findActiveAmenitiesByRoomIds')
+            ->with([4])
+            ->willReturn([4 => []]);
+        $rooms->expects(self::never())->method('findPublicById');
+        $rooms->expects(self::never())->method('findAllPublic');
+        $rooms->expects(self::never())->method('findActiveAmenitiesByRoomId');
+        $images = $this->createMock(RoomImageCatalogRepository::class);
+        $images->expects(self::once())
+            ->method('findPrimaryByRoomIds')
+            ->with([4])
+            ->willReturn([]);
+        $images->expects(self::never())->method('findPrimaryByRoomId');
+        $images->expects(self::never())->method('findAllByRoomId');
+
+        $service = new PublicAvailabilityService(
+            new AvailabilityService(
+                $availability,
+                static fn (): DateTimeImmutable => self::timestamp('2026-08-01 12:00:00'),
+            ),
+            $rooms,
+            new PublicRoomCatalogServiceProvider(
+                static fn (): PublicRoomCatalogService => new PublicRoomCatalogService(
+                    $rooms,
+                    $images,
+                    new RoomImageUrl(),
+                ),
+            ),
+        );
+
+        $context = $service->searchContext(
+            AvailabilityRequest::fromInput('2026-08-10', '2026-08-12', 2, 0),
+            'garden-room',
+        );
+
+        self::assertSame(4, $context['rooms'][0]['room_id']);
+        self::assertSame('garden-room', $context['selectedRoom']['slug']);
+        self::assertTrue($context['selectedRoom']['is_available']);
     }
 
     public function testSelectedRoomUsesCanonicalPublicLookupAndExistingAvailabilityResult(): void

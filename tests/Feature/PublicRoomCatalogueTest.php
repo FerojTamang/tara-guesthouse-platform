@@ -40,8 +40,8 @@ final class PublicRoomCatalogueTest extends TestCase
     {
         $room = $this->room('<script>Garden</script>', 'garden-room', 'Description <b>x</b>');
         $this->rooms->method('findAllPublic')->willReturn([$room]);
-        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([$this->amenity('<i>Wi-Fi</i>')]);
-        $this->images->method('findPrimaryByRoomId')->willReturn($this->image());
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => [$this->amenity('<i>Wi-Fi</i>')]]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([1 => $this->image()]);
         $response = $this->router->dispatch(Request::create('GET', '/rooms'));
         self::assertSame(200, $response->statusCode()); self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertStringContainsString('&lt;script&gt;Garden&lt;/script&gt;', $response->body()); self::assertStringNotContainsString('101', $response->body());
@@ -66,7 +66,7 @@ final class PublicRoomCatalogueTest extends TestCase
 
     public function testListingUsesPlaceholderWithoutPrimaryImage(): void
     {
-        $this->rooms->method('findAllPublic')->willReturn([$this->room('Garden', 'garden-room', null)]); $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]); $this->images->method('findPrimaryByRoomId')->willReturn(null);
+        $this->rooms->method('findAllPublic')->willReturn([$this->room('Garden', 'garden-room', null)]); $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => []]); $this->images->method('findPrimaryByRoomIds')->willReturn([]);
         $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
         self::assertStringContainsString('/assets/images/room-placeholder.svg', $body);
         self::assertStringContainsString('/assets/images/home/home-hero-sauraha-jungle-lodge.webp', $body);
@@ -80,9 +80,12 @@ final class PublicRoomCatalogueTest extends TestCase
             $this->room('Second Room', 'second-room', 'Second description', 2),
             $this->room('Third Room', 'third-room', 'Third description', 3),
         ]);
-        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
-        $this->images->method('findPrimaryByRoomId')->willReturnCallback(
-            fn (int $roomId): RoomImage => $this->image($roomId, dechex($roomId)),
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => [], 2 => [], 3 => []]);
+        $this->images->method('findPrimaryByRoomIds')->willReturnCallback(
+            fn (array $roomIds): array => array_combine(
+                $roomIds,
+                array_map(fn (int $roomId): RoomImage => $this->image($roomId, dechex($roomId)), $roomIds),
+            ),
         );
 
         $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
@@ -123,10 +126,8 @@ final class PublicRoomCatalogueTest extends TestCase
             $this->room('Room Without Image', 'room-without-image', null, 1),
             $this->room('Room With Image', 'room-with-image', null, 2),
         ]);
-        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
-        $this->images->method('findPrimaryByRoomId')->willReturnCallback(
-            fn (int $roomId): ?RoomImage => $roomId === 2 ? $this->image(2, 'b') : null,
-        );
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([1 => [], 2 => []]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([2 => $this->image(2, 'b')]);
 
         $body = $this->router->dispatch(Request::create('GET', '/rooms'))->body();
 

@@ -326,12 +326,17 @@ final readonly class PublicCmsService
         }
 
         $now = $this->now();
+        $pages = array_values(array_filter(
+            $this->pages->findAllPublished(),
+            static fn (mixed $page): bool => $page instanceof CmsPage && $page->isPublicAt($now),
+        ));
+        $profiles = $this->profiles->findByPageIds(array_map(
+            static fn (CmsPage $page): int => $page->id(),
+            $pages,
+        ));
         $items = [];
-        foreach ($this->pages->findAllPublished() as $page) {
-            if (!$page instanceof CmsPage || !$page->isPublicAt($now)) {
-                continue;
-            }
-            $profile = $this->profiles->findByPageId($page->id());
+        foreach ($pages as $page) {
+            $profile = $profiles[$page->id()] ?? null;
             if (
                 !$profile instanceof PageContentProfile
                 || $profile->contentType() !== $contentType
@@ -549,18 +554,24 @@ final readonly class PublicCmsService
     /** @return list<array{title: string, slug: string}> */
     private function navigationPages(): array
     {
+        $routes = new NavigationRouteCatalog();
+        $pages = array_values(array_filter(
+            $this->pages->findAllPublished(),
+            static fn (mixed $page): bool => $page instanceof CmsPage
+                && $page->isPublished()
+                && !$routes->isReservedPageSlug($page->slug()),
+        ));
+        $profiles = $this->profiles instanceof PageContentProfileRepository && $pages !== []
+            ? $this->profiles->findByPageIds(array_map(
+                static fn (CmsPage $page): int => $page->id(),
+                $pages,
+            ))
+            : [];
         $result = [];
 
-        foreach ($this->pages->findAllPublished() as $page) {
-            if (
-                !$page instanceof CmsPage
-                || !$page->isPublished()
-                || (new NavigationRouteCatalog())->isReservedPageSlug($page->slug())
-            ) {
-                continue;
-            }
-
-            $contentType = $this->profiles?->findByPageId($page->id())?->contentType() ?? 'page';
+        foreach ($pages as $page) {
+            $profile = $profiles[$page->id()] ?? null;
+            $contentType = $profile?->contentType() ?? 'page';
             if (in_array($contentType, ['news', 'notice'], true)) {
                 continue;
             }

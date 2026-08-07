@@ -122,6 +122,32 @@ final class ContentMediaRepositoryTest extends DatabaseTestCase
     }
 
 
+    public function testPageProfilesCanBeLoadedInOneKeyedBatch(): void
+    {
+        $firstPageId = CmsFixture::insertPage($this->connection, $this->administratorId, [
+            'title' => 'First bulk page',
+            'slug' => 'first-bulk-page',
+        ]);
+        $secondPageId = CmsFixture::insertPage($this->connection, $this->administratorId, [
+            'title' => 'Second bulk page',
+            'slug' => 'second-bulk-page',
+        ]);
+        $this->profiles->upsertCore($firstPageId, 'news', 'First summary.', $this->administratorId);
+        $this->profiles->upsertCore($secondPageId, 'notice', 'Second summary.', $this->administratorId);
+
+        $profiles = $this->profiles->findByPageIds([
+            $secondPageId,
+            $firstPageId,
+            $secondPageId,
+            0,
+        ]);
+
+        self::assertSame([$firstPageId, $secondPageId], array_keys($profiles));
+        self::assertSame('news', $profiles[$firstPageId]->contentType());
+        self::assertSame('notice', $profiles[$secondPageId]->contentType());
+        self::assertSame([], $this->profiles->findByPageIds([0, -1]));
+    }
+
     public function testActiveChecksumIsUniqueButCanBeReusedAfterSoftDeletion(): void
     {
         $checksum = str_repeat('d', 64);

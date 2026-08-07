@@ -27,10 +27,24 @@ interface RoomCatalogRepository
     /** @return list<Room> */
     public function findAllPublic(): array;
 
+    public function findPublicById(int $roomId): ?Room;
+
+    /**
+     * @param list<int> $roomIds
+     * @return list<Room>
+     */
+    public function findPublicByIds(array $roomIds): array;
+
     public function findPublicBySlug(string $slug): ?Room;
 
     /** @return list<Amenity> */
     public function findActiveAmenitiesByRoomId(int $roomId): array;
+
+    /**
+     * @param list<int> $roomIds
+     * @return array<int, list<Amenity>>
+     */
+    public function findActiveAmenitiesByRoomIds(array $roomIds): array;
 
     /** @return list<int> */
     public function findAmenityIds(int $roomId): array;

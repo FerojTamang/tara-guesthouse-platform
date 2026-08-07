@@ -12,6 +12,12 @@ interface PageContentProfileRepository
 {
     public function findByPageId(int $pageId): ?PageContentProfile;
 
+    /**
+     * @param list<int> $pageIds
+     * @return array<int, PageContentProfile>
+     */
+    public function findByPageIds(array $pageIds): array;
+
     public function upsertCore(
         int $pageId,
         string $contentType,

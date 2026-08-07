@@ -78,8 +78,12 @@ final class PublicBookingPageTest extends TestCase
         $this->submitter = new PublicBookingPageSubmitterFake();
         $this->logger = new PublicBookingPageLoggerFake();
         $timezone = new DateTimeZone('Asia/Kathmandu');
+        $bookingRoom = self::room();
         $rooms = $this->createStub(RoomCatalogRepository::class);
-        $rooms->method('findAllPublic')->willReturn([self::room()]);
+        $rooms->method('findPublicById')->willReturnCallback(
+            static fn (int $roomId): ?Room => $roomId === $bookingRoom->id() ? $bookingRoom : null,
+        );
+        $rooms->method('findActiveAmenitiesByRoomId')->willReturn([]);
         $images = $this->createStub(RoomImageCatalogRepository::class);
         $images->method('findPrimaryByRoomId')->willReturn(null);
         $images->method('findAllByRoomId')->willReturn([]);

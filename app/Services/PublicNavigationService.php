@@ -33,17 +33,17 @@ final readonly class PublicNavigationService
         try {
             $items = $this->navigation->findAllActive();
             $publishedPages = [];
-            $hasPageTarget = false;
+            $pageTargets = [];
             foreach ($items as $item) {
-                if ($item->linkType() === NavigationItem::PAGE) {
-                    $hasPageTarget = true;
-                    break;
+                if ($item->linkType() === NavigationItem::PAGE && $item->pageId() !== null) {
+                    $pageTargets[$item->pageId()] = true;
                 }
             }
-            if ($hasPageTarget) {
+            if ($pageTargets !== []) {
                 foreach ($this->pages->findAllPublished() as $page) {
                     if (
                         $page instanceof CmsPage
+                        && isset($pageTargets[$page->id()])
                         && $page->isPublished()
                         && !$this->routes->isReservedPageSlug($page->slug())
                     ) {
@@ -51,6 +51,9 @@ final readonly class PublicNavigationService
                     }
                 }
             }
+            $profiles = $this->profiles instanceof PageContentProfileRepository && $publishedPages !== []
+                ? $this->profiles->findByPageIds(array_keys($publishedPages))
+                : [];
 
             $main = [];
             $footer = [];
@@ -68,7 +71,7 @@ final readonly class PublicNavigationService
                 }
 
                 if ($item->location() === NavigationItem::FOOTER) {
-                    $link = $this->link($item, $publishedPages);
+                    $link = $this->link($item, $publishedPages, $profiles);
                     if ($link !== null) {
                         $footer[] = $link;
                     }
@@ -78,7 +81,7 @@ final readonly class PublicNavigationService
                 if ($item->isGroup()) {
                     $children = [];
                     foreach ($childrenByParent[$item->id()] ?? [] as $child) {
-                        $link = $this->link($child, $publishedPages);
+                        $link = $this->link($child, $publishedPages, $profiles);
                         if ($link !== null) {
                             $children[] = $link;
                         }
@@ -93,7 +96,7 @@ final readonly class PublicNavigationService
                     continue;
                 }
 
-                $link = $this->link($item, $publishedPages);
+                $link = $this->link($item, $publishedPages, $profiles);
                 if ($link !== null) {
                     $main[] = [...$link, 'children' => []];
                 }
@@ -107,9 +110,10 @@ final readonly class PublicNavigationService
 
     /**
      * @param array<int, CmsPage> $publishedPages
+     * @param array<int, \App\Models\PageContentProfile> $profiles
      * @return array{label: string, href: string}|null
      */
-    private function link(NavigationItem $item, array $publishedPages): ?array
+    private function link(NavigationItem $item, array $publishedPages, array $profiles): ?array
     {
         if ($item->linkType() === NavigationItem::ROUTE) {
             $routeKey = $item->routeKey();
@@ -127,7 +131,8 @@ final readonly class PublicNavigationService
             return null;
         }
 
-        $contentType = $this->profiles?->findByPageId($page->id())?->contentType() ?? 'page';
+        $profile = $profiles[$page->id()] ?? null;
+        $contentType = $profile?->contentType() ?? 'page';
         $prefix = match ($contentType) {
             'news' => '/news/',
             'notice' => '/notices/',

@@ -60,6 +60,32 @@ final class PublicCmsServiceTest extends TestCase
     }
 
 
+    public function testNavigationPagesLoadPublishingProfilesInOneBatch(): void
+    {
+        $about = self::page(5, 'about', CmsPage::PUBLISHED, 'About.');
+        $news = self::page(6, 'garden-update', CmsPage::PUBLISHED, 'News.');
+        $notice = self::page(7, 'arrival-notice', CmsPage::PUBLISHED, 'Notice.');
+        $reserved = self::page(8, 'rooms', CmsPage::PUBLISHED, 'Reserved.');
+        $pages = $this->createStub(PageRepository::class);
+        $pages->method('findAllPublished')->willReturn([$about, $news, $notice, $reserved]);
+        $profiles = $this->createMock(PageContentProfileRepository::class);
+        $profiles->expects(self::once())
+            ->method('findByPageIds')
+            ->with([5, 6, 7])
+            ->willReturn([
+                5 => self::profile(5, 'page', 'About summary.'),
+                6 => self::profile(6, 'news', 'News summary.'),
+                7 => self::profile(7, 'notice', 'Notice summary.'),
+            ]);
+        $profiles->expects(self::never())->method('findByPageId');
+
+        $layout = $this->service(pages: $pages, profiles: $profiles)->layoutContext();
+
+        self::assertSame([
+            ['title' => 'About', 'slug' => 'about'],
+        ], $layout['navigation_pages']);
+    }
+
     public function testPublishingProfileProjectsNoticeMediaSocialAndNoindexMetadata(): void
     {
         $page = self::page(5, 'guest-update', CmsPage::PUBLISHED, 'Notice body.');

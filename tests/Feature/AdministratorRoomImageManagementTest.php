@@ -451,8 +451,11 @@ final class HttpRoomRepository implements RoomCatalogRepository
     public function findById(int $id): ?Room { return $this->room; }
     public function findAll(): array { return []; }
     public function findAllPublic(): array { return []; }
+    public function findPublicById(int $roomId): ?Room { return null; }
+    public function findPublicByIds(array $roomIds): array { return []; }
     public function findPublicBySlug(string $slug): ?Room { return null; }
     public function findActiveAmenitiesByRoomId(int $roomId): array { return []; }
+    public function findActiveAmenitiesByRoomIds(array $roomIds): array { return []; }
     public function findAmenityIds(int $roomId): array { return []; }
     public function create(int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): Room { throw new LogicException(); }
     public function update(int $id, int $roomTypeId, string $roomNumber, string $name, string $slug, ?string $description, string $pricePerNight, int $capacityAdults, int $capacityChildren, string $operationalStatus, bool $published): ?Room { throw new LogicException(); }
@@ -469,6 +472,7 @@ final class HttpImageRepository implements RoomImageCatalogRepository
     public function countByRoomId(int $roomId): int { $this->events[] = 'count'; return max($this->count, count($this->items)); }
     public function findAllByRoomId(int $roomId): array { $this->events[] = 'list'; return array_values($this->items); }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { foreach ($this->items as $item) { if ($item->isPrimary()) return $item; } return null; }
+    public function findPrimaryByRoomIds(array $roomIds): array { $primary = $this->findPrimaryByRoomId(7); return $primary === null ? [] : [7 => $primary]; }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage { return $roomId === 7 ? ($this->items[$imageId] ?? null) : null; }
     public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage { return $this->items[1] = new RoomImage(1, $roomId, $filePath, $altText, $sortOrder, $primary, new DateTimeImmutable('2026-01-01 UTC')); }
     public function clearPrimaryByRoomId(int $roomId): void { foreach ($this->items as $id => $item) { $this->items[$id] = new RoomImage($id, 7, $item->filePath(), $item->altText(), $item->sortOrder(), false, $item->createdAt()); } }

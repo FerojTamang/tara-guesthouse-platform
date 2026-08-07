@@ -65,11 +65,17 @@ final class PublicNavigationServiceTest extends TestCase
         $pages->method('findAllPublished')->willReturn([
             self::page(20, 'garden-update', CmsPage::PUBLISHED),
             self::page(21, 'arrival-notice', CmsPage::PUBLISHED),
+            self::page(23, 'unreferenced-page', CmsPage::PUBLISHED),
         ]);
-        $profiles = $this->createStub(PageContentProfileRepository::class);
-        $profiles->method('findByPageId')->willReturnCallback(
-            static fn (int $pageId): PageContentProfile => self::profile($pageId, $pageId === 20 ? 'news' : 'notice'),
-        );
+        $profiles = $this->createMock(PageContentProfileRepository::class);
+        $profiles->expects(self::once())
+            ->method('findByPageIds')
+            ->with([20, 21])
+            ->willReturn([
+                20 => self::profile(20, 'news'),
+                21 => self::profile(21, 'notice'),
+            ]);
+        $profiles->expects(self::never())->method('findByPageId');
 
         $layout = (new PublicNavigationService(
             $navigation,

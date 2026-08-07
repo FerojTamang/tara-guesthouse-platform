@@ -326,8 +326,14 @@ final class PublicCmsExperienceTest extends TestCase
             self::room(3, 'Courtyard Room', 'courtyard-room', 'R-PRIVATE-03'),
             self::room(4, 'Fourth Room', 'fourth-room', 'R-PRIVATE-04'),
         ]);
+        $roomRepository->method('findActiveAmenitiesByRoomIds')->willReturn([
+            1 => [],
+            2 => [],
+            3 => [],
+            4 => [],
+        ]);
         $roomImages = $this->createStub(RoomImageCatalogRepository::class);
-        $roomImages->method('findPrimaryByRoomId')->willReturn(self::roomImage());
+        $roomImages->method('findPrimaryByRoomIds')->willReturn([1 => self::roomImage()]);
         $activityRepository = $this->createMock(ActivityCatalogRepository::class);
         $activityRepository->method('findHomepageActivities')->with(4)->willReturn([self::activity()]);
         $galleryRepository = $this->createMock(GalleryCatalogRepository::class);
@@ -534,6 +540,7 @@ final class PublicCmsProfileRepositoryFake implements PageContentProfileReposito
 {
     /** @var array<int, PageContentProfile> */ public array $profiles = [];
     public function findByPageId(int $pageId): ?PageContentProfile { return $this->profiles[$pageId] ?? null; }
+    public function findByPageIds(array $pageIds): array { return array_intersect_key($this->profiles, array_flip($pageIds)); }
     public function upsertCore(int $pageId, string $contentType, ?string $summary, int $updatedBy): PageContentProfile { throw new RuntimeException('Not supported.'); }
     public function updatePublishing(int $pageId, ?string $noticeStyle, ?DateTimeImmutable $publishAt, ?DateTimeImmutable $expiresAt, bool $featured, bool $pinned, ?int $featuredMediaId, ?string $socialTitle, ?string $socialDescription, ?int $socialMediaId, bool $seoNoindex, int $updatedBy): PageContentProfile { throw new RuntimeException('Not supported.'); }
     public function updatePublication(int $pageId, DateTimeImmutable $publishAt, int $updatedBy): void { throw new RuntimeException('Not supported.'); }

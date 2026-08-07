@@ -405,6 +405,7 @@ final readonly class FailingCreateImageRepository implements RoomImageCatalogRep
     public function countByRoomId(int $roomId): int { return $this->inner->countByRoomId($roomId); }
     public function findAllByRoomId(int $roomId): array { return $this->inner->findAllByRoomId($roomId); }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { return $this->inner->findPrimaryByRoomId($roomId); }
+    public function findPrimaryByRoomIds(array $roomIds): array { return $this->inner->findPrimaryByRoomIds($roomIds); }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage { return $this->inner->findByIdAndRoomId($imageId, $roomId); }
     public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage { throw new RuntimeException('sensitive database failure'); }
     public function clearPrimaryByRoomId(int $roomId): void { $this->inner->clearPrimaryByRoomId($roomId); }
@@ -419,6 +420,7 @@ final readonly class WorkflowFailingImageRepository implements RoomImageCatalogR
     public function countByRoomId(int $roomId): int { return $this->inner->countByRoomId($roomId); }
     public function findAllByRoomId(int $roomId): array { return $this->inner->findAllByRoomId($roomId); }
     public function findPrimaryByRoomId(int $roomId): ?RoomImage { return $this->inner->findPrimaryByRoomId($roomId); }
+    public function findPrimaryByRoomIds(array $roomIds): array { return $this->inner->findPrimaryByRoomIds($roomIds); }
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage { return $this->inner->findByIdAndRoomId($imageId, $roomId); }
     public function create(int $roomId, string $filePath, ?string $altText, int $sortOrder, bool $primary): RoomImage { return $this->inner->create($roomId, $filePath, $altText, $sortOrder, $primary); }
     public function clearPrimaryByRoomId(int $roomId): void { $this->inner->clearPrimaryByRoomId($roomId); }

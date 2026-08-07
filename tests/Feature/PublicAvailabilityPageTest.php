@@ -94,9 +94,11 @@ final class PublicAvailabilityPageTest extends TestCase
     public function testValidSearchRendersEscapedAvailableRoomsAndPreservesCriteria(): void
     {
         $this->availability->roomIds = [12];
-        $this->rooms->method('findAllPublic')->willReturn([
+        $this->rooms->method('findPublicByIds')->willReturn([
             self::room('<script>Deluxe</script>', 'deluxe-room-12'),
         ]);
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([12 => []]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([]);
 
         $response = $this->router->dispatch(Request::create(
             'GET',
@@ -152,9 +154,11 @@ final class PublicAvailabilityPageTest extends TestCase
                 ? self::room('Deluxe Room', 'deluxe-room-12')
                 : null,
         );
-        $this->rooms->method('findAllPublic')->willReturn([
+        $this->rooms->method('findPublicByIds')->willReturn([
             self::room('Deluxe Room', 'deluxe-room-12'),
         ]);
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([12 => []]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([]);
 
         $response = $this->router->dispatch(Request::create('GET', '/availability', [
             'room' => 'deluxe-room-12',
@@ -182,9 +186,11 @@ final class PublicAvailabilityPageTest extends TestCase
         $this->rooms->method('findPublicBySlug')->willReturn(
             self::room('Deluxe Room', 'deluxe-room-12'),
         );
-        $this->rooms->method('findAllPublic')->willReturn([
+        $this->rooms->method('findPublicByIds')->willReturn([
             self::room('Deluxe Room', 'deluxe-room-12'),
         ]);
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([12 => []]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([]);
 
         $response = $this->router->dispatch(Request::create('GET', '/availability', [
             'room' => 'deluxe-room-12',
@@ -226,11 +232,11 @@ final class PublicAvailabilityPageTest extends TestCase
     {
         $room = self::room('Garden Suite', 'garden-suite');
         $this->availability->roomIds = [12];
-        $this->rooms->method('findAllPublic')->willReturn([$room]);
-        $this->rooms->method('findActiveAmenitiesByRoomId')->willReturn([
+        $this->rooms->method('findPublicByIds')->willReturn([$room]);
+        $this->rooms->method('findActiveAmenitiesByRoomIds')->willReturn([12 => [
             self::amenity('<em>Air conditioning</em>'),
-        ]);
-        $this->images->method('findPrimaryByRoomId')->willReturn(self::image());
+        ]]);
+        $this->images->method('findPrimaryByRoomIds')->willReturn([12 => self::image()]);
 
         $response = $this->router->dispatch(Request::create('GET', '/availability', [
             'check_in' => '2026-08-10',

@@ -123,12 +123,54 @@ final class RoomImageRepository implements RoomImageCatalogRepository
             return null;
         }
 
-        return $this->lookup(
-            self::SELECT_COLUMNS
-                . ' WHERE room_id = :lookup AND is_primary = 1 ORDER BY sort_order ASC, id ASC LIMIT 1',
-            $roomId,
-            'The primary room image lookup failed.',
-        );
+        return $this->findPrimaryByRoomIds([$roomId])[$roomId] ?? null;
+    }
+
+    /**
+     * @param list<int> $roomIds
+     * @return array<int, RoomImage>
+     */
+    public function findPrimaryByRoomIds(array $roomIds): array
+    {
+        $identifiers = $this->normalizeIdentifiers($roomIds);
+        if ($identifiers === []) {
+            return [];
+        }
+
+        try {
+            $placeholders = [];
+            foreach (array_keys($identifiers) as $index) {
+                $placeholders[] = ':room_id_' . $index;
+            }
+
+            $statement = $this->connection->prepare(
+                self::SELECT_COLUMNS
+                    . ' WHERE room_id IN (' . implode(', ', $placeholders) . ') AND is_primary = 1'
+                    . ' ORDER BY room_id ASC, sort_order ASC, id ASC',
+            );
+            foreach ($identifiers as $index => $roomId) {
+                $statement->bindValue('room_id_' . $index, $roomId, PDO::PARAM_INT);
+            }
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The primary room images could not be mapped.');
+            }
+
+            $images = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The primary room images could not be mapped.');
+                }
+                $image = $this->mapRoomImage($row);
+                $images[$image->roomId()] ??= $image;
+            }
+
+            return $images;
+        } catch (Throwable) {
+            throw new DatabaseException('The primary room image lookup failed.');
+        }
     }
 
     public function create(
@@ -332,6 +374,22 @@ final class RoomImageRepository implements RoomImageCatalogRepository
             $this->boolean($row, 'is_primary'),
             $this->dateTime($row, 'created_at'),
         );
+    }
+
+    /**
+     * @param list<int> $identifiers
+     * @return list<int>
+     */
+    private function normalizeIdentifiers(array $identifiers): array
+    {
+        $normalized = [];
+        foreach ($identifiers as $identifier) {
+            if (is_int($identifier) && $identifier > 0) {
+                $normalized[$identifier] = $identifier;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     private function generatedIdentifier(): int

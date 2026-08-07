@@ -215,6 +215,7 @@ final class StructuredPageProfileRepositoryFake implements PageContentProfileRep
     public array $usages = [];
 
     public function findByPageId(int $pageId): ?PageContentProfile { return null; }
+    public function findByPageIds(array $pageIds): array { return []; }
     public function upsertCore(int $pageId, string $contentType, ?string $summary, int $updatedBy): PageContentProfile
     {
         $this->profiles[$pageId] = ['content_type' => $contentType, 'summary' => $summary, 'updated_by' => $updatedBy];

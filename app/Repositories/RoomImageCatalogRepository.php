@@ -15,6 +15,12 @@ interface RoomImageCatalogRepository
 
     public function findPrimaryByRoomId(int $roomId): ?RoomImage;
 
+    /**
+     * @param list<int> $roomIds
+     * @return array<int, RoomImage>
+     */
+    public function findPrimaryByRoomIds(array $roomIds): array;
+
     public function findByIdAndRoomId(int $imageId, int $roomId): ?RoomImage;
 
     public function create(

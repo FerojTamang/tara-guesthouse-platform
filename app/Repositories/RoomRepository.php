@@ -164,6 +164,67 @@ final class RoomRepository implements RoomCatalogRepository
         );
     }
 
+    public function findPublicById(int $roomId): ?Room
+    {
+        if ($roomId <= 0) {
+            return null;
+        }
+
+        return $this->lookup(
+            self::SELECT_COLUMNS . " WHERE r.id = :lookup AND r.deleted_at IS NULL"
+                . " AND r.operational_status = 'active' AND r.is_published = 1 LIMIT 1",
+            $roomId,
+            PDO::PARAM_INT,
+        );
+    }
+
+    /**
+     * @param list<int> $roomIds
+     * @return list<Room>
+     */
+    public function findPublicByIds(array $roomIds): array
+    {
+        $identifiers = $this->normalizeIdentifiers($roomIds);
+        if ($identifiers === []) {
+            return [];
+        }
+
+        try {
+            $placeholders = [];
+            foreach (array_keys($identifiers) as $index) {
+                $placeholders[] = ':room_id_' . $index;
+            }
+
+            $statement = $this->connection->prepare(
+                self::SELECT_COLUMNS
+                    . " WHERE r.id IN (" . implode(', ', $placeholders) . ")"
+                    . " AND r.deleted_at IS NULL AND r.operational_status = 'active'"
+                    . ' AND r.is_published = 1 ORDER BY r.room_number ASC, r.id ASC',
+            );
+            foreach ($identifiers as $index => $roomId) {
+                $statement->bindValue('room_id_' . $index, $roomId, PDO::PARAM_INT);
+            }
+            $statement->execute();
+            $rows = $statement->fetchAll();
+
+            if (!is_array($rows)) {
+                throw new RuntimeException('The public room records could not be mapped.');
+            }
+
+            $rooms = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    throw new RuntimeException('The public room records could not be mapped.');
+                }
+                $rooms[] = $this->mapRoom($row);
+            }
+
+            return $rooms;
+        } catch (Throwable) {
+            throw new DatabaseException('The public room listing failed.');
+        }
+    }
+
     public function findPublicBySlug(string $slug): ?Room
     {
         if ($slug === '') {
@@ -185,29 +246,54 @@ final class RoomRepository implements RoomCatalogRepository
             return [];
         }
 
+        return $this->findActiveAmenitiesByRoomIds([$roomId])[$roomId] ?? [];
+    }
+
+    /**
+     * @param list<int> $roomIds
+     * @return array<int, list<Amenity>>
+     */
+    public function findActiveAmenitiesByRoomIds(array $roomIds): array
+    {
+        $identifiers = $this->normalizeIdentifiers($roomIds);
+        if ($identifiers === []) {
+            return [];
+        }
+
         try {
+            $placeholders = [];
+            foreach (array_keys($identifiers) as $index) {
+                $placeholders[] = ':room_id_' . $index;
+            }
+
             $statement = $this->connection->prepare(
-                'SELECT a.id, a.name, a.icon, a.is_active, a.created_at, a.updated_at '
+                'SELECT ra.room_id, a.id, a.name, a.icon, a.is_active, a.created_at, a.updated_at '
                 . 'FROM room_amenities ra INNER JOIN amenities a ON a.id = ra.amenity_id '
-                . 'WHERE ra.room_id = :room_id AND a.is_active = 1 ORDER BY a.name ASC, a.id ASC',
+                . 'WHERE ra.room_id IN (' . implode(', ', $placeholders) . ') AND a.is_active = 1 '
+                . 'ORDER BY ra.room_id ASC, a.name ASC, a.id ASC',
             );
-            $statement->bindValue('room_id', $roomId, PDO::PARAM_INT);
+            foreach ($identifiers as $index => $roomId) {
+                $statement->bindValue('room_id_' . $index, $roomId, PDO::PARAM_INT);
+            }
             $statement->execute();
             $rows = $statement->fetchAll();
+
             if (!is_array($rows)) {
                 throw new RuntimeException('The room amenities could not be mapped.');
             }
-            $amenities = [];
+
+            $amenities = array_fill_keys($identifiers, []);
             foreach ($rows as $row) {
                 if (!is_array($row)) {
                     throw new RuntimeException('The room amenities could not be mapped.');
                 }
-                $amenities[] = new Amenity(
-                    $this->positiveInteger($row, 'id'), $this->string($row, 'name'),
-                    $this->nullableString($row, 'icon'), $this->boolean($row, 'is_active'),
-                    $this->dateTime($row, 'created_at'), $this->dateTime($row, 'updated_at'),
-                );
+                $roomId = $this->positiveInteger($row, 'room_id');
+                if (!array_key_exists($roomId, $amenities)) {
+                    throw new RuntimeException('The room amenities could not be mapped.');
+                }
+                $amenities[$roomId][] = $this->mapAmenity($row);
             }
+
             return $amenities;
         } catch (Throwable) {
             throw new DatabaseException('The room amenity lookup failed.');
@@ -501,6 +587,35 @@ final class RoomRepository implements RoomCatalogRepository
             $this->dateTime($row, 'room_updated_at'),
             $this->nullableDateTime($row, 'deleted_at'),
         );
+    }
+
+    /** @param array<string, mixed> $row */
+    private function mapAmenity(array $row): Amenity
+    {
+        return new Amenity(
+            $this->positiveInteger($row, 'id'),
+            $this->string($row, 'name'),
+            $this->nullableString($row, 'icon'),
+            $this->boolean($row, 'is_active'),
+            $this->dateTime($row, 'created_at'),
+            $this->dateTime($row, 'updated_at'),
+        );
+    }
+
+    /**
+     * @param list<int> $identifiers
+     * @return list<int>
+     */
+    private function normalizeIdentifiers(array $identifiers): array
+    {
+        $normalized = [];
+        foreach ($identifiers as $identifier) {
+            if (is_int($identifier) && $identifier > 0) {
+                $normalized[$identifier] = $identifier;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     private function generatedIdentifier(): int

@@ -348,6 +348,32 @@ final class RoomRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repository->findPublicBySlug('inactive-room'));
     }
 
+    public function testPublicIdentifierLookupsBatchEligibleRoomsAndIgnoreInvalidOrIneligibleIds(): void
+    {
+        $eligible = $this->repository->findPublicById($this->roomIds['public']);
+        self::assertInstanceOf(Room::class, $eligible);
+        self::assertSame($this->roomIds['public'], $eligible->id());
+
+        foreach ([0, -1, 999999, $this->roomIds['maintenance'], $this->roomIds['draft'], $this->roomIds['deleted']] as $roomId) {
+            self::assertNull($this->repository->findPublicById($roomId));
+        }
+
+        $rooms = $this->repository->findPublicByIds([
+            $this->roomIds['maintenance'],
+            $this->roomIds['public'],
+            $this->roomIds['draft'],
+            $this->roomIds['public'],
+            $this->roomIds['deleted'],
+            0,
+        ]);
+
+        self::assertSame([$this->roomIds['public']], array_map(
+            static fn (Room $room): int => $room->id(),
+            $rooms,
+        ));
+        self::assertSame([], $this->repository->findPublicByIds([0, -1]));
+    }
+
     public function testPublicAmenitiesIncludeOnlyActiveAssignmentsInDeterministicOrder(): void
     {
         $extra = $this->insertAmenity('Airport transfer', null, true);
@@ -356,6 +382,27 @@ final class RoomRepositoryTest extends DatabaseTestCase
             static fn (\App\Models\Amenity $amenity): string => $amenity->name(),
             $this->repository->findActiveAmenitiesByRoomId($this->roomIds['public']),
         ));
+    }
+
+    public function testPublicAmenitiesBatchLookupReturnsEveryRequestedRoomKeyWithoutInactiveAssignments(): void
+    {
+        $amenities = $this->repository->findActiveAmenitiesByRoomIds([
+            $this->roomIds['maintenance'],
+            $this->roomIds['public'],
+            $this->roomIds['maintenance'],
+            0,
+        ]);
+
+        self::assertSame([
+            $this->roomIds['maintenance'],
+            $this->roomIds['public'],
+        ], array_keys($amenities));
+        self::assertSame([], $amenities[$this->roomIds['maintenance']]);
+        self::assertSame(['Wi-Fi'], array_map(
+            static fn (\App\Models\Amenity $amenity): string => $amenity->name(),
+            $amenities[$this->roomIds['public']],
+        ));
+        self::assertSame([], $this->repository->findActiveAmenitiesByRoomIds([0, -1]));
     }
 
     public function testMissingAndInjectionShapedLookupsReturnNullWithoutMutation(): void

@@ -83,6 +83,8 @@ final class PublicAvailabilityService
     {
         try {
             $selectedRoom = null;
+            $selectedCatalogRoom = null;
+            $selectedRoomId = null;
             $publicRooms = [];
 
             if ($roomSlug !== null) {
@@ -101,15 +103,61 @@ final class PublicAvailabilityService
                 }
 
                 $publicRooms[$room->id()] = $room;
-                $selectedRoom = $this->map($room, false, $request->stayPeriod()->nights(), $enrich);
+                $selectedRoomId = $room->id();
+                if ($enrich && $this->catalog !== null) {
+                    $selectedCatalogRoom = $this->catalog->service()->getManyByIds([$room->id()])[$room->id()] ?? null;
+                    if (!is_array($selectedCatalogRoom)) {
+                        throw new RuntimeException('The selected public room projection is unavailable.');
+                    }
+                    $selectedRoom = $this->mapCatalogRoom(
+                        $room->id(),
+                        $selectedCatalogRoom,
+                        $request->stayPeriod()->nights(),
+                        false,
+                    );
+                } else {
+                    $selectedRoom = $this->map($room, false, $request->stayPeriod()->nights());
+                }
             }
 
             $result = $this->availability->search($request);
             $availableIds = $result->roomIds();
 
+            if (is_array($selectedCatalogRoom) && is_int($selectedRoomId)) {
+                $response = in_array($selectedRoomId, $availableIds, true)
+                    ? [$this->mapCatalogRoom(
+                        $selectedRoomId,
+                        $selectedCatalogRoom,
+                        $request->stayPeriod()->nights(),
+                        true,
+                    )]
+                    : [];
+                $selectedRoom['is_available'] = $response !== [];
+
+                return ['rooms' => $response, 'selectedRoom' => $selectedRoom];
+            }
+
             if ($roomSlug === null) {
                 if ($availableIds === []) {
                     return ['rooms' => [], 'selectedRoom' => null];
+                }
+
+                if ($enrich && $this->catalog !== null) {
+                    $catalogRooms = $this->catalog->service()->getManyByIds($availableIds);
+                    $response = [];
+                    foreach ($availableIds as $roomId) {
+                        $public = $catalogRooms[$roomId] ?? null;
+                        if (is_array($public)) {
+                            $response[] = $this->mapCatalogRoom(
+                                $roomId,
+                                $public,
+                                $request->stayPeriod()->nights(),
+                                true,
+                            );
+                        }
+                    }
+
+                    return ['rooms' => $response, 'selectedRoom' => null];
                 }
 
                 foreach ($this->rooms->findAllPublic() as $room) {
@@ -126,7 +174,7 @@ final class PublicAvailabilityService
                     continue;
                 }
 
-                $response[] = $this->map($room, true, $request->stayPeriod()->nights(), $enrich);
+                $response[] = $this->map($room, true, $request->stayPeriod()->nights());
             }
 
             if ($selectedRoom !== null) {
@@ -192,10 +240,32 @@ final class PublicAvailabilityService
         }
     }
 
-    /** @return array<string, mixed> */
-    private function map(Room $room, bool $available, int $nights, bool $enrich): array
+    /**
+     * @param array<string, mixed> $public
+     * @return array<string, mixed>
+     */
+    private function mapCatalogRoom(int $roomId, array $public, int $nights, bool $available): array
     {
-        $mapped = [
+        return [
+            'room_id' => $roomId,
+            'name' => $public['name'],
+            'slug' => $public['slug'],
+            'is_available' => $available,
+            'currency' => Booking::CURRENCY_NPR,
+            'price_per_night' => $public['pricePerNight'],
+            'room_type_name' => $public['roomTypeName'],
+            'capacity_adults' => $public['capacityAdults'],
+            'capacity_children' => $public['capacityChildren'],
+            'primary_image_url' => $public['primaryImageUrl'],
+            'amenities' => array_slice($public['amenities'], 0, 4),
+            'nights' => $nights,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function map(Room $room, bool $available, int $nights): array
+    {
+        return [
             'room_id' => $room->id(),
             'name' => $room->name(),
             'slug' => $room->slug(),
@@ -209,17 +279,6 @@ final class PublicAvailabilityService
             'amenities' => [],
             'nights' => $nights,
         ];
-
-        if ($enrich && $this->catalog !== null) {
-            $public = $this->catalog->service()->getById($room->id());
-            $mapped['room_type_name'] = $public['roomTypeName'];
-            $mapped['capacity_adults'] = $public['capacityAdults'];
-            $mapped['capacity_children'] = $public['capacityChildren'];
-            $mapped['primary_image_url'] = $public['primaryImageUrl'];
-            $mapped['amenities'] = array_slice($public['amenities'], 0, 4);
-        }
-
-        return $mapped;
     }
 
     /**
