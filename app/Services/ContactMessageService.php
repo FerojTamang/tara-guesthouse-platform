@@ -30,6 +30,7 @@ final readonly class ContactMessageService
         private ContactTransaction $transaction,
         private ContactReplyMailSender $mail,
         ?callable $clock = null,
+        private ?AdministratorEventNotifier $notifications = null,
     ) {
         $this->clock = Closure::fromCallable(
             $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable(
@@ -44,7 +45,7 @@ final readonly class ContactMessageService
         ?string $ipAddress,
         ?string $userAgent,
     ): ContactMessage {
-        return $this->transact(function () use ($request, $ipAddress, $userAgent): ContactMessage {
+        $contact = $this->transact(function () use ($request, $ipAddress, $userAgent): ContactMessage {
             $contact = $this->contacts->create(
                 $request->name(),
                 $request->email(),
@@ -68,6 +69,10 @@ final readonly class ContactMessageService
 
             return $contact;
         });
+
+        $this->deliverAdministratorNotification($contact);
+
+        return $contact;
     }
 
     /** @return list<ContactMessage> */
@@ -296,6 +301,19 @@ final readonly class ContactMessageService
 
             return $updated;
         });
+    }
+
+    private function deliverAdministratorNotification(ContactMessage $contact): void
+    {
+        if (!$this->notifications instanceof AdministratorEventNotifier) {
+            return;
+        }
+
+        try {
+            $this->notifications->contactMessageReceived($contact);
+        } catch (Throwable) {
+            error_log('Contact post-commit Administrator notification delivery failed.');
+        }
     }
 
     private function normalizeSearch(?string $search): ?string

@@ -10,6 +10,7 @@ use App\Models\IssuedReviewInvitation;
 use App\Models\Payment;
 use App\Requests\GuestBookingRequest;
 use App\Services\BookingAccessToken;
+use App\Services\AdministratorEventNotifier;
 use App\Services\BookingSubmissionWorkflow;
 use App\Services\BookingSubmitter;
 use App\Services\TransactionalMailDispatcher;
@@ -48,6 +49,25 @@ final class BookingSubmissionWorkflowTest extends TestCase
         self::assertSame($submitter->booking, $mail->booking);
         self::assertTrue($mail->submissionHadCompleted);
         self::assertSame(1, $mail->calls);
+    }
+
+
+    public function testAdministratorNotificationRunsAfterSubmissionAndCannotChangeTheResult(): void
+    {
+        $submitter = new WorkflowSubmitterFake();
+        $notifications = new BookingWorkflowAdministratorNotifierFake($submitter);
+        $notifications->failure = new \RuntimeException('private notification failure');
+        $result = (new BookingSubmissionWorkflow(
+            $submitter,
+            new BookingAccessToken(str_repeat('k', 32)),
+            null,
+            $notifications,
+        ))->submit(self::request());
+
+        self::assertSame($submitter->booking, $result->booking());
+        self::assertSame($submitter->booking, $notifications->booking);
+        self::assertTrue($notifications->submissionHadCompleted);
+        self::assertSame(1, $notifications->calls);
     }
 
     public function testDomainFailuresArePreserved(): void
@@ -174,6 +194,42 @@ final class BookingWorkflowMailDispatcherFake implements TransactionalMailDispat
     }
 
     public function reviewInvitation(Booking $booking, IssuedReviewInvitation $invitation): void
+    {
+    }
+}
+
+
+final class BookingWorkflowAdministratorNotifierFake implements AdministratorEventNotifier
+{
+    public ?Booking $booking = null;
+    public int $calls = 0;
+    public bool $submissionHadCompleted = false;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly WorkflowSubmitterFake $submitter)
+    {
+    }
+
+    public function bookingReceived(Booking $booking): void
+    {
+        $this->calls++;
+        $this->booking = $booking;
+        $this->submissionHadCompleted = $this->submitter->completed;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function contactMessageReceived(\App\Models\ContactMessage $contact): void
+    {
+    }
+
+    public function paymentSubmitted(Booking $booking, Payment $payment): void
+    {
+    }
+
+    public function reviewSubmitted(\App\Models\Review $review): void
     {
     }
 }

@@ -13,6 +13,7 @@ use App\Repositories\ContactMessageRepository;
 use App\Requests\AdministratorContactReplyRequest;
 use App\Requests\AdministratorContactStatusRequest;
 use App\Requests\ContactMessageRequest;
+use App\Services\AdministratorEventNotifier;
 use App\Services\ContactMessageService;
 use App\Services\ContactTransaction;
 use App\Services\ContactReplyMailSender;
@@ -56,6 +57,30 @@ final class ContactMessageServiceTest extends TestCase
         self::assertCount(1, $this->audit->entries);
         self::assertSame('contact_message_submitted', $this->audit->entries[0]->eventType());
         self::assertSame('00:00:00', $contact->createdAt()->format('H:i:s'));
+    }
+
+
+    public function testSubmissionNotificationRunsAfterCommitAndFailureDoesNotRollBackContact(): void
+    {
+        $notifications = new ContactAdministratorNotifierFake($this->transaction);
+        $notifications->failure = new \RuntimeException('private notification failure');
+        $service = new ContactMessageService(
+            $this->contacts,
+            $this->audit,
+            $this->transaction,
+            $this->mail,
+            static fn (): DateTimeImmutable => new DateTimeImmutable('2026-08-04 00:00:00 UTC'),
+            $notifications,
+        );
+
+        $contact = $service->submit(self::request(), null, null);
+
+        self::assertSame(1, $contact->id());
+        self::assertSame(1, $this->transaction->commitCalls);
+        self::assertSame(0, $this->transaction->rollbackCalls);
+        self::assertSame($contact, $notifications->contact);
+        self::assertTrue($notifications->commitHadCompleted);
+        self::assertSame(1, $notifications->calls);
     }
 
     public function testSuccessfulReplyIsSentThenRetainedAndMarksInquiryReplied(): void
@@ -300,5 +325,41 @@ final class ContactServiceMailFake implements ContactReplyMailSender
         $this->recipient = $contact->email();
         $this->body = $replyBody;
         return $this->deliver;
+    }
+}
+
+
+final class ContactAdministratorNotifierFake implements AdministratorEventNotifier
+{
+    public ?ContactMessage $contact = null;
+    public int $calls = 0;
+    public bool $commitHadCompleted = false;
+    public ?\Throwable $failure = null;
+
+    public function __construct(private readonly ContactServiceTransactionFake $transaction)
+    {
+    }
+
+    public function bookingReceived(\App\Models\Booking $booking): void
+    {
+    }
+
+    public function contactMessageReceived(ContactMessage $contact): void
+    {
+        $this->calls++;
+        $this->contact = $contact;
+        $this->commitHadCompleted = $this->transaction->commitCalls > 0;
+
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+    }
+
+    public function paymentSubmitted(\App\Models\Booking $booking, \App\Models\Payment $payment): void
+    {
+    }
+
+    public function reviewSubmitted(\App\Models\Review $review): void
+    {
     }
 }

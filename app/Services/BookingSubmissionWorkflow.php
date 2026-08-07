@@ -16,6 +16,7 @@ final readonly class BookingSubmissionWorkflow
         private BookingSubmitter $bookings,
         private BookingAccessToken $tokens,
         private ?TransactionalMailDispatcher $mail = null,
+        private ?AdministratorEventNotifier $notifications = null,
     ) {
     }
 
@@ -33,6 +34,7 @@ final readonly class BookingSubmissionWorkflow
                 $booking,
                 $this->tokens->issue($booking->bookingReference(), $deadline),
             );
+            $this->deliverAdministratorNotification($booking);
             $this->deliverBookingReceived($booking);
 
             return $result;
@@ -40,6 +42,19 @@ final readonly class BookingSubmissionWorkflow
             throw $exception;
         } catch (Throwable $failure) {
             throw BookingException::failure($failure);
+        }
+    }
+
+    private function deliverAdministratorNotification(Booking $booking): void
+    {
+        if (!$this->notifications instanceof AdministratorEventNotifier) {
+            return;
+        }
+
+        try {
+            $this->notifications->bookingReceived($booking);
+        } catch (Throwable) {
+            error_log('Booking post-commit Administrator notification delivery failed.');
         }
     }
 

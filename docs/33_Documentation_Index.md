@@ -80,6 +80,7 @@ These files support, but do not alter, the preserved 38-document numbering:
 | `44_Sprint_4_Operations_Content_Implementation_Plan.md` | Approved Sprint 4 Operations and Content scope, ticket sequence, decision gates, and incremental GitHub delivery workflow | Implementation executed locally; S4-019 closure pending |
 | `45_Sprint_4_QA_Closure_Report.md` | Executed Sprint 4 Operations and Content QA evidence and closure verdict | Ready for final local closure gates |
 | `46_Sprint_5_Dashboard_Hardening_Deployment_Implementation_Plan.md` | Proposed Sprint 5 dashboard, hardening, deployment, and closure sequence | Approval required; S5-001 |
+| `47_Phase_6_UAT_Execution_Plan.md` | Reproducible Version 1 public/Administrator UAT scenarios, evidence rules, defect handling, and approval record | Ready for S6-007 execution |
 | `archive/22_PreDecision_State_Machine_Proposals.md` | Historical pre-decision state proposals | Archived; not an implementation source |
 
 # 5. Recommended Reading Order

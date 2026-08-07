@@ -36,6 +36,7 @@ final class GuestPaymentSubmissionService implements GuestPaymentSubmitter
         private readonly BookingTransaction $transaction,
         ?callable $clock = null,
         private readonly ?TransactionalMailDispatcher $mail = null,
+        private readonly ?AdministratorEventNotifier $notifications = null,
     ) {
         $this->clock = $clock === null
             ? static fn (): DateTimeImmutable => new DateTimeImmutable(
@@ -106,6 +107,7 @@ final class GuestPaymentSubmissionService implements GuestPaymentSubmitter
 
             $commitAttempted = true;
             $this->transaction->commit();
+            $this->deliverAdministratorNotification($booking, $payment);
             $this->deliverPaymentSubmitted($booking, $payment);
 
             return $payment;
@@ -141,6 +143,20 @@ final class GuestPaymentSubmissionService implements GuestPaymentSubmitter
             }
 
             throw $safeFailure;
+        }
+    }
+
+
+    private function deliverAdministratorNotification(Booking $booking, Payment $payment): void
+    {
+        if (!$this->notifications instanceof AdministratorEventNotifier) {
+            return;
+        }
+
+        try {
+            $this->notifications->paymentSubmitted($booking, $payment);
+        } catch (Throwable) {
+            error_log('Payment post-commit Administrator notification delivery failed.');
         }
     }
 

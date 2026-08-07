@@ -13,6 +13,7 @@ use App\Controllers\AdministratorBookingController;
 use App\Controllers\AdministratorCmsController;
 use App\Controllers\AdministratorContactController;
 use App\Repositories\PdoAdministratorDashboardMetricsRepository;
+use App\Repositories\PdoAdministratorNotificationRecipientRepository;
 use App\Controllers\AdministratorGalleryController;
 use App\Controllers\AdministratorInvoiceController;
 use App\Controllers\AdministratorNotificationController;
@@ -84,6 +85,7 @@ use App\Services\AdministratorBookingStatusService;
 use App\Services\AdministratorBookingStatusServiceProvider;
 use App\Services\AdministratorInvoiceService;
 use App\Services\AdministratorInvoiceServiceProvider;
+use App\Services\AdministratorEventNotificationService;
 use App\Services\AdministratorNotificationService;
 use App\Services\AdministratorNotificationServiceProvider;
 use App\Services\AdministratorNavigationService;
@@ -585,6 +587,10 @@ final class Bootstrap
                     new PdoAuditLogRepository($connection),
                     new PdoContactTransaction($connection),
                     $contactReplyMail,
+                    notifications: new AdministratorEventNotificationService(
+                        new PdoAdministratorNotificationRecipientRepository($connection),
+                        new AdministratorNotificationService(new PdoNotificationRepository($connection)),
+                    ),
                 );
             },
         );
@@ -727,6 +733,10 @@ final class Bootstrap
                     new PdoAuditLogRepository($connection),
                     new PdoReviewTransaction($connection),
                     new ReviewTokenHasher(),
+                    notifications: new AdministratorEventNotificationService(
+                        new PdoAdministratorNotificationRecipientRepository($connection),
+                        new AdministratorNotificationService(new PdoNotificationRepository($connection)),
+                    ),
                 );
             },
         );
@@ -853,6 +863,10 @@ final class Bootstrap
                     ),
                     new BookingAccessToken($accessTokenKey),
                     $mail,
+                    new AdministratorEventNotificationService(
+                        new PdoAdministratorNotificationRecipientRepository($connection),
+                        new AdministratorNotificationService(new PdoNotificationRepository($connection)),
+                    ),
                 );
             },
         );
@@ -902,6 +916,10 @@ final class Bootstrap
                     new PdoBookingTransaction($connection),
                     null,
                     $mail,
+                    new AdministratorEventNotificationService(
+                        new PdoAdministratorNotificationRecipientRepository($connection),
+                        new AdministratorNotificationService(new PdoNotificationRepository($connection)),
+                    ),
                 );
             },
         );

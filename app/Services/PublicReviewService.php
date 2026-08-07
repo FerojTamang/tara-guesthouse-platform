@@ -35,6 +35,7 @@ final readonly class PublicReviewService
         private ReviewTransaction $transaction,
         private ReviewTokenHasher $tokens,
         ?callable $clock = null,
+        private ?AdministratorEventNotifier $notifications = null,
     ) {
         $this->clock = Closure::fromCallable(
             $clock ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now', new DateTimeZone('UTC')),
@@ -89,7 +90,7 @@ final readonly class PublicReviewService
         ?string $ipAddress,
         ?string $userAgent,
     ): Review {
-        return $this->transact(function () use ($token, $request, $ipAddress, $userAgent): Review {
+        $review = $this->transact(function () use ($token, $request, $ipAddress, $userAgent): Review {
             $now = $this->now();
             $hash = $this->hashForLookup($token);
             $invitation = $this->invitations->lockByTokenHash($hash);
@@ -133,6 +134,23 @@ final readonly class PublicReviewService
 
             return $review;
         });
+
+        $this->deliverAdministratorNotification($review);
+
+        return $review;
+    }
+
+    private function deliverAdministratorNotification(Review $review): void
+    {
+        if (!$this->notifications instanceof AdministratorEventNotifier) {
+            return;
+        }
+
+        try {
+            $this->notifications->reviewSubmitted($review);
+        } catch (Throwable) {
+            error_log('Review post-commit Administrator notification delivery failed.');
+        }
     }
 
     private function requireEligibleInvitation(
