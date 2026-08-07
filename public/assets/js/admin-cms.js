@@ -451,7 +451,8 @@
         blocks.push(blockDefaults(add.value));
         add.value = '';
         render();
-        list.lastElementChild?.scrollIntoView({behavior: 'smooth', block: 'center'});
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        list.lastElementChild?.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'center'});
     });
 
     list.addEventListener('input', (event) => {

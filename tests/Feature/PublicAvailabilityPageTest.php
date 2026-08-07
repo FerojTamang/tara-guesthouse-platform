@@ -275,12 +275,50 @@ final class PublicAvailabilityPageTest extends TestCase
         self::assertStringContainsString('class="tg-availability-search-stage"', $response->body());
         self::assertStringContainsString('aria-describedby="availability-search-error"', $response->body());
         self::assertStringContainsString('Check-in date is invalid.', $response->body());
+        self::assertStringContainsString('href="#availability-check-in"', $response->body());
+        self::assertMatchesRegularExpression(
+            '/id="availability-check-in"[^>]*aria-invalid="true"[^>]*aria-describedby="availability-check-in-error"/',
+            $response->body(),
+        );
+        self::assertStringContainsString('id="availability-check-in-error"', $response->body());
+        self::assertDoesNotMatchRegularExpression(
+            '/id="availability-check-out"[^>]*aria-invalid="true"/',
+            $response->body(),
+        );
         self::assertStringContainsString(
             'value="&lt;script&gt;bad&lt;/script&gt;"',
             $response->body(),
         );
         self::assertStringNotContainsString('<script>bad</script>', $response->body());
         self::assertStringNotContainsString('Available rooms', $response->body());
+    }
+
+    public function testOccupancyValidationMarksOnlyTheAffectedAvailabilityField(): void
+    {
+        $response = $this->router->dispatch(Request::create(
+            'GET',
+            '/availability',
+            [
+                'check_in' => '2026-08-10',
+                'check_out' => '2026-08-12',
+                'adults' => '0',
+                'children' => '0',
+            ],
+        ));
+
+        self::assertSame(422, $response->statusCode());
+        self::assertStringContainsString('Adults is invalid.', $response->body());
+        self::assertStringContainsString('href="#availability-adults"', $response->body());
+        self::assertMatchesRegularExpression(
+            '/id="availability-adults"[^>]*aria-invalid="true"[^>]*aria-describedby="availability-adults-error"/',
+            $response->body(),
+        );
+        self::assertStringContainsString('id="availability-adults-error"', $response->body());
+        self::assertDoesNotMatchRegularExpression(
+            '/id="availability-check-in"[^>]*aria-invalid="true"/',
+            $response->body(),
+        );
+        self::assertSame(0, $this->availability->searchCalls);
     }
 
     public function testSystemFailureReturnsOnlyGeneric500(): void

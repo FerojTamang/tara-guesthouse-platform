@@ -6,6 +6,11 @@ $genericQuery = http_build_query([
     'children' => $values['children'],
 ], '', '&', PHP_QUERY_RFC3986);
 $selectedAvailableRoom = $selectedRoom !== null && $rooms !== [] ? $rooms[0] : null;
+$availabilityErrorField = is_string($errorField ?? null) ? $errorField : null;
+$availabilityCheckInError = $availabilityErrorField === 'availability-check-in' ? $error : null;
+$availabilityCheckOutError = $availabilityErrorField === 'availability-check-out' ? $error : null;
+$availabilityAdultsError = $availabilityErrorField === 'availability-adults' ? $error : null;
+$availabilityChildrenError = $availabilityErrorField === 'availability-children' ? $error : null;
 ?>
 <section class="tg-journey-hero" aria-labelledby="availability-heading"><div class="tg-container">
     <nav class="tg-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span aria-current="page">Availability</span></nav>
@@ -14,14 +19,14 @@ $selectedAvailableRoom = $selectedRoom !== null && $rooms !== [] ? $rooms[0] : n
 
 <div class="tg-container tg-journey-content">
     <div class="tg-availability-search-stage">
-        <?php if ($error !== null): ?><div id="availability-search-error" class="tg-alert tg-alert--error" role="alert" tabindex="-1"><strong>Please review your search.</strong><p><?= $e($error) ?></p></div><?php endif; ?>
+        <?php if ($error !== null): ?><div id="availability-search-error" class="tg-alert tg-alert--error" role="alert" tabindex="-1"><strong>Please review your search.</strong><p><?= $e($error) ?></p><?php if ($availabilityErrorField !== null): ?><a href="#<?= $e($availabilityErrorField) ?>">Go to the field that needs attention</a><?php endif; ?></div><?php endif; ?>
         <form method="get" action="/availability" class="tg-search-card tg-journey-form" aria-label="Availability search"<?= $error !== null ? ' aria-describedby="availability-search-error"' : '' ?>>
             <?php if ($values['room'] !== ''): ?><input type="hidden" name="room" value="<?= $e($values['room']) ?>"><?php endif; ?>
             <div class="tg-search-card__grid">
-                <div><label for="availability-check-in">Check-in date</label><input id="availability-check-in" name="check_in" type="date" value="<?= $e($values['checkIn']) ?>" required<?= $error !== null ? ' aria-invalid="true"' : '' ?>></div>
-                <div><label for="availability-check-out">Check-out date</label><input id="availability-check-out" name="check_out" type="date" value="<?= $e($values['checkOut']) ?>" required<?= $error !== null ? ' aria-invalid="true"' : '' ?>></div>
-                <div><label for="availability-adults">Adults</label><input id="availability-adults" name="adults" type="number" min="1" step="1" value="<?= $e($values['adults']) ?>" required></div>
-                <div><label for="availability-children">Children</label><input id="availability-children" name="children" type="number" min="0" step="1" value="<?= $e($values['children']) ?>" required></div>
+                <div><label for="availability-check-in">Check-in date</label><input id="availability-check-in" name="check_in" type="date" value="<?= $e($values['checkIn']) ?>" required<?= $availabilityCheckInError !== null ? ' aria-invalid="true" aria-describedby="availability-check-in-error"' : '' ?>><?php if ($availabilityCheckInError !== null): ?><p id="availability-check-in-error" class="tg-field-error"><?= $e($availabilityCheckInError) ?></p><?php endif; ?></div>
+                <div><label for="availability-check-out">Check-out date</label><input id="availability-check-out" name="check_out" type="date" value="<?= $e($values['checkOut']) ?>" required<?= $availabilityCheckOutError !== null ? ' aria-invalid="true" aria-describedby="availability-check-out-error"' : '' ?>><?php if ($availabilityCheckOutError !== null): ?><p id="availability-check-out-error" class="tg-field-error"><?= $e($availabilityCheckOutError) ?></p><?php endif; ?></div>
+                <div><label for="availability-adults">Adults</label><input id="availability-adults" name="adults" type="number" min="1" step="1" value="<?= $e($values['adults']) ?>" required<?= $availabilityAdultsError !== null ? ' aria-invalid="true" aria-describedby="availability-adults-error"' : '' ?>><?php if ($availabilityAdultsError !== null): ?><p id="availability-adults-error" class="tg-field-error"><?= $e($availabilityAdultsError) ?></p><?php endif; ?></div>
+                <div><label for="availability-children">Children</label><input id="availability-children" name="children" type="number" min="0" step="1" value="<?= $e($values['children']) ?>" required<?= $availabilityChildrenError !== null ? ' aria-invalid="true" aria-describedby="availability-children-error"' : '' ?>><?php if ($availabilityChildrenError !== null): ?><p id="availability-children-error" class="tg-field-error"><?= $e($availabilityChildrenError) ?></p><?php endif; ?></div>
                 <button class="tg-button tg-button--emerald" type="submit" data-ripple>Check availability</button>
             </div>
         </form>

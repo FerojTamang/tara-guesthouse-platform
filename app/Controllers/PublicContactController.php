@@ -72,11 +72,14 @@ final readonly class PublicContactController
             );
         } catch (ContactException $exception) {
             if ($exception->isValidationFailure()) {
+                $message = $exception->getMessage();
+
                 return $this->formResponse(
                     $values,
-                    $exception->getMessage(),
+                    $message,
                     false,
                     422,
+                    $this->errorField($message),
                 );
             }
 
@@ -246,11 +249,24 @@ final readonly class PublicContactController
         return $trim ? trim($value) : trim(str_replace(["\r\n", "\r"], "\n", $value));
     }
 
+    private function errorField(string $message): ?string
+    {
+        return match (true) {
+            str_starts_with($message, 'Name') => 'contact-name',
+            str_starts_with($message, 'Email') => 'contact-email',
+            str_starts_with($message, 'Phone') => 'contact-phone',
+            str_starts_with($message, 'Subject') => 'contact-subject',
+            str_starts_with($message, 'Message') => 'contact-message',
+            default => null,
+        };
+    }
+
     private function formResponse(
         array $values,
         ?string $error,
         bool $success,
         int $statusCode = 200,
+        ?string $errorField = null,
     ): Response {
         $html = $this->views->render(
             'public.contact.index',
@@ -260,6 +276,7 @@ final readonly class PublicContactController
                 'csrfToken' => $this->csrfTokens->token(),
                 'values' => $values,
                 'error' => $error,
+                'errorField' => $errorField,
                 'success' => $success,
             ],
             'layouts.base',

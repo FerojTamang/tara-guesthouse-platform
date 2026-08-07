@@ -245,6 +245,36 @@ final class PublicReviewExperienceTest extends TestCase
         self::assertStringNotContainsString('review_status', $invalid->body());
     }
 
+    public function testValidationAssociatesTheErrorWithOnlyTheAffectedReviewField(): void
+    {
+        $input = self::input();
+        $input['_csrf'] = $this->tokens->token();
+        $input['rating'] = '6';
+
+        $response = $this->router->dispatch(Request::create(
+            'POST',
+            '/review/' . $this->reviewToken,
+            input: $input,
+            remoteAddress: '203.0.113.64',
+        ));
+
+        self::assertSame(422, $response->statusCode());
+        self::assertSame([], $this->reviews->all());
+        self::assertStringContainsString('id="review-form-error"', $response->body());
+        self::assertStringContainsString('aria-describedby="review-form-error"', $response->body());
+        self::assertStringContainsString('href="#review-rating-1"', $response->body());
+        self::assertStringContainsString('id="review-rating-error"', $response->body());
+        self::assertMatchesRegularExpression(
+            '/id="review-rating-1"[^>]*aria-invalid="true"/',
+            $response->body(),
+        );
+        self::assertDoesNotMatchRegularExpression(
+            '/id="review-title"[^>]*aria-invalid="true"/',
+            $response->body(),
+        );
+        self::assertFalse($this->invitations->invitation()->isUsed());
+    }
+
     public function testInvalidTokenAndSixthAttemptFailWithoutSensitiveDetails(): void
     {
         $invalid = $this->router->dispatch(Request::create('GET', '/review/not-a-token'));

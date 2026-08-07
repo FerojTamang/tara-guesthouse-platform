@@ -155,12 +155,15 @@ final readonly class PublicAvailabilityController
             );
         } catch (AvailabilityException $exception) {
             if ($exception->isValidationFailure()) {
+                $message = $exception->getMessage();
+
                 return $this->pageResponse(
                     $values,
                     [],
-                    $exception->getMessage(),
+                    $message,
                     true,
                     422,
+                    errorField: $this->errorField($message),
                 );
             }
 
@@ -208,6 +211,17 @@ final readonly class PublicAvailabilityController
         return is_int($value) ? (string) $value : '';
     }
 
+    private function errorField(string $message): ?string
+    {
+        return match (true) {
+            str_starts_with($message, 'Check-in') => 'availability-check-in',
+            str_starts_with($message, 'Check-out') => 'availability-check-out',
+            str_starts_with($message, 'Adults') => 'availability-adults',
+            str_starts_with($message, 'Children') => 'availability-children',
+            default => null,
+        };
+    }
+
     /**
      * @param array{room: string, checkIn: string, checkOut: string, adults: string, children: string} $values
      * @param list<array<string, mixed>> $rooms
@@ -219,6 +233,7 @@ final readonly class PublicAvailabilityController
         bool $submitted,
         int $statusCode = 200,
         ?array $selectedRoom = null,
+        ?string $errorField = null,
     ): Response {
         if ($this->views === null) {
             return Response::text(
@@ -235,6 +250,7 @@ final readonly class PublicAvailabilityController
                 'values' => $values,
                 'rooms' => $rooms,
                 'error' => $error,
+                'errorField' => $errorField,
                 'submitted' => $submitted,
                 'selectedRoom' => $selectedRoom,
                 'isBookingFlow' => true,

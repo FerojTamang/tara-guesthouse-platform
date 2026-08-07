@@ -109,7 +109,8 @@
         const date = new Date(year, month - 1, day);
         return iso(date) === value ? date : null;
     };
-    const monthCount = () => window.matchMedia('(max-width: 991.98px)').matches ? 1 : 2;
+    const monthBreakpoint = window.matchMedia('(max-width: 991.98px)');
+    const monthCount = () => monthBreakpoint.matches ? 1 : 2;
     const isUnavailable = (value) => unavailableRanges.some((range) => value >= range.check_in && value < range.check_out);
     const selectedStart = () => parse(checkIn.value);
     const selectedEnd = () => parse(checkOut.value);
@@ -133,7 +134,7 @@
         section.append(title);
         const grid = document.createElement('div');
         grid.className = 'tg-calendar-grid';
-        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((label) => {
+        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach((label) => {
             const weekday = document.createElement('span');
             weekday.className = 'tg-calendar-weekday';
             weekday.textContent = label;
@@ -151,18 +152,29 @@
             button.type = 'button';
             button.className = 'tg-calendar-day';
             button.textContent = String(day.getDate());
-            button.setAttribute('aria-label', day.toLocaleDateString(undefined, { dateStyle: 'long' }));
-            const disabled = day < today || day >= maximum || isUnavailable(value);
+            const unavailable = isUnavailable(value);
+            const disabled = day < today || day >= maximum || unavailable;
             if (day.getTime() === today.getTime()) button.classList.add('is-today');
-            if (isUnavailable(value)) button.classList.add('is-unavailable');
+            if (unavailable) button.classList.add('is-unavailable');
             if (disabled) {
                 button.disabled = true;
                 button.classList.add('is-disabled');
             }
             const start = selectedStart();
             const finish = selectedEnd();
-            if ((start && value === iso(start)) || (finish && value === iso(finish))) button.classList.add('is-selected');
+            const isStart = start && value === iso(start);
+            const isFinish = finish && value === iso(finish);
+            if (isStart || isFinish) {
+                button.classList.add('is-selected');
+                button.setAttribute('aria-pressed', 'true');
+            }
             if (start && finish && day > start && day < finish) button.classList.add('is-in-range');
+            const accessibleLabel = [day.toLocaleDateString(undefined, { dateStyle: 'long' })];
+            if (unavailable) accessibleLabel.push('unavailable');
+            else if (disabled) accessibleLabel.push('not selectable');
+            if (isStart) accessibleLabel.push('selected check-in');
+            if (isFinish) accessibleLabel.push('selected check-out');
+            button.setAttribute('aria-label', accessibleLabel.join(', '));
             button.addEventListener('click', () => selectDate(day));
             grid.append(button);
         }
@@ -215,6 +227,12 @@
     next.addEventListener('click', () => { visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1); load(); });
     checkIn.addEventListener('change', render);
     checkOut.addEventListener('change', render);
+    const reloadForBreakpoint = () => load();
+    if (typeof monthBreakpoint.addEventListener === 'function') {
+        monthBreakpoint.addEventListener('change', reloadForBreakpoint);
+    } else if (typeof monthBreakpoint.addListener === 'function') {
+        monthBreakpoint.addListener(reloadForBreakpoint);
+    }
     render();
     load();
 })();

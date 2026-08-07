@@ -193,6 +193,11 @@ final class PublicRoomCatalogueTest extends TestCase
         self::assertStringContainsString('6 photos', $body);
         self::assertStringContainsString('View all photos', $body);
         self::assertStringContainsString('role="dialog" aria-modal="true"', $body);
+        self::assertStringContainsString(
+            'data-availability-calendar role="region" aria-labelledby="room-availability-calendar-heading"',
+            $body,
+        );
+        self::assertStringContainsString('id="room-availability-calendar-heading"', $body);
         self::assertStringContainsString('data-photo-previous', $body);
         self::assertStringContainsString('data-photo-next', $body);
         self::assertStringContainsString('/assets/js/pages/room-detail.js', $body);

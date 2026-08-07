@@ -1,3 +1,7 @@
+<?php
+$contactErrorField = is_string($errorField ?? null) ? $errorField : null;
+$contactFieldError = static fn (string $field): ?string => $error !== null && $contactErrorField === $field ? $error : null;
+?>
 <section class="container py-5" aria-labelledby="contact-heading">
     <div class="row g-5">
         <div class="col-lg-5">
@@ -43,15 +47,21 @@
             <?php endif; ?>
 
             <?php if ($error !== null): ?>
-                <div class="alert alert-danger" role="alert"><?= $e($error) ?></div>
+                <div id="contact-form-error" class="alert alert-danger" role="alert">
+                    <?= $e($error) ?>
+                    <?php if ($contactErrorField !== null): ?>
+                        <a class="alert-link d-block mt-2" href="#<?= $e($contactErrorField) ?>">Go to the field that needs attention</a>
+                    <?php endif; ?>
+                </div>
             <?php endif; ?>
 
-            <form method="post" action="/contact" class="card border-0 shadow-sm" novalidate>
+            <form method="post" action="/contact" class="card border-0 shadow-sm" novalidate<?= $error !== null ? ' aria-describedby="contact-form-error"' : '' ?>>
                 <div class="card-body p-4">
                     <input type="hidden" name="_csrf" value="<?= $e($csrfToken) ?>">
 
                     <div class="row g-3">
                         <div class="col-md-6">
+                            <?php $fieldError = $contactFieldError('contact-name'); ?>
                             <label for="contact-name" class="form-label">Name</label>
                             <input
                                 id="contact-name"
@@ -60,13 +70,16 @@
                                 minlength="2"
                                 maxlength="100"
                                 autocomplete="name"
-                                class="form-control"
+                                class="form-control<?= $fieldError !== null ? ' is-invalid' : '' ?>"
                                 value="<?= $e($values['name']) ?>"
                                 required
+                                <?= $fieldError !== null ? 'aria-invalid="true" aria-describedby="contact-name-error"' : '' ?>
                             >
+                            <?php if ($fieldError !== null): ?><div id="contact-name-error" class="invalid-feedback"><?= $e($fieldError) ?></div><?php endif; ?>
                         </div>
 
                         <div class="col-md-6">
+                            <?php $fieldError = $contactFieldError('contact-email'); ?>
                             <label for="contact-email" class="form-label">Email</label>
                             <input
                                 id="contact-email"
@@ -74,13 +87,16 @@
                                 type="email"
                                 maxlength="150"
                                 autocomplete="email"
-                                class="form-control"
+                                class="form-control<?= $fieldError !== null ? ' is-invalid' : '' ?>"
                                 value="<?= $e($values['email']) ?>"
                                 required
+                                <?= $fieldError !== null ? 'aria-invalid="true" aria-describedby="contact-email-error"' : '' ?>
                             >
+                            <?php if ($fieldError !== null): ?><div id="contact-email-error" class="invalid-feedback"><?= $e($fieldError) ?></div><?php endif; ?>
                         </div>
 
                         <div class="col-12">
+                            <?php $fieldError = $contactFieldError('contact-phone'); ?>
                             <label for="contact-phone" class="form-label">
                                 Phone <span class="text-secondary">(optional)</span>
                             </label>
@@ -90,12 +106,15 @@
                                 type="tel"
                                 maxlength="20"
                                 autocomplete="tel"
-                                class="form-control"
+                                class="form-control<?= $fieldError !== null ? ' is-invalid' : '' ?>"
                                 value="<?= $e($values['phone']) ?>"
+                                <?= $fieldError !== null ? 'aria-invalid="true" aria-describedby="contact-phone-error"' : '' ?>
                             >
+                            <?php if ($fieldError !== null): ?><div id="contact-phone-error" class="invalid-feedback"><?= $e($fieldError) ?></div><?php endif; ?>
                         </div>
 
                         <div class="col-12">
+                            <?php $fieldError = $contactFieldError('contact-subject'); ?>
                             <label for="contact-subject" class="form-label">Subject</label>
                             <input
                                 id="contact-subject"
@@ -103,13 +122,16 @@
                                 type="text"
                                 minlength="3"
                                 maxlength="200"
-                                class="form-control"
+                                class="form-control<?= $fieldError !== null ? ' is-invalid' : '' ?>"
                                 value="<?= $e($values['subject']) ?>"
                                 required
+                                <?= $fieldError !== null ? 'aria-invalid="true" aria-describedby="contact-subject-error"' : '' ?>
                             >
+                            <?php if ($fieldError !== null): ?><div id="contact-subject-error" class="invalid-feedback"><?= $e($fieldError) ?></div><?php endif; ?>
                         </div>
 
                         <div class="col-12">
+                            <?php $fieldError = $contactFieldError('contact-message'); ?>
                             <label for="contact-message" class="form-label">Message</label>
                             <textarea
                                 id="contact-message"
@@ -117,9 +139,11 @@
                                 rows="7"
                                 minlength="10"
                                 maxlength="5000"
-                                class="form-control"
+                                class="form-control<?= $fieldError !== null ? ' is-invalid' : '' ?>"
                                 required
+                                <?= $fieldError !== null ? 'aria-invalid="true" aria-describedby="contact-message-error"' : '' ?>
                             ><?= $e($values['message']) ?></textarea>
+                            <?php if ($fieldError !== null): ?><div id="contact-message-error" class="invalid-feedback"><?= $e($fieldError) ?></div><?php endif; ?>
                         </div>
                     </div>
                 </div>

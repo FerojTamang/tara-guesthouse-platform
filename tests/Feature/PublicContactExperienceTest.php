@@ -138,6 +138,36 @@ final class PublicContactExperienceTest extends TestCase
         self::assertStringNotContainsString('Your message has been received.', $refresh->body());
     }
 
+    public function testValidationAssociatesTheErrorWithOnlyTheAffectedContactField(): void
+    {
+        $input = self::input();
+        $input['_csrf'] = $this->tokens->token();
+        $input['email'] = 'not-an-email';
+
+        $response = $this->router->dispatch(Request::create(
+            'POST',
+            '/contact',
+            input: $input,
+            remoteAddress: '203.0.113.24',
+        ));
+
+        self::assertSame(422, $response->statusCode());
+        self::assertSame([], $this->repository->messages);
+        self::assertStringContainsString('id="contact-form-error"', $response->body());
+        self::assertStringContainsString('aria-describedby="contact-form-error"', $response->body());
+        self::assertStringContainsString('href="#contact-email"', $response->body());
+        self::assertMatchesRegularExpression(
+            '/id="contact-email"[^>]*aria-invalid="true"[^>]*aria-describedby="contact-email-error"/',
+            $response->body(),
+        );
+        self::assertStringContainsString('id="contact-email-error"', $response->body());
+        self::assertDoesNotMatchRegularExpression(
+            '/id="contact-name"[^>]*aria-invalid="true"/',
+            $response->body(),
+        );
+        self::assertStringContainsString('value="not-an-email"', $response->body());
+    }
+
     public function testJsonApiReturnsOnlyReceiptIdentifierAndRejectsUnsupportedPayload(): void
     {
         $payload = self::input();

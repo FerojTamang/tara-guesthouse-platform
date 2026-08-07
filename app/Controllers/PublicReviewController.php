@@ -99,11 +99,14 @@ final readonly class PublicReviewController
             return Response::redirect('/reviews', 303, $this->tokenHeaders());
         } catch (ReviewException $exception) {
             if ($exception->isValidationFailure()) {
+                $message = $exception->getMessage();
+
                 return $this->submissionForm(
                     $token,
                     $values,
-                    $exception->getMessage(),
+                    $message,
                     422,
+                    $this->errorField($message),
                 );
             }
 
@@ -280,12 +283,23 @@ final readonly class PublicReviewController
         return $trim ? trim($display) : trim(str_replace(["\r\n", "\r"], "\n", $display));
     }
 
+    private function errorField(string $message): ?string
+    {
+        return match (true) {
+            str_starts_with($message, 'Rating') => 'review-rating',
+            str_starts_with($message, 'Title') => 'review-title',
+            str_starts_with($message, 'Comment') => 'review-comment',
+            default => null,
+        };
+    }
+
     /** @param array{rating: string, title: string, comment: string} $values */
     private function submissionForm(
         string $token,
         array $values,
         ?string $error,
         int $statusCode = 200,
+        ?string $errorField = null,
     ): Response {
         $html = $this->views->render(
             'public.reviews.submit',
@@ -295,6 +309,7 @@ final readonly class PublicReviewController
                 'reviewToken' => $token,
                 'values' => $values,
                 'error' => $error,
+                'errorField' => $errorField,
                 'showPublicNavigation' => false,
             ],
             'layouts.base',

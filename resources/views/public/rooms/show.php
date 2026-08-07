@@ -111,8 +111,8 @@ $displayImageCount = count($displayImages);
         <aside class="tg-reservation-card" aria-labelledby="room-availability-title" data-availability-card>
             <p class="tg-eyebrow">Plan your stay</p><h2 id="room-availability-title">Check this room</h2><p class="tg-reservation-card__rate"><strong>NPR <?= $e($room['pricePerNight']) ?></strong> per night</p>
             <p class="tg-availability-state<?= $availabilityResult === 'available' ? ' is-available' : ($availabilityResult === 'unavailable' ? ' is-unavailable' : '') ?>" data-availability-state aria-live="polite"><?= $availabilityResult === 'available' ? 'Available for your selected stay.' : ($availabilityResult === 'unavailable' ? 'Not available for these dates.' : 'Select your dates to check this room.') ?></p>
-            <div class="tg-inline-calendar" data-availability-calendar aria-label="Room availability calendar">
-                <div class="tg-inline-calendar__toolbar"><button type="button" data-calendar-previous aria-label="Previous month">&#8592;</button><strong data-calendar-heading>Availability calendar</strong><button type="button" data-calendar-next aria-label="Next month">&#8594;</button></div>
+            <div class="tg-inline-calendar" data-availability-calendar role="region" aria-labelledby="room-availability-calendar-heading">
+                <div class="tg-inline-calendar__toolbar"><button type="button" data-calendar-previous aria-label="Previous month">&#8592;</button><strong id="room-availability-calendar-heading" data-calendar-heading>Availability calendar</strong><button type="button" data-calendar-next aria-label="Next month">&#8594;</button></div>
                 <div class="tg-inline-calendar__months" data-calendar-months><p>Use the date fields below to choose your stay. Calendar details load when JavaScript is available.</p></div>
                 <div class="tg-inline-calendar__legend"><span><i class="is-available"></i>Available</span><span><i class="is-unavailable"></i>Unavailable</span><span><i class="is-selected"></i>Selected</span></div>
                 <p class="tg-inline-calendar__message" data-calendar-message aria-live="polite"></p>

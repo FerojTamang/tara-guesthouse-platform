@@ -302,6 +302,17 @@ final class PublicBookingPageTest extends TestCase
             $validation->body(),
         );
         self::assertStringContainsString('href="#guest_email"', $validation->body());
+        self::assertStringContainsString('id="booking-form-error"', $validation->body());
+        self::assertStringContainsString('aria-describedby="booking-form-error"', $validation->body());
+        self::assertMatchesRegularExpression(
+            '/id="guest_email"[^>]*aria-invalid="true"[^>]*aria-describedby="guest_email_error"/',
+            $validation->body(),
+        );
+        self::assertStringContainsString('id="guest_email_error"', $validation->body());
+        self::assertDoesNotMatchRegularExpression(
+            '/id="guest_phone"[^>]*aria-invalid="true"/',
+            $validation->body(),
+        );
         self::assertStringContainsString('Deluxe Garden Room', $validation->body());
 
         $this->submitter->failure = BookingException::roomUnavailable();
